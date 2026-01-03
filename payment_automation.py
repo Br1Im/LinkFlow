@@ -1,5 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
@@ -434,55 +435,77 @@ def create_payment_link(card_number, owner_name, amount, account_index=0):
                 break
             time.sleep(0.2)
 
+        print(f"[{time.time()-start_time:.1f}s] Ищу кнопку Оплатить...", flush=True)
+        
+        try:
+            submit_btn = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input.button.button--green[name='SubmitBtn']")))
+            print(f"[{time.time()-start_time:.1f}s] Кнопка найдена по CSS", flush=True)
+        except:
+            submit_btn = wait.until(EC.presence_of_element_located((By.NAME, "SubmitBtn")))
+            print(f"[{time.time()-start_time:.1f}s] Кнопка найдена по NAME", flush=True)
+        
         print(f"[{time.time()-start_time:.1f}s] Ожидаю активацию кнопки...", flush=True)
-        submit_btn = wait.until(EC.presence_of_element_located((By.NAME, "SubmitBtn")))
         for i in range(30):
             if not submit_btn.get_attribute("disabled"):
                 print(f"[{time.time()-start_time:.1f}s] ✅ Кнопка активна!", flush=True)
                 break
             time.sleep(0.3)
-
-        print(f"[{time.time()-start_time:.1f}s] Нажимаю Оплатить...", flush=True)
         
-        try:
-            driver.execute_script("arguments[0].scrollIntoView(true);", submit_btn)
-            time.sleep(0.3)
-        except:
-            pass
-        
-        try:
-            ActionChains(driver).move_to_element(submit_btn).click().perform()
-            print(f"[{time.time()-start_time:.1f}s] Клик выполнен (ActionChains)", flush=True)
-        except Exception as e1:
-            print(f"[{time.time()-start_time:.1f}s] ActionChains не сработал: {e1}", flush=True)
+        print(f"[{time.time()-start_time:.1f}s] Финальное ожидание loader...", flush=True)
+        time.sleep(1)
+        for check_attempt in range(20):
             try:
-                submit_btn.click()
-                print(f"[{time.time()-start_time:.1f}s] Клик выполнен (обычный)", flush=True)
-            except Exception as e2:
-                print(f"[{time.time()-start_time:.1f}s] Обычный клик не сработал: {e2}", flush=True)
-                driver.execute_script("arguments[0].click();", submit_btn)
-                print(f"[{time.time()-start_time:.1f}s] Клик выполнен (JS)", flush=True)
+                loader = driver.find_element(By.ID, "loadercontainer")
+                style = loader.get_attribute("style")
+                is_visible = loader.is_displayed()
+                if "display: none" in style and not is_visible:
+                    print(f"[{time.time()-start_time:.1f}s] Loader точно скрыт!", flush=True)
+                    break
+                if check_attempt % 5 == 0:
+                    print(f"[{time.time()-start_time:.1f}s] Loader еще виден, ждем... ({check_attempt+1}/20)", flush=True)
+            except:
+                break
+            time.sleep(0.3)
+        
+        wait.until(EC.invisibility_of_element_located((By.ID, "loadercontainer")))
+        print(f"[{time.time()-start_time:.1f}s] Кликаю на кнопку Оплатить...", flush=True)
+        driver.execute_script("arguments[0].click();", submit_btn)
+        print(f"[{time.time()-start_time:.1f}s] ✅ Клик выполнен!", flush=True)
         
         print(f"[{time.time()-start_time:.1f}s] Ожидаю обработку платежа...", flush=True)
-        time.sleep(1.5)
+        time.sleep(2)
+        
+        print(f"[{time.time()-start_time:.1f}s] Проверяю состояние страницы...", flush=True)
+        try:
+            page_source_snippet = driver.page_source[:500]
+            print(f"[{time.time()-start_time:.1f}s] HTML начало: {page_source_snippet[:200]}", flush=True)
+        except:
+            pass
         
         for attempt in range(40):
             try:
                 loader = driver.find_element(By.ID, "loadercontainer")
                 style = loader.get_attribute("style")
-                if "display: none" in style or not loader.is_displayed():
+                is_visible = loader.is_displayed()
+                
+                if attempt == 0:
+                    print(f"[{time.time()-start_time:.1f}s] Loader style: {style}, visible: {is_visible}", flush=True)
+                
+                if "display: none" in style or not is_visible:
                     print(f"[{time.time()-start_time:.1f}s] Платёж обработан", flush=True)
                     break
                 if attempt % 10 == 0 and attempt > 0:
                     print(f"[{time.time()-start_time:.1f}s] Ожидаю... (попытка {attempt+1}/40)", flush=True)
-            except:
+            except Exception as e:
+                if attempt == 0:
+                    print(f"[{time.time()-start_time:.1f}s] Loader не найден: {e}", flush=True)
                 break
             time.sleep(0.3)
 
         print(f"[{time.time()-start_time:.1f}s] Ищу QR-код...", flush=True)
         
         qr_img = None
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 qr_img = wait.until(EC.presence_of_element_located((By.ID, "Image1")))
                 print(f"[{time.time()-start_time:.1f}s] QR-код найден!", flush=True)
@@ -649,7 +672,7 @@ def create_payment_link(card_number, owner_name, amount, account_index=0):
             time.sleep(0.2)
 
         print(f"[{time.time()-start_time:.1f}s] Ожидаю QR-код...", flush=True)
-        wait_long = WebDriverWait(driver, 15)
+        wait_long = WebDriverWait(driver, 30)
         qr_img = wait_long.until(EC.presence_of_element_located((By.ID, "Image1")))
         qr_code_base64 = qr_img.get_attribute("src")
 
