@@ -7,7 +7,7 @@
 
 import sys
 import time
-from payment_automation import create_payment_link
+from payment_service import warmup_for_user, create_payment_fast
 from database import db
 
 def test_payment(amount=5000):
@@ -31,13 +31,20 @@ def test_payment(amount=5000):
     print(f"   Владелец: {requisite['owner_name']}")
     print(f"   Сумма: {amount} руб.\n")
     
+    # Прогрев браузера
+    print("🔥 Прогреваю браузер...")
+    warmup_result = warmup_for_user(0)
+    
+    if not warmup_result.get('success'):
+        print(f"❌ Прогрев не удался: {warmup_result.get('error')}")
+        return False
+    
+    print("✅ Браузер прогрет!\n")
+    
     start_time = time.time()
     
-    result = create_payment_link(
-        card_number=requisite['card_number'],
-        owner_name=requisite['owner_name'],
-        amount=amount
-    )
+    # Создание платежа
+    result = create_payment_fast(amount)
     
     elapsed = time.time() - start_time
     
@@ -55,15 +62,6 @@ def test_payment(amount=5000):
         print(f"⏱️  Время генерации: {result['elapsed_time']:.1f} сек")
         print(f"🔗 Ссылка: {result['payment_link']}")
         print(f"📱 Аккаунт: {result['account_used']}")
-        print(f"🖼️  QR-код: {result['qr_file']}")
-        
-        # Удаляем QR-код после теста
-        import os
-        try:
-            os.remove(result['qr_file'])
-            print(f"🗑️  QR-код удален")
-        except:
-            pass
         
         return True
 
@@ -85,5 +83,9 @@ if __name__ == "__main__":
     
     # Запускаем тест
     success = test_payment(amount)
+    
+    # Закрываем браузер
+    from payment_service import close_browser
+    close_browser()
     
     sys.exit(0 if success else 1)

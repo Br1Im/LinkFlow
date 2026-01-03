@@ -7,9 +7,11 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, 
     filters, ContextTypes, ConversationHandler, CallbackQueryHandler
 )
-from payment_automation import create_payment_link
 from database import db
 from keyboards import *
+from config import BOT_TOKEN
+from payment_service import warmup_for_user, create_payment_fast, is_browser_ready
+from payment_automation import login_account
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -260,7 +262,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await query.edit_message_text("🔄 Выполняю вход в аккаунты...\n\nЭто может занять 30-60 секунд")
         
-        from payment_automation import login_account
         import asyncio
         
         results = []
@@ -389,7 +390,6 @@ async def add_account_password_handler(update: Update, context: ContextTypes.DEF
         "Это может занять 20-30 секунд"
     )
     
-    from payment_automation import login_account
     import asyncio
     
     account = db.get_account(index)
@@ -477,10 +477,24 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data.clear()
     
-    await update.message.reply_text(
-        "💰 Создание ссылки для оплаты\n\n"
-        "Введите сумму (1000-100000 руб.):"
-    )
+    # 🔥 ПРОГРЕВ БРАУЗЕРА пока пользователь вводит сумму
+    warmup_msg = await update.message.reply_text("🔥 Подготавливаю систему...")
+    
+    loop = asyncio.get_event_loop()
+    warmup_result = await loop.run_in_executor(None, warmup_for_user, user_id)
+    
+    if warmup_result.get('success'):
+        await warmup_msg.edit_text(
+            "💰 Создание ссылки для оплаты\n\n"
+            "✅ Система готова!\n"
+            "Введите сумму (1000-100000 руб.):"
+        )
+    else:
+        await warmup_msg.edit_text(
+            "💰 Создание ссылки для оплаты\n\n"
+            "⚠️ Прогрев не удался, но можно продолжить\n"
+            "Введите сумму (1000-100000 руб.):"
+        )
     
     return AMOUNT
 
@@ -491,9 +505,6 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     text = update.message.text.strip()
     user_id = update.effective_user.id
-    
-    print(f"Текст: {text}", flush=True)
-    print(f"User ID: {user_id}", flush=True)
     
     try:
         amount_value = float(text)
@@ -521,25 +532,66 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     status_msg = await update.message.reply_text(
         "⏳ Создаю платёжную ссылку...\n\n"
-        "Это займёт 5-10 секунд"
+        "Это займёт 3-5 секунд"
     )
     
     start_time = time.time()
+    payment_sent = False
     
-    try:
-        from payment_automation import create_payment_link
+    # Callback для МГНОВЕННОЙ отправки
+    async def send_to_user(payment_link, qr_file_path):
+        nonlocal payment_sent
+        if payment_sent:
+            return
+        payment_sent = True
         
-        loop = asyncio.get_event_loop()
+        elapsed = time.time() - start_time
         
-        result = await loop.run_in_executor(
-            None, 
-            create_payment_link, 
-            requisite['card_number'], 
-            requisite['owner_name'], 
-            text
+        payment_id = db.add_payment(
+            admin_id=user_id,
+            card_number=requisite['card_number'],
+            owner_name=requisite['owner_name'],
+            amount=float(text),
+            payment_link=payment_link
         )
         
-        if "error" in result:
+        await status_msg.delete()
+        
+        response = (
+            f"✅ Платёж #{payment_id} создан!\n\n"
+            f"💳 Карта: {requisite['card_number']}\n"
+            f"👤 Владелец: {requisite['owner_name']}\n"
+            f"💰 Сумма: {text} руб.\n"
+            f"⏱ Время: {elapsed:.1f} сек\n\n"
+            f"🔗 {payment_link}"
+        )
+        
+        with open(qr_file_path, 'rb') as qr_file:
+            await update.message.reply_photo(photo=qr_file, caption=response)
+        
+        try:
+            os.remove(qr_file_path)
+        except:
+            pass
+    
+    try:
+        loop = asyncio.get_event_loop()
+        
+        # Создаем wrapper для callback
+        def sync_callback(payment_link, qr_file_path):
+            asyncio.run_coroutine_threadsafe(
+                send_to_user(payment_link, qr_file_path),
+                loop
+            )
+        
+        result = await loop.run_in_executor(
+            None,
+            create_payment_fast,
+            text,
+            sync_callback
+        )
+        
+        if "error" in result and not payment_sent:
             elapsed_time = result.get('elapsed_time', time.time() - start_time)
             await status_msg.edit_text(
                 f"❌ Ошибка при создании платежа\n\n"
@@ -547,55 +599,24 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"⏱ Время: {elapsed_time:.1f} сек\n\n"
                 f"Попробуйте ещё раз"
             )
-        else:
-            elapsed_time = result.get('elapsed_time', time.time() - start_time)
-            
-            payment_id = db.add_payment(
-                admin_id=user_id,
-                card_number=requisite['card_number'],
-                owner_name=requisite['owner_name'],
-                amount=float(text),
-                payment_link=result['payment_link']
-            )
-            
-            await status_msg.delete()
-            
-            response = (
-                f"✅ Платёж #{payment_id} создан!\n\n"
-                f"💳 Карта: {requisite['card_number']}\n"
-                f"👤 Владелец: {requisite['owner_name']}\n"
-                f"💰 Сумма: {text} руб.\n"
-                f"⏱ Время: {elapsed_time:.1f} сек\n\n"
-                f"🔗 {result['payment_link']}"
-            )
-            
-            qr_file_path = result['qr_file']
-            with open(qr_file_path, 'rb') as qr_file:
-                await update.message.reply_photo(photo=qr_file, caption=response)
-            
-            try:
-                os.remove(qr_file_path)
-            except:
-                pass
     
     except Exception as e:
-        elapsed_time = time.time() - start_time
-        error_trace = str(e)
-        print(f"❌ ОШИБКА: {error_trace}", flush=True)
-        
-        await status_msg.edit_text(
-            f"❌ Ошибка\n\n"
-            f"Детали: {error_trace}\n"
-            f"⏱ Время: {elapsed_time:.1f} сек\n\n"
-            f"Попробуйте ещё раз"
-        )
+        if not payment_sent:
+            elapsed_time = time.time() - start_time
+            error_trace = str(e)
+            print(f"❌ ОШИБКА: {error_trace}", flush=True)
+            
+            await status_msg.edit_text(
+                f"❌ Ошибка\n\n"
+                f"Детали: {error_trace}\n"
+                f"⏱ Время: {elapsed_time:.1f} сек\n\n"
+                f"Попробуйте ещё раз"
+            )
     
     return ConversationHandler.END
 
 
 async def auto_check_accounts():
-    from payment_automation import login_account
-    
     accounts = db.get_accounts()
     
     if not accounts:
@@ -647,12 +668,10 @@ async def post_init(application):
 
 
 def main():
-    TOKEN = '8556732862:AAGIT_7dqSHeKJbSljE1FRf62Fy6u0t0t2A'
-    
     print("🚀 Запуск платёжного бота...")
     print("✅ Система готова к работе!")
     
-    application = Application.builder().token(TOKEN).post_init(post_init).build()
+    application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     
     pay_conv = ConversationHandler(
         entry_points=[

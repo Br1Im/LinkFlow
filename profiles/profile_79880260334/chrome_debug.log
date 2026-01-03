@@ -1,60 +1,30 @@
-[816:19640:0101/192202.163:INFO:components\enterprise\browser\controller\chrome_browser_cloud_management_controller.cc:206] No machine level policy manager exists.
-[15956:9324:0101/192202.331:INFO:third_party\webrtc\rtc_base\cpu_info.cc:75] Available number of cores: 12
-[19356:9428:0101/192202.334:INFO:third_party\webrtc\rtc_base\cpu_info.cc:75] Available number of cores: 12
-[24012:24884:0101/192202.630:INFO:third_party\webrtc\rtc_base\cpu_info.cc:75] Available number of cores: 12
-[816:19640:0101/192203.576:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
-[816:19640:0101/192203.576:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
-[816:19640:0101/192203.576:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
-[816:19640:0101/192203.576:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
-[816:19640:0101/192203.576:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
-[816:19640:0101/192203.576:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
-[816:19640:0101/192203.577:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
-[816:19640:0101/192203.577:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
-[21984:6800:0101/192203.619:VERBOSE1:components\viz\service\main\viz_main_impl.cc:86] VizNullHypothesis is disabled (not a warning)
-[19356:14256:0101/192204.016:INFO:third_party\webrtc\api\video_codecs\sdp_video_format.cc:272] Matched SdpVideoFormat Codec name: VP9, parameters: { } with Codec name: VP9, parameters: { profile-id=0 }, scalability_modes: [L1T1, L1T2, L1T3, L2T1, L2T1h, L2T1_KEY, L2T2, L2T2h, L2T2_KEY, L2T2_KEY_SHIFT, L2T3, L2T3h, L2T3_KEY, L3T1, L3T1h, L3T1_KEY, L3T2, L3T2h, L3T2_KEY, L3T3, L3T3h, L3T3_KEY, S2T1, S2T1h, S2T2, S2T2h, S2T3, S2T3h, S3T1, S3T1h, S3T2, S3T2h, S3T3, S3T3h]
-[19356:14256:0101/192204.016:INFO:third_party\webrtc\api\video_codecs\sdp_video_format.cc:272] Matched SdpVideoFormat Codec name: AV1, parameters: { } with Codec name: AV1, parameters: { level-idx=5 profile=0 tier=0 }, scalability_modes: [L1T1, L1T2, L1T3, L2T1, L2T1h, L2T1_KEY, L2T2, L2T2h, L2T2_KEY, L2T2_KEY_SHIFT, L2T3, L2T3h, L2T3_KEY, L3T1, L3T1h, L3T1_KEY, L3T2, L3T2h, L3T2_KEY, L3T3, L3T3h, L3T3_KEY, S2T1, S2T1h, S2T2, S2T2h, S2T3, S2T3h, S3T1, S3T1h, S3T2, S3T2h, S3T3, S3T3h]
-[19356:14256:0101/192204.016:INFO:third_party\webrtc\api\video_codecs\sdp_video_format.cc:270] Failed to match SdpVideoFormat Codec name: H265, parameters: { }
-[19356:14256:0101/192204.016:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:923] Running WebRTC with a combined Network and Worker thread.
-[19356:14256:0101/192204.016:INFO:third_party\webrtc\media\engine\webrtc_voice_engine.cc:493] WebRtcVoiceEngine::WebRtcVoiceEngine
-[19356:5244:0101/192204.017:INFO:third_party\webrtc\pc\peer_connection_factory.cc:381] Using default network controller factory
-[19356:5244:0101/192204.017:INFO:third_party\webrtc\modules\pacing\bitrate_prober.cc:54] Bandwidth probing enabled, set to inactive
-[19356:5244:0101/192204.017:INFO:third_party\webrtc\modules\remote_bitrate_estimator\transport_sequence_number_feedback_generator.cc:52] Maximum interval between transport feedback RTCP messages: 250 ms
-[19356:5244:0101/192204.017:INFO:third_party\webrtc\modules\remote_bitrate_estimator\aimd_rate_control.cc:88] Using aimd rate control with back off factor 0.85
-[19356:5244:0101/192204.017:INFO:third_party\webrtc\modules\remote_bitrate_estimator\remote_bitrate_estimator_single_stream.cc:59] RemoteBitrateEstimatorSingleStream: Instantiating.
-[19356:5244:0101/192204.018:INFO:third_party\webrtc\media\engine\webrtc_voice_engine.cc:527] WebRtcVoiceEngine::Init
-[19356:5244:0101/192204.018:INFO:third_party\webrtc\media\engine\webrtc_voice_engine.cc:611] WebRtcVoiceEngine::ApplyOptions: AudioOptions {aec: 1, agc: 1, ns: 1, hf: 1, swap: 0, audio_jitter_buffer_max_packets: 200, audio_jitter_buffer_fast_accelerate: 0, audio_jitter_buffer_min_delay_ms: 0, }
-[19356:5244:0101/192204.018:INFO:third_party\webrtc\rtc_base\openssl_key_pair.cc:36] Making key pair
-[19356:5244:0101/192204.018:INFO:third_party\webrtc\rtc_base\openssl_key_pair.cc:89] Returning key pair
-[19356:5244:0101/192204.018:INFO:third_party\webrtc\rtc_base\boringssl_certificate.cc:186] Making certificate for WebRTC
-[19356:5244:0101/192204.018:INFO:third_party\webrtc\rtc_base\boringssl_certificate.cc:242] Returning certificate
-[19356:5244:0101/192204.019:INFO:third_party\webrtc\p2p\base\p2p_transport_channel.cc:572] Set backup connection ping interval to 25 s milliseconds.
-[19356:5244:0101/192204.019:INFO:third_party\webrtc\p2p\base\p2p_transport_channel.cc:581] Set ICE receiving timeout to 2500 ms milliseconds
-[19356:5244:0101/192204.019:INFO:third_party\webrtc\p2p\base\p2p_transport_channel.cc:588] Set ping most likely connection to 0
-[19356:5244:0101/192204.019:INFO:third_party\webrtc\p2p\base\p2p_transport_channel.cc:595] Set stable_writable_connection_ping_interval to 2500 ms
-[19356:5244:0101/192204.019:INFO:third_party\webrtc\p2p\base\p2p_transport_channel.cc:608] Set presume writable when fully relayed to 0
-[19356:5244:0101/192204.019:INFO:third_party\webrtc\p2p\base\p2p_transport_channel.cc:626] Set regather_on_failed_networks_interval to 300 s
-[19356:5244:0101/192204.019:INFO:third_party\webrtc\p2p\base\p2p_transport_channel.cc:633] Set receiving_switching_delay to 1 s
-[19356:5244:0101/192204.019:INFO:third_party\webrtc\pc\jsep_transport_controller.cc:1156] Creating DtlsSrtpTransport.
-[19356:5244:0101/192204.019:INFO:third_party\webrtc\pc\dtls_srtp_transport.cc:72] Setting RTP Transport on 0 transport 0x582c00137400
-[19356:5244:0101/192204.020:INFO:third_party\webrtc\p2p\base\p2p_transport_channel.cc:506] Set ICE ufrag: NXBT pwd: 1Xfkih9LS7JNQ3jGPd7Xy2xK on transport 0
-[19356:14256:0101/192204.020:INFO:third_party\webrtc\pc\peer_connection.cc:2201] Creating data channel, mid=0
-[19356:14256:0101/192204.020:INFO:third_party\webrtc\pc\sdp_offer_answer.cc:3108] Session: 7148833340871513813 Old state: stable New state: have-local-offer
-[19356:5244:0101/192204.020:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:370] Start getting ports with turn_port_prune_policy 0
-[19356:5244:0101/192204.038:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:803] Allocate ports on any any 
-[19356:5244:0101/192204.038:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:891] Network manager has started
-[19356:5244:0101/192204.038:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:1400] Net[any:0.0.0.x/0:Wildcard:id=0]: Allocation Phase=Udp
-[19356:5244:0101/192204.038:INFO:third_party\webrtc\p2p\base\port.cc:129] Port[137a00:0:1:0:host:Net[any:0.0.0.x/0:Wildcard:id=0]]: Port created with network cost 999
-[19356:5244:0101/192204.038:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:913] Adding allocated port for 0
-[19356:5244:0101/192204.038:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:933] Port[137a00:0:1:0:host:Net[any:0.0.0.x/0:Wildcard:id=0]]: Added port to allocator
-[19356:5244:0101/192204.038:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:1400] Net[any:0:0:0:x:x:x:x:x/0:Wildcard:id=0]: Allocation Phase=Udp
-[19356:5244:0101/192204.038:INFO:third_party\webrtc\p2p\base\port.cc:129] Port[2ba0000:0:1:0:host:Net[any:0:0:0:x:x:x:x:x/0:Wildcard:id=0]]: Port created with network cost 999
-[19356:5244:0101/192204.038:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:913] Adding allocated port for 0
-[19356:5244:0101/192204.038:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:933] Port[2ba0000:0:1:0:host:Net[any:0:0:0:x:x:x:x:x/0:Wildcard:id=0]]: Added port to allocator
-[19356:5244:0101/192204.044:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:950] Port[137a00:0:1:0:host:Net[any:0.0.0.x/0:Wildcard:id=0]]: Gathered candidate: Cand[:2402575578:1:udp:2113937151:4b421999-e7df-4abc-9526-9b5b49ca70e0.local:51833:host::0:NXBT:1Xfkih9LS7JNQ3jGPd7Xy2xK:0:999:0]
-[19356:5244:0101/192204.044:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:983] Port[137a00:0:1:0:host:Net[any:0.0.0.x/0:Wildcard:id=0]]: Port ready.
-[19356:5244:0101/192204.044:INFO:third_party\webrtc\p2p\client\basic_port_allocator.cc:1095] Port[137a00:0:1:0:host:Net[any:0.0.0.x/0:Wildcard:id=0]]: Port completed gathering candidates.
-[19356:14256:0101/192204.046:INFO:third_party\webrtc\pc\sdp_offer_answer.cc:3108] Session: 7148833340871513813 Old state: have-local-offer New state: closed
-[19356:5244:0101/192204.046:INFO:third_party\webrtc\pc\peer_connection.cc:2658] Tearing down data channel transport for mid=0
-[23228:12880:0101/192204.069:INFO:third_party\webrtc\rtc_base\cpu_info.cc:75] Available number of cores: 12
-[8852:20616:0101/192205.777:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
-[8852:20616:0101/192205.777:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
+[23888:24660:0102/055159.138:INFO:components\enterprise\browser\controller\chrome_browser_cloud_management_controller.cc:206] No machine level policy manager exists.
+[23888:24660:0102/055200.644:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055200.644:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055200.644:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055200.644:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055200.644:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055200.644:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055200.644:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055200.644:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[636:25012:0102/055201.265:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:923] Running WebRTC with a combined Network and Worker thread.
+[23888:24660:0102/055203.153:INFO:CONSOLE:1] "loginPopup", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:20008:0102/055203.531:ERROR:google_apis\gcm\engine\registration_request.cc:292] Registration response error message: DEPRECATED_ENDPOINT
+[636:25012:0102/055204.928:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:923] Running WebRTC with a combined Network and Worker thread.
+[636:1480:0102/055205.227:WARNING:third_party\webrtc\media\engine\webrtc_voice_engine.cc:808] Attempting to stop aecdump when no audio processing module is present
+[23888:24660:0102/055205.449:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055205.449:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055205.449:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055205.449:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055205.449:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055205.449:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055205.449:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055205.449:INFO:CONSOLE:1] "Data module segmenttop does not exist!!", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[636:25012:0102/055208.826:INFO:third_party\blink\renderer\modules\peerconnection\peer_connection_dependency_factory.cc:923] Running WebRTC with a combined Network and Worker thread.
+[23888:24660:0102/055209.044:INFO:CONSOLE:1] "CardNumberInput props [object Object]", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055209.052:INFO:CONSOLE:1] "Начало выполнения нефинансового запроса authRequest", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055209.052:INFO:CONSOLE:1] "Начало выполнения нефинансового запроса authRequest сумма [object Object]", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055209.113:INFO:CONSOLE:1] "PaymentTools  paymentToolGroups [object Object] paymentTool undefined", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[23888:24660:0102/055209.114:INFO:CONSOLE:1] "calcCommission isDirect вычислены данные isDirect= true", source: https://1.elecsnet.ru/NotebookFront/dist/js/app/main.js?v=45 (1)
+[22712:19744:0102/055211.251:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
+[22712:19744:0102/055211.251:WARNING:net\extras\sqlite\sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net\extras\sqlite\sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
