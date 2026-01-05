@@ -83,7 +83,16 @@ class HybridPaymentManager:
         print(f"🔐 Авторизация через Selenium...", flush=True)
         
         try:
-            profile_path = os.path.abspath(os.path.join("profiles", account['profile_path']))
+            # Используем временный профиль в локальной папке (не OneDrive!)
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            profile_path = os.path.join(temp_dir, "elecsnet_hybrid_profile")
+            
+            # Создаем папку если нет
+            os.makedirs(profile_path, exist_ok=True)
+            
+            print(f"   📁 Профиль: {profile_path}", flush=True)
+            
             self.driver = self._create_driver(profile_path)
             
             self.driver.get(self.ELECSNET_URL)
