@@ -137,7 +137,6 @@ class BrowserManager:
                 self.driver = None
                 self.is_ready = False
             
-            print(f"\n🔥 ПРОГРЕВ БРАУЗЕРА...", flush=True)
             start_time = time.time()
             
             try:
@@ -168,7 +167,7 @@ class BrowserManager:
                 self.last_activity = time.time()
                 
                 elapsed = time.time() - start_time
-                print(f"🔥 Браузер прогрет за {elapsed:.1f} сек!", flush=True)
+                print(f"✅ Браузер прогрет за {elapsed:.1f} сек (скрыто от пользователя)", flush=True)
                 return True
                 
             except Exception as e:

@@ -477,24 +477,14 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data.clear()
     
-    # 🔥 ПРОГРЕВ БРАУЗЕРА пока пользователь вводит сумму
-    warmup_msg = await update.message.reply_text("🔥 Подготавливаю систему...")
-    
+    # Прогрев браузера в фоне (без уведомления пользователя)
     loop = asyncio.get_event_loop()
-    warmup_result = await loop.run_in_executor(None, warmup_for_user, user_id)
+    loop.run_in_executor(None, warmup_for_user, user_id)
     
-    if warmup_result.get('success'):
-        await warmup_msg.edit_text(
-            "💰 Создание ссылки для оплаты\n\n"
-            "✅ Система готова!\n"
-            "Введите сумму (1000-100000 руб.):"
-        )
-    else:
-        await warmup_msg.edit_text(
-            "💰 Создание ссылки для оплаты\n\n"
-            "⚠️ Прогрев не удался, но можно продолжить\n"
-            "Введите сумму (1000-100000 руб.):"
-        )
+    await update.message.reply_text(
+        "💰 Создание ссылки для оплаты\n\n"
+        "Введите сумму (1000-100000 руб.):"
+    )
     
     return AMOUNT
 

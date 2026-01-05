@@ -13,6 +13,8 @@ ENV/
 # Bot data
 bot_database.json
 chrome_profile/
+profiles/
+temp_qr/
 *.png
 
 # IDE
