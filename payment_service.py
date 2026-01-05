@@ -130,6 +130,29 @@ def create_payment_fast(amount, send_callback=None):
     # Selenium режим (или fallback)
     print(f"🔧 Создание платежа в SELENIUM режиме...", flush=True)
     
+    # Проверяем готовность браузера, если нет - прогреваем
+    if not browser_manager.is_ready:
+        print(f"⚠️ Selenium браузер не прогрет, прогреваю...", flush=True)
+        requisites = db.get_requisites()
+        accounts = db.get_accounts()
+        
+        if requisites and accounts:
+            requisite = requisites[0]
+            account = accounts[0]
+            
+            success = browser_manager.warmup(
+                card_number=requisite['card_number'],
+                owner_name=requisite['owner_name'],
+                account=account
+            )
+            
+            if not success:
+                return {
+                    "error": "Не удалось прогреть Selenium браузер",
+                    "elapsed_time": 0,
+                    "mode": "selenium"
+                }
+    
     def internal_callback(payment_link, qr_base64):
         """Внутренний callback для обработки данных"""
         # Сохраняем QR

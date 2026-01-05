@@ -636,7 +636,7 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = await loop.run_in_executor(
             None,
             create_payment_fast,
-            text,
+            amount_value,
             sync_callback
         )
         
