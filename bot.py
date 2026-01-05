@@ -318,6 +318,49 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await query.edit_message_text(text, reply_markup=back_button("manage_requisites"))
     
+    elif data == "payment_mode":
+        from payment_modes import mode_manager
+        status = mode_manager.get_status()
+        await query.edit_message_text(
+            status,
+            reply_markup=payment_mode_menu()
+        )
+    
+    elif data == "set_mode_hybrid":
+        from payment_modes import mode_manager, PaymentMode
+        mode_manager.set_mode(PaymentMode.HYBRID)
+        status = mode_manager.get_status()
+        await query.edit_message_text(
+            f"✅ Режим изменен на HYBRID (Быстрый)\n\n{status}",
+            reply_markup=payment_mode_menu()
+        )
+    
+    elif data == "set_mode_selenium":
+        from payment_modes import mode_manager, PaymentMode
+        mode_manager.set_mode(PaymentMode.SELENIUM)
+        status = mode_manager.get_status()
+        await query.edit_message_text(
+            f"✅ Режим изменен на SELENIUM (Надежный)\n\n{status}",
+            reply_markup=payment_mode_menu()
+        )
+    
+    elif data == "toggle_auto_fallback":
+        from payment_modes import mode_manager
+        mode_manager.toggle_auto_fallback()
+        status = mode_manager.get_status()
+        await query.edit_message_text(
+            f"✅ Настройка изменена\n\n{status}",
+            reply_markup=payment_mode_menu()
+        )
+    
+    elif data == "mode_status":
+        from payment_modes import mode_manager
+        status = mode_manager.get_status()
+        await query.edit_message_text(
+            status,
+            reply_markup=payment_mode_menu()
+        )
+    
     elif data == "view_statistics":
         stats = db.get_statistics()
         

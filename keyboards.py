@@ -13,8 +13,19 @@ def main_admin_menu():
         [InlineKeyboardButton("👥 Управление админами", callback_data="manage_admins")],
         [InlineKeyboardButton("🔐 Управление аккаунтами", callback_data="manage_accounts")],
         [InlineKeyboardButton("💳 Управление реквизитами", callback_data="manage_requisites")],
+        [InlineKeyboardButton("⚡ Режим создания платежей", callback_data="payment_mode")],
         [InlineKeyboardButton("📊 Статистика", callback_data="view_statistics")],
         [InlineKeyboardButton("❌ Закрыть", callback_data="close")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def payment_mode_menu():
+    keyboard = [
+        [InlineKeyboardButton("⚡ HYBRID (Быстрый)", callback_data="set_mode_hybrid")],
+        [InlineKeyboardButton("🔧 SELENIUM (Надежный)", callback_data="set_mode_selenium")],
+        [InlineKeyboardButton("🔄 Авто-переключение", callback_data="toggle_auto_fallback")],
+        [InlineKeyboardButton("📊 Статус режимов", callback_data="mode_status")],
+        [InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
