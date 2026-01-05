@@ -643,7 +643,6 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"⏱ Время: {elapsed_time:.1f} сек\n\n"
                     f"Введите сумму снова или /cancel для выхода"
                 )
-            )
             return AMOUNT
     
     return AMOUNT
