@@ -3,6 +3,8 @@
 Конфигурация бота
 """
 
+import os
+
 # Telegram
 BOT_TOKEN = '8556732862:AAGIT_7dqSHeKJbSljE1FRf62Fy6u0t0t2A'
 
@@ -23,8 +25,12 @@ ELEMENT_WAIT_TIMEOUT = 15
 ACCOUNT_CHECK_INTERVAL = 30
 
 # Пути
-PROFILE_BASE_PATH = "profiles"
-QR_TEMP_PATH = "temp_qr"
+PROFILE_BASE_PATH = os.path.abspath("profiles")
+QR_TEMP_PATH = os.path.abspath("temp_qr")
+
+# Создаем папки если их нет
+os.makedirs(PROFILE_BASE_PATH, exist_ok=True)
+os.makedirs(QR_TEMP_PATH, exist_ok=True)
 
 # URL
 ELECSNET_URL = 'https://1.elecsnet.ru/NotebookFront/services/0mhp/default.aspx?merchantId=36924&fromSegment='

@@ -34,6 +34,8 @@ class BrowserManager:
         options.add_argument('--disable-gpu')
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_argument('--disable-extensions')
+        options.add_argument('--disable-features=LockProfileCookieDatabase')
+        options.add_argument('--disable-site-isolation-trials')
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         options.page_load_strategy = 'eager'
         
