@@ -477,7 +477,6 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data.clear()
     
-    # Прогрев браузера в фоне (без уведомления пользователя)
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, warmup_for_user, user_id)
     
