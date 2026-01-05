@@ -508,19 +508,24 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if amount_value < 1000:
             await update.message.reply_text(
                 "❌ Сумма слишком мала!\n\n"
-                "Минимальная сумма: 1000 руб."
+                "Минимальная сумма: 1000 руб.\n"
+                "Введите другую сумму или /cancel для выхода"
             )
             return AMOUNT
         
         if amount_value > 100000:
             await update.message.reply_text(
                 "❌ Сумма слишком велика!\n\n"
-                "Максимальная сумма: 100000 руб."
+                "Максимальная сумма: 100000 руб.\n"
+                "Введите другую сумму или /cancel для выхода"
             )
             return AMOUNT
             
     except ValueError:
-        await update.message.reply_text("❌ Неверный формат! Введите число:")
+        await update.message.reply_text(
+            "❌ Неверный формат! Введите число:\n"
+            "Или /cancel для выхода"
+        )
         return AMOUNT
     
     requisites = db.get_requisites()
@@ -594,12 +599,26 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if "error" in result and not payment_sent:
             elapsed_time = result.get('elapsed_time', time.time() - start_time)
-            await status_msg.edit_text(
-                f"❌ Ошибка при создании платежа\n\n"
-                f"Детали: {result['error']}\n"
-                f"⏱ Время: {elapsed_time:.1f} сек\n\n"
-                f"Попробуйте ещё раз"
-            )
+            error_msg = result['error']
+            
+            print(f"⚠️ Ошибка платежа: {error_msg}", flush=True)
+            print("🔄 Пытаюсь восстановить браузер...", flush=True)
+            
+            loop = asyncio.get_event_loop()
+            warmup_result = await loop.run_in_executor(None, warmup_for_user, user_id)
+            
+            if warmup_result.get('success'):
+                await status_msg.edit_text(
+                    f"⚠️ Браузер был восстановлен\n\n"
+                    f"Введите сумму снова:"
+                )
+            else:
+                await status_msg.edit_text(
+                    f"❌ Ошибка при создании платежа\n\n"
+                    f"Детали: {error_msg}\n"
+                    f"⏱ Время: {elapsed_time:.1f} сек\n\n"
+                    f"Введите сумму снова или /cancel для выхода"
+                )
             return AMOUNT
     
     except Exception as e:
@@ -608,11 +627,22 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             error_trace = str(e)
             print(f"❌ ОШИБКА: {error_trace}", flush=True)
             
-            await status_msg.edit_text(
-                f"❌ Ошибка\n\n"
-                f"Детали: {error_trace}\n"
-                f"⏱ Время: {elapsed_time:.1f} сек\n\n"
-                f"Попробуйте ещё раз"
+            print("🔄 Пытаюсь восстановить браузер...", flush=True)
+            loop = asyncio.get_event_loop()
+            warmup_result = await loop.run_in_executor(None, warmup_for_user, user_id)
+            
+            if warmup_result.get('success'):
+                await status_msg.edit_text(
+                    f"⚠️ Браузер был восстановлен\n\n"
+                    f"Введите сумму снова:"
+                )
+            else:
+                await status_msg.edit_text(
+                    f"❌ Ошибка\n\n"
+                    f"Детали: {error_trace}\n"
+                    f"⏱ Время: {elapsed_time:.1f} сек\n\n"
+                    f"Введите сумму снова или /cancel для выхода"
+                )
             )
             return AMOUNT
     
@@ -662,6 +692,27 @@ async def periodic_account_check(interval_minutes=30):
         await auto_check_accounts()
 
 
+async def periodic_browser_check(interval_minutes=5):
+    """Периодическая проверка и восстановление браузера"""
+    while True:
+        await asyncio.sleep(interval_minutes * 60)
+        print(f"\n🔍 Проверка состояния браузера...", flush=True)
+        
+        from payment_service import browser_manager
+        
+        if not browser_manager.is_ready or not browser_manager.driver:
+            print("⚠️ Браузер не готов, восстанавливаю...", flush=True)
+            loop = asyncio.get_event_loop()
+            warmup_result = await loop.run_in_executor(None, warmup_for_user, SUPER_ADMIN_ID)
+            
+            if warmup_result.get('success'):
+                print("✅ Браузер восстановлен!", flush=True)
+            else:
+                print("❌ Не удалось восстановить браузер", flush=True)
+        else:
+            print("✅ Браузер в порядке", flush=True)
+
+
 async def post_init(application):
     print("\n🔐 Запускаю автоматическую проверку аккаунтов...", flush=True)
     await auto_check_accounts()
@@ -676,7 +727,10 @@ async def post_init(application):
         print("⚠️ Не удалось прогреть браузер, будет прогрет при первом платеже", flush=True)
     
     asyncio.create_task(periodic_account_check(30))
-    print("⏰ Периодическая проверка запущена (каждые 30 минут)", flush=True)
+    print("⏰ Периодическая проверка аккаунтов запущена (каждые 30 минут)", flush=True)
+    
+    asyncio.create_task(periodic_browser_check(5))
+    print("🔍 Периодическая проверка браузера запущена (каждые 5 минут)", flush=True)
 
 
 def main():
@@ -691,9 +745,15 @@ def main():
             MessageHandler(filters.Text(['💳 Создать ссылку']), pay_command)
         ],
         states={
-            AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, amount_handler)],
+            AMOUNT: [
+                MessageHandler(filters.Text(['💳 Создать ссылку']), pay_command),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, amount_handler)
+            ],
         },
-        fallbacks=[CommandHandler('cancel', cancel_payment)],
+        fallbacks=[
+            CommandHandler('cancel', cancel_payment),
+            MessageHandler(filters.Text(['💳 Создать ссылку']), pay_command)
+        ],
     )
     
     admin_conv = ConversationHandler(
