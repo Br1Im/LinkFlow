@@ -459,6 +459,13 @@ async def add_requisite_name_handler(update: Update, context: ContextTypes.DEFAU
     
     return ConversationHandler.END
 
+async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "❌ Создание платежей отменено",
+        reply_markup=admin_keyboard()
+    )
+    return ConversationHandler.END
+
 async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
@@ -562,6 +569,11 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             os.remove(qr_file_path)
         except:
             pass
+        
+        await update.message.reply_text(
+            "💰 Введите следующую сумму (1000-100000 руб.)\n"
+            "или /cancel для выхода"
+        )
     
     try:
         loop = asyncio.get_event_loop()
@@ -588,6 +600,7 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"⏱ Время: {elapsed_time:.1f} сек\n\n"
                 f"Попробуйте ещё раз"
             )
+            return AMOUNT
     
     except Exception as e:
         if not payment_sent:
@@ -601,8 +614,9 @@ async def amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"⏱ Время: {elapsed_time:.1f} сек\n\n"
                 f"Попробуйте ещё раз"
             )
+            return AMOUNT
     
-    return ConversationHandler.END
+    return AMOUNT
 
 
 async def auto_check_accounts():
@@ -670,7 +684,7 @@ def main():
         states={
             AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, amount_handler)],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler('cancel', cancel_payment)],
     )
     
     admin_conv = ConversationHandler(
