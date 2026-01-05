@@ -10,6 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import os
 import threading
+import shutil
 from config import *
 
 
@@ -25,8 +26,45 @@ class BrowserManager:
         self.lock = threading.Lock()
         self.last_activity = 0
     
+    def _cleanup_profile(self, profile_path):
+        """Очистка проблемных файлов профиля"""
+        try:
+            # Удаляем файлы блокировки
+            lock_files = [
+                'SingletonLock',
+                'SingletonSocket',
+                'SingletonCookie',
+                'lockfile',
+                'DevToolsActivePort'
+            ]
+            
+            for lock_file in lock_files:
+                lock_path = os.path.join(profile_path, lock_file)
+                if os.path.exists(lock_path):
+                    try:
+                        os.remove(lock_path)
+                        print(f"🧹 Удален {lock_file}", flush=True)
+                    except:
+                        pass
+            
+            # Очистка Default профиля
+            default_path = os.path.join(profile_path, 'Default')
+            if os.path.exists(default_path):
+                for lock_file in lock_files:
+                    lock_path = os.path.join(default_path, lock_file)
+                    if os.path.exists(lock_path):
+                        try:
+                            os.remove(lock_path)
+                        except:
+                            pass
+        except Exception as e:
+            print(f"⚠️ Ошибка очистки профиля: {e}", flush=True)
+    
     def _create_driver(self, profile_path):
         """Создание драйвера Chrome"""
+        # Очищаем профиль перед запуском
+        self._cleanup_profile(profile_path)
+        
         options = webdriver.ChromeOptions()
         options.add_argument(f'--user-data-dir={profile_path}')
         options.add_argument('--no-sandbox')
@@ -36,7 +74,15 @@ class BrowserManager:
         options.add_argument('--disable-extensions')
         options.add_argument('--disable-features=LockProfileCookieDatabase')
         options.add_argument('--disable-site-isolation-trials')
-        options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        options.add_argument('--disable-background-networking')
+        options.add_argument('--disable-sync')
+        options.add_argument('--metrics-recording-only')
+        options.add_argument('--disable-default-apps')
+        options.add_argument('--no-first-run')
+        options.add_argument('--disable-setuid-sandbox')
+        options.add_argument('--disable-web-security')
+        options.add_experimental_option('excludeSwitches', ['enable-logging', 'enable-automation'])
+        options.add_experimental_option('useAutomationExtension', False)
         options.page_load_strategy = 'eager'
         
         driver = webdriver.Chrome(options=options)
