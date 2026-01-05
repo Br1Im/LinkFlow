@@ -666,6 +666,15 @@ async def post_init(application):
     print("\n🔐 Запускаю автоматическую проверку аккаунтов...", flush=True)
     await auto_check_accounts()
     
+    print("\n🔥 Прогреваю браузер для быстрых платежей...", flush=True)
+    loop = asyncio.get_event_loop()
+    warmup_result = await loop.run_in_executor(None, warmup_for_user, SUPER_ADMIN_ID)
+    
+    if warmup_result.get('success'):
+        print("✅ Браузер прогрет и готов к работе!", flush=True)
+    else:
+        print("⚠️ Не удалось прогреть браузер, будет прогрет при первом платеже", flush=True)
+    
     asyncio.create_task(periodic_account_check(30))
     print("⏰ Периодическая проверка запущена (каждые 30 минут)", flush=True)
 
