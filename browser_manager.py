@@ -25,10 +25,20 @@ class BrowserManager:
         self.account_phone = None
         self.lock = threading.Lock()
         self.last_activity = 0
+        self._warmup_in_progress = False  # Флаг процесса прогрева
     
     def _cleanup_profile(self, profile_path):
         """Очистка проблемных файлов профиля"""
         try:
+            # Убиваем все процессы Chrome перед очисткой
+            import subprocess
+            try:
+                subprocess.run(['taskkill', '/F', '/IM', 'chrome.exe'], 
+                             capture_output=True, timeout=5)
+                time.sleep(1)
+            except:
+                pass
+            
             # Удаляем файлы блокировки
             lock_files = [
                 'SingletonLock',
@@ -120,12 +130,34 @@ class BrowserManager:
     
     def warmup(self, card_number, owner_name, account):
         """Прогрев браузера с заполнением данных"""
+        
+        # Проверка: если прогрев уже идёт, ждём его завершения
+        if self._warmup_in_progress:
+            print("⏳ Прогрев уже выполняется, ожидаю...", flush=True)
+            # Ждём максимум 30 секунд
+            for _ in range(60):
+                if not self._warmup_in_progress:
+                    break
+                time.sleep(0.5)
+            
+            # Если прогрев завершился успешно, возвращаем True
+            if self.is_ready:
+                return True
+        
         with self.lock:
+            # Двойная проверка после получения блокировки
+            if self._warmup_in_progress:
+                return False
+            
+            # Устанавливаем флаг
+            self._warmup_in_progress = True
+            
             # Если уже прогрет с теми же данными
             if (self.is_ready and self.driver and 
                 self.card_number == card_number and 
                 self.owner_name == owner_name):
                 print("🔥 Браузер уже прогрет!", flush=True)
+                self._warmup_in_progress = False
                 return True
             
             # Закрываем старый браузер
@@ -180,6 +212,10 @@ class BrowserManager:
                     self.driver = None
                 self.is_ready = False
                 return False
+            
+            finally:
+                # Всегда сбрасываем флаг прогрева
+                self._warmup_in_progress = False
     
     def create_payment(self, amount, callback=None):
         """
@@ -198,7 +234,10 @@ class BrowserManager:
                 print(f"[{time.time()-start_time:.1f}s] Заполняю сумму...", flush=True)
                 amount_input = wait.until(EC.element_to_be_clickable((By.NAME, "summ.transfer")))
                 amount_input.clear()
-                amount_input.send_keys(str(amount))
+                
+                # Форматируем сумму с пробелами как разделителями тысяч (например: "1 000")
+                amount_formatted = f"{int(amount):,}".replace(",", " ")
+                amount_input.send_keys(amount_formatted)
                 
                 # Ждем обработку
                 time.sleep(0.5)

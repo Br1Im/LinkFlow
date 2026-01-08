@@ -1,7 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 Гибридное решение: Selenium для авторизации + API для скорости
-Скорость создания платежа: ~1 секунда!
+СТАТУС: ЭКСПЕРИМЕНТАЛЬНЫЙ - В настоящее время не работает полностью через API
+
+Проблема: Не удалось найти правильный способ получить QR и ссылку через чистый API.
+- formatReqId работает ✅
+- logredirect работает ✅  
+- Финальный шаг (получение QR/ссылки) требует Selenium
+
+Текущая реализация: Использует Selenium для всего процесса (как fallback)
+Скорость: ~3-5 секунд (с прогретым браузером)
 """
 
 from selenium import webdriver
@@ -141,9 +149,8 @@ class HybridPaymentManager:
             
             self.is_authorized = True
             
-            # Закрываем браузер - он больше не нужен!
-            self.driver.quit()
-            self.driver = None
+            # НЕ закрываем браузер - будем использовать его для навигации!
+            print(f"   ✅ Cookies получены: {len(selenium_cookies)} шт. (браузер остается открытым)", flush=True)
             
             return True
             
@@ -270,26 +277,40 @@ class HybridPaymentManager:
         
         redirect_response = redirect_result["data"]
         
-        # Шаг 3: Получаем QR и ссылку через авторизованную сессию
+        print(f"   📄 logredirect ответ: {json.dumps(redirect_response, ensure_ascii=False, indent=2)}", flush=True)
+        
+        # Шаг 3: POST запрос на /SBP/default.aspx с form data
+        print(f"   📤 POST на /SBP/default.aspx с form data...", flush=True)
+        
         sbp_url = f"{self.BASE_URL}/SBP/default.aspx"
         
         try:
             headers = {
                 "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "accept-language": "ru-RU,ru;q=0.9",
+                "content-type": "application/x-www-form-urlencoded",
                 "referer": self.ELECSNET_URL,
+                "origin": "https://1.elecsnet.ru",
                 "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
             
-            response = self.session.get(
+            # Отправляем как form data
+            response = self.session.post(
                 sbp_url,
-                params=redirect_response.get("params", {}),
                 headers=headers,
-                timeout=10
+                data=params_json,  # Словарь автоматически кодируется как form data
+                timeout=10,
+                allow_redirects=True
             )
             
             if response.status_code == 200:
                 html = response.text
+                
+                print(f"   📄 Получен HTML ({len(html)} символов)", flush=True)
+                
+                # Сохраняем для отладки
+                with open("sbp_response.html", "w", encoding="utf-8") as f:
+                    f.write(html)
                 
                 import re
                 qr_match = re.search(r'<img[^>]+id="Image1"[^>]+src="([^"]+)"', html)
@@ -305,22 +326,62 @@ class HybridPaymentManager:
                         "elapsed_time": elapsed
                     }
                 else:
-                    return {
-                        "success": False,
-                        "error": "QR или ссылка не найдены в HTML",
-                        "elapsed_time": time.time() - start_time
-                    }
+                    # Если не нашли через API, fallback на Selenium
+                    print(f"   ⚠️ QR/ссылка не найдены в HTML, пробую через Selenium...", flush=True)
+                    return self._get_result_via_selenium(params_json, start_time)
             else:
+                print(f"   ⚠️ HTTP {response.status_code}, пробую через Selenium...", flush=True)
+                return self._get_result_via_selenium(params_json, start_time)
+                
+        except Exception as e:
+            print(f"   ⚠️ Ошибка API: {e}, пробую через Selenium...", flush=True)
+            return self._get_result_via_selenium(params_json, start_time)
+    
+    def _get_result_via_selenium(self, params_json, start_time):
+        """Получение результата через Selenium (fallback)"""
+        try:
+            if not self.driver:
                 return {
                     "success": False,
-                    "error": f"SBP HTTP {response.status_code}",
+                    "error": "Selenium драйвер не доступен",
                     "elapsed_time": time.time() - start_time
                 }
-                
+            
+            # Навигация на страницу SBP
+            import urllib.parse
+            query_params = urllib.parse.urlencode(params_json)
+            sbp_url = f"{self.BASE_URL}/SBP/default.aspx?{query_params}"
+            
+            print(f"   📍 Selenium: переход на SBP...", flush=True)
+            self.driver.get(sbp_url)
+            time.sleep(3)
+            
+            # Получаем QR и ссылку
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            
+            wait = WebDriverWait(self.driver, 10)
+            
+            qr_img = wait.until(EC.presence_of_element_located((By.ID, "Image1")))
+            qr_base64 = qr_img.get_attribute("src")
+            
+            payment_link_element = wait.until(EC.presence_of_element_located((By.ID, "LinkMobil")))
+            payment_link = payment_link_element.get_attribute("href")
+            
+            elapsed = time.time() - start_time
+            
+            return {
+                "success": True,
+                "payment_link": payment_link,
+                "qr_base64": qr_base64,
+                "elapsed_time": elapsed
+            }
+            
         except Exception as e:
             return {
                 "success": False,
-                "error": f"SBP request: {str(e)}",
+                "error": f"Selenium fallback: {str(e)}",
                 "elapsed_time": time.time() - start_time
             }
     

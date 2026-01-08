@@ -28,7 +28,7 @@ class PaymentModeManager:
                 with open(self.CONFIG_FILE, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     return {
-                        "mode": PaymentMode(data.get("mode", "hybrid")),
+                        "mode": PaymentMode(data.get("mode", "selenium")),  # Default to selenium
                         "hybrid_failures": data.get("hybrid_failures", 0),
                         "auto_fallback": data.get("auto_fallback", True)
                     }
@@ -37,7 +37,7 @@ class PaymentModeManager:
         
         # Конфигурация по умолчанию
         return {
-            "mode": PaymentMode.HYBRID,
+            "mode": PaymentMode.SELENIUM,  # SELENIUM по умолчанию (надежнее)
             "hybrid_failures": 0,
             "auto_fallback": True  # Автоматическое переключение при ошибках
         }
@@ -95,14 +95,15 @@ class PaymentModeManager:
         
         status = f"🔧 РЕЖИМ СОЗДАНИЯ ПЛАТЕЖЕЙ\n\n"
         
-        if mode == PaymentMode.HYBRID:
-            status += "✅ Текущий режим: HYBRID (Быстрый)\n"
-            status += "   Скорость: ~1-2 секунды\n"
-            status += "   Метод: API + Selenium\n"
-        else:
+        if mode == PaymentMode.SELENIUM:
             status += "✅ Текущий режим: SELENIUM (Надежный)\n"
             status += "   Скорость: ~3-5 секунд\n"
             status += "   Метод: Только Selenium\n"
+        else:
+            status += "⚠️ Текущий режим: HYBRID (Экспериментальный)\n"
+            status += "   Скорость: ~1-2 секунды (цель)\n"
+            status += "   Метод: API + Selenium\n"
+            status += "   Статус: В РАЗРАБОТКЕ\n"
         
         status += f"\n📊 Статистика:\n"
         status += f"   Ошибок гибридного режима: {failures}\n"

@@ -25,6 +25,7 @@ class Database:
             "accounts": [],
             "requisites": [],
             "payments": [],
+            "orders": [],  # Новое поле для webhook заказов
             "statistics": {
                 "total_payments": 0,
                 "total_amount": 0,
@@ -197,5 +198,44 @@ class Database:
             "count": 0,
             "total_amount": 0
         })
+
+    # Методы для работы с заказами через webhook
+    def save_order(self, order_data: dict):
+        """Сохранение заказа от webhook"""
+        if "orders" not in self.data:
+            self.data["orders"] = []
+        
+        self.data["orders"].append(order_data)
+        self._save()
+
+    def get_order_by_id(self, order_id: str) -> Optional[dict]:
+        """Получение заказа по ID"""
+        if "orders" not in self.data:
+            return None
+        
+        for order in self.data["orders"]:
+            if order.get("order_id") == order_id:
+                return order
+        return None
+
+    def update_order_status(self, order_id: str, status: str) -> bool:
+        """Обновление статуса заказа"""
+        if "orders" not in self.data:
+            return False
+        
+        for order in self.data["orders"]:
+            if order.get("order_id") == order_id:
+                order["status"] = status
+                order["updated_at"] = datetime.now().isoformat()
+                self._save()
+                return True
+        return False
+
+    def get_orders(self, limit: int = None) -> list:
+        """Получение списка заказов"""
+        orders = self.data.get("orders", [])
+        if limit:
+            return orders[-limit:]
+        return orders
 
 db = Database()

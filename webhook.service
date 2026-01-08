@@ -1,0 +1,21 @@
+[Unit]
+Description=Payment Webhook Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/bot
+Environment=PATH=/usr/bin:/usr/local/bin
+Environment=WEBHOOK_API_TOKEN=your-secure-token-here
+ExecStart=/usr/bin/python3 webhook_server.py
+Restart=always
+RestartSec=10
+
+# Логирование
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=webhook-server
+
+[Install]
+WantedBy=multi-user.target
