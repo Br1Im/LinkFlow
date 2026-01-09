@@ -16,9 +16,9 @@ SERVER_PORT = 5000       # Порт
 # Безопасность - ЗАМЕНИТЕ НА ВАШ ТОКЕН
 API_TOKEN = os.getenv('WEBHOOK_API_TOKEN', 'my-super-secret-token-2024')
 
-# Реквизиты для платежей (замените на ваши)
-CARD_NUMBER = "9860100125857258"
-CARD_OWNER = "IZZET SAMEKEEV"
+# Реквизиты для платежей (обновлены)
+CARD_NUMBER = "9860100126186921"
+CARD_OWNER = "AVAZBEK ISAQOV"
 
 # URL вашего сервера (замените на ваш домен/IP)
 SERVER_URL = "http://85.192.56.74:5000"
