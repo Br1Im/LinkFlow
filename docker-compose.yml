@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  payment-admin:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+      - ./bot/bot_database.json:/app/bot/bot_database.json
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DISPLAY=:99
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - payment-network
+
+networks:
+  payment-network:
+    driver: bridge
