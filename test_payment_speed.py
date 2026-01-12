@@ -9,7 +9,7 @@ import time
 import json
 
 # Настройки
-API_URL = "http://127.0.0.1:5000/api/create-payment"
+API_URL = "http://127.0.0.1:5001/api/create-payment"
 TEST_AMOUNT = 10000  # Тестовая сумма в сумах
 
 def test_payment_creation():
@@ -164,7 +164,7 @@ def run_multiple_tests(count=5):
 def check_browser_status():
     """Проверяет статус браузера"""
     try:
-        response = requests.get("http://127.0.0.1:5000/api/pool/status", timeout=5)
+        response = requests.get("http://127.0.0.1:5001/api/pool/status", timeout=5)
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     # Проверка доступности API
     print("🔍 Проверка доступности API...")
     try:
-        response = requests.get("http://127.0.0.1:5000/api/health", timeout=5)
+        response = requests.get("http://127.0.0.1:5001/api/health", timeout=5)
         if response.status_code == 200:
             print("✅ API доступен")
         else:
@@ -206,7 +206,7 @@ if __name__ == "__main__":
             print("⚠️  Браузер не прогрет - будет использован холодный старт")
     
     # Запуск тестов
-    results = run_multiple_tests(count=1)  # Только 1 тест для отладки
+    results = run_multiple_tests(count=5)  # Финальный тест стабильности
     
     print("\n" + "="*60)
     print("✅ ТЕСТИРОВАНИЕ ЗАВЕРШЕНО")
