@@ -1,0 +1,188 @@
+{
+  "timestamp": "2026-01-13 22:00:19",
+  "sequential_results": [
+    {
+      "test_id": "1s_1",
+      "success": false,
+      "time": 40.092530727386475,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "1s_2",
+      "success": false,
+      "time": 40.058382987976074,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "1s_3",
+      "success": false,
+      "time": 40.08084750175476,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "1s_4",
+      "success": false,
+      "time": 40.07389998435974,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "1s_5",
+      "success": false,
+      "time": 40.0647611618042,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "2s_1",
+      "success": true,
+      "time": 22.87937092781067,
+      "error": null,
+      "status_code": 201
+    },
+    {
+      "test_id": "2s_2",
+      "success": true,
+      "time": 21.355382919311523,
+      "error": null,
+      "status_code": 201
+    },
+    {
+      "test_id": "2s_3",
+      "success": true,
+      "time": 22.45157241821289,
+      "error": null,
+      "status_code": 201
+    },
+    {
+      "test_id": "2s_4",
+      "success": false,
+      "time": 40.054428815841675,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "2s_5",
+      "success": false,
+      "time": 40.05485963821411,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "3s_1",
+      "success": true,
+      "time": 27.854042768478394,
+      "error": null,
+      "status_code": 201
+    },
+    {
+      "test_id": "3s_2",
+      "success": false,
+      "time": 40.05250668525696,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "3s_3",
+      "success": false,
+      "time": 40.054163217544556,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "3s_4",
+      "success": false,
+      "time": 40.05425548553467,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "3s_5",
+      "success": true,
+      "time": 21.201396226882935,
+      "error": null,
+      "status_code": 201
+    }
+  ],
+  "concurrent_results": [
+    {
+      "test_id": "concurrent_2_1",
+      "success": true,
+      "time": 22.362193822860718,
+      "error": null,
+      "status_code": 201
+    },
+    {
+      "test_id": "concurrent_2_2",
+      "success": false,
+      "time": 40.06425094604492,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "concurrent_3_1",
+      "success": true,
+      "time": 23.10776925086975,
+      "error": null,
+      "status_code": 201
+    },
+    {
+      "test_id": "concurrent_3_2",
+      "success": false,
+      "time": 40.056437969207764,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "concurrent_3_3",
+      "success": false,
+      "time": 40.055341958999634,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "concurrent_5_1",
+      "success": false,
+      "time": 40.054622650146484,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "concurrent_5_4",
+      "success": false,
+      "time": 40.057793855667114,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "concurrent_5_2",
+      "success": false,
+      "time": 40.060317516326904,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "concurrent_5_3",
+      "success": false,
+      "time": 40.060317516326904,
+      "error": "Timeout",
+      "status_code": 0
+    },
+    {
+      "test_id": "concurrent_5_5",
+      "success": false,
+      "time": 40.06306791305542,
+      "error": "Timeout",
+      "status_code": 0
+    }
+  ],
+  "summary": {
+    "total_tests": 25,
+    "successful": 7,
+    "failed": 18,
+    "success_rate": 28.000000000000004
+  }
+}
