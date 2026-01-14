@@ -68,7 +68,7 @@ ENV CHROME_PATH=/usr/bin/google-chrome
 
 ENV PYTHONUNBUFFERED=1
 
-EXPOSE 5000
+EXPOSE 5001
 
 # Запускаем Xvfb и приложение
 CMD ["sh", "-c", "pkill Xvfb 2>/dev/null || true && rm -f /tmp/.X99-lock && Xvfb :99 -screen 0 1920x1080x24 & sleep 2 && cd bot && python admin_panel.py"]

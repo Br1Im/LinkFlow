@@ -5,7 +5,7 @@
 ЦЕЛЬ: Поддержка частых запросов (1-3s интервал) и ускорение до 8-12s
 """
 
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, render_template
 from flask_cors import CORS
 import json
 import uuid
@@ -24,12 +24,35 @@ from payment_service import create_payment_fast as create_payment
 from database import db
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
      allow_headers=["Content-Type", "Authorization"])
+
+# Middleware для логирования всех запросов
+@app.before_request
+def log_request():
+    """Логирование каждого входящего запроса"""
+    logger.info(f"📨 ЗАПРОС: {request.method} {request.path}")
+    logger.info(f"   IP: {request.remote_addr}")
+    logger.info(f"   Headers: {dict(request.headers)}")
+    if request.method in ['POST', 'PUT', 'PATCH']:
+        try:
+            logger.info(f"   Body: {request.get_json()}")
+        except:
+            logger.info(f"   Body: {request.get_data()}")
+
+@app.after_request
+def log_response(response):
+    """Логирование каждого ответа"""
+    logger.info(f"📤 ОТВЕТ: {request.method} {request.path} -> {response.status_code}")
+    return response
 
 # База данных созданных ссылок
 payment_links = {}
@@ -154,8 +177,15 @@ def verify_token():
 def create_payment_api_optimized():
     """ОПТИМИЗИРОВАННЫЙ API для создания платежа с параллельной обработкой"""
     
+    logger.info("=" * 80)
+    logger.info("🔥 НОВЫЙ ЗАПРОС НА СОЗДАНИЕ ПЛАТЕЖА")
+    logger.info(f"   Метод: {request.method}")
+    logger.info(f"   IP клиента: {request.remote_addr}")
+    logger.info(f"   User-Agent: {request.headers.get('User-Agent', 'N/A')}")
+    
     # Проверка авторизации
     if not verify_token():
+        logger.warning("❌ ОТКЛОНЕН: Неверный токен авторизации")
         return jsonify({
             "success": False,
             "error": "Unauthorized",
@@ -208,7 +238,11 @@ def create_payment_api_optimized():
         # Генерируем уникальный ID запроса
         request_id = str(uuid.uuid4())
         
-        logger.info(f"📥 Новый запрос {request_id}: amount={amount}, orderId={order_id}")
+        logger.info(f"✅ ВАЛИДАЦИЯ ПРОЙДЕНА")
+        logger.info(f"   Request ID: {request_id}")
+        logger.info(f"   Amount: {amount} сум")
+        logger.info(f"   Order ID: {order_id}")
+        logger.info(f"📥 Запуск асинхронной обработки платежа...")
         
         # ПАРАЛЛЕЛЬНАЯ обработка - не ждем результата
         future = executor.submit(process_payment_async, request_id, amount, order_id)
@@ -217,7 +251,12 @@ def create_payment_api_optimized():
         try:
             result = future.result(timeout=60)  # Увеличен до 60 секунд для стабильной работы
             
+            logger.info(f"⏱️  Обработка завершена за {result.get('processing_time', 0):.1f}s")
+            
             if result['success']:
+                logger.info(f"✅ УСПЕХ: Платеж создан успешно")
+                logger.info(f"   Payment Link: {result['payment_link']}")
+                logger.info("=" * 80)
                 return jsonify({
                     "success": True,
                     "request_id": result['request_id'],
@@ -228,6 +267,8 @@ def create_payment_api_optimized():
                     "message": "Payment created successfully"
                 }), 201
             else:
+                logger.error(f"❌ ОШИБКА: {result['error']}")
+                logger.info("=" * 80)
                 return jsonify({
                     "success": False,
                     "request_id": result['request_id'],
@@ -238,6 +279,8 @@ def create_payment_api_optimized():
                 
         except TimeoutError:
             # Если превышен таймаут, возвращаем статус "в обработке"
+            logger.error(f"⏰ ТАЙМАУТ: Обработка превысила 60 секунд")
+            logger.info("=" * 80)
             return jsonify({
                 "success": False,
                 "request_id": request_id,
@@ -248,7 +291,9 @@ def create_payment_api_optimized():
             }), 408
             
     except Exception as e:
-        logger.error(f"💥 Критическая ошибка API: {e}")
+        logger.error(f"💥 КРИТИЧЕСКАЯ ОШИБКА API: {e}")
+        logger.exception("Полный traceback:")
+        logger.info("=" * 80)
         return jsonify({
             "success": False,
             "error": str(e),
@@ -335,39 +380,166 @@ def get_payment_status(request_id):
             "request_id": request_id
         }), 404
 
-# Остальные endpoints (accounts, cards, etc.) остаются без изменений
-@app.route('/api/accounts')
-def get_accounts():
-    """Получение всех аккаунтов"""
-    accounts = db.get_accounts()
-    return jsonify(accounts)
+@app.route('/api/cards', methods=['GET', 'POST', 'DELETE'])
+def manage_cards():
+    """Управление картами"""
+    if request.method == 'GET':
+        cards = db.get_requisites()
+        return jsonify(cards)
+    elif request.method == 'POST':
+        data = request.json
+        card = {
+            'card_number': data.get('card_number'),
+            'owner_name': data.get('owner_name')
+        }
+        db.add_requisite(card['card_number'], card['owner_name'])
+        return jsonify({'success': True, 'card': card})
+    return jsonify({'success': False}), 400
 
-@app.route('/api/cards')
-def get_cards():
-    """Получение всех карт"""
+@app.route('/api/cards/<int:index>', methods=['DELETE'])
+def delete_card(index):
+    """Удаление карты"""
     cards = db.get_requisites()
-    return jsonify(cards)
+    if 0 <= index < len(cards):
+        db.delete_requisite(index)
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Card not found'}), 404
+
+@app.route('/api/accounts', methods=['GET', 'POST'])
+def manage_accounts():
+    """Управление аккаунтами"""
+    if request.method == 'GET':
+        accounts = db.get_accounts()
+        return jsonify(accounts)
+    elif request.method == 'POST':
+        data = request.json
+        account = {
+            'phone': data.get('phone'),
+            'password': data.get('password')
+        }
+        db.add_account(account['phone'], account['password'])
+        return jsonify({'success': True, 'account': account})
+    return jsonify({'success': False}), 400
+
+@app.route('/api/accounts/<int:index>', methods=['DELETE'])
+def delete_account(index):
+    """Удаление аккаунта"""
+    accounts = db.get_accounts()
+    if 0 <= index < len(accounts):
+        db.delete_account(index)
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Account not found'}), 404
+
+@app.route('/api/accounts/<int:index>/check', methods=['POST'])
+def check_account(index):
+    """Проверка аккаунта"""
+    # Заглушка для проверки аккаунта
+    return jsonify({'success': True, 'status': 'active'})
+
+@app.route('/api/links', methods=['GET'])
+def get_links():
+    """Получение всех созданных платежей"""
+    links_list = list(payment_links.values())
+    # Сортируем по дате создания (новые первые)
+    links_list.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return jsonify(links_list)
+
+@app.route('/api/links/<request_id>', methods=['DELETE'])
+def delete_link(request_id):
+    """Удаление платежа"""
+    if request_id in payment_links:
+        del payment_links[request_id]
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Payment not found'}), 404
+
+@app.route('/api/create-payment', methods=['POST'])
+def create_payment_frontend():
+    """Создание платежа из фронтенда"""
+    logger.info("=" * 80)
+    logger.info("🎨 ЗАПРОС ИЗ ФРОНТЕНДА НА СОЗДАНИЕ ПЛАТЕЖА")
+    
+    data = request.json
+    amount = data.get('amount')
+    order_id = data.get('orderId', f'order-{int(time.time())}')
+    
+    logger.info(f"   Amount: {amount} сум")
+    logger.info(f"   Order ID: {order_id}")
+    
+    if not amount:
+        return jsonify({'success': False, 'error': 'Amount is required'}), 400
+    
+    # Используем существующий оптимизированный эндпоинт
+    request_id = str(uuid.uuid4())
+    
+    logger.info(f"   Request ID: {request_id}")
+    logger.info(f"📥 Запуск асинхронной обработки...")
+    
+    # Запускаем асинхронную обработку
+    future = executor.submit(process_payment_async, request_id, amount, order_id)
+    
+    # Ждем результат (синхронно для фронтенда)
+    try:
+        result = future.result(timeout=70)  # Ждем до 70 секунд
+        
+        if request_id in payment_links:
+            payment_data = payment_links[request_id]
+            
+            logger.info(f"✅ УСПЕХ! Платеж создан")
+            logger.info(f"   Payment Link: {payment_data.get('payment_link')}")
+            logger.info(f"   Processing Time: {payment_data.get('processing_time'):.1f}s")
+            logger.info(f"   QR Code: {'Да' if payment_data.get('qr_base64') else 'Нет'}")
+            logger.info("=" * 80)
+            
+            return jsonify({
+                'success': True,
+                'paymentId': request_id,
+                'orderId': order_id,
+                'amount': amount,
+                'paymentUrl': payment_data.get('payment_link'),
+                'qrCode': payment_data.get('qr_base64'),
+                'elapsedTime': payment_data.get('processing_time'),
+                'createdAt': payment_data.get('created_at')
+            })
+        else:
+            logger.error(f"❌ ОШИБКА: Платеж не найден в payment_links")
+            logger.info("=" * 80)
+            return jsonify({
+                'success': False,
+                'error': 'Payment processing failed'
+            }), 500
+    except TimeoutError:
+        logger.error(f"⏰ ТАЙМАУТ: Обработка превысила 70 секунд")
+        logger.info("=" * 80)
+        return jsonify({
+            'success': False,
+            'error': 'Payment processing timeout'
+        }), 408
+    except Exception as e:
+        logger.error(f"💥 ИСКЛЮЧЕНИЕ: {e}")
+        logger.exception("Полный traceback:")
+        logger.info("=" * 80)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/warmup', methods=['POST'])
+def warmup_browser():
+    """Ручной прогрев браузера"""
+    try:
+        from payment_service import warmup_for_user
+        warmup_result = warmup_for_user(user_id=None)
+        return jsonify(warmup_result)
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/')
 def admin_panel():
     """Главная страница админ-панели"""
-    return jsonify({
-        "message": "Optimized Payment System API",
-        "version": "2.0",
-        "features": [
-            "Parallel processing",
-            "Fast response (8-12s target)",
-            "High frequency support (1-3s intervals)",
-            "Thread pool execution",
-            "Real-time statistics"
-        ],
-        "endpoints": {
-            "POST /api/payment": "Create payment (optimized)",
-            "GET /api/stats": "System statistics",
-            "GET /api/health": "Health check",
-            "GET /api/payment/<id>": "Payment status"
-        }
-    })
+    return render_template('admin.html')
 
 if __name__ == '__main__':
     logger.info("🚀 Запуск ОПТИМИЗИРОВАННОЙ системы платежей")
@@ -375,4 +547,16 @@ if __name__ == '__main__':
     logger.info("🎯 Цель: 8-12 секунд на платеж")
     logger.info("🔥 Поддержка частых запросов (1-3s)")
     
-    app.run(host='0.0.0.0', port=5001, debug=False, threaded=True)
+    # Автоматический прогрев браузера при старте
+    logger.info("🔥 Запуск автоматического прогрева браузера...")
+    try:
+        from payment_service import warmup_for_user
+        warmup_result = warmup_for_user(user_id=None)
+        if warmup_result.get('success'):
+            logger.info(f"✅ Браузер прогрет успешно! Режим: {warmup_result.get('mode')}")
+        else:
+            logger.warning(f"⚠️ Прогрев браузера не удался: {warmup_result.get('error')}")
+    except Exception as e:
+        logger.error(f"❌ Ошибка прогрева браузера: {e}")
+    
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

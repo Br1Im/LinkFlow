@@ -4,7 +4,7 @@ services:
   payment-admin:
     build: .
     ports:
-      - "5001:5000"
+      - "5001:5001"
     volumes:
       - ./data:/app/data
       - ./bot/bot_database.json:/app/bot/bot_database.json
@@ -13,7 +13,7 @@ services:
       - DISPLAY=:99
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:5001/"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -126,6 +126,15 @@ class Database:
         if 0 <= index < len(self.data["requisites"]):
             return self.data["requisites"][index]
         return None
+    
+    # Алиасы для совместимости с API
+    def delete_account(self, index: int) -> bool:
+        """Алиас для remove_account"""
+        return self.remove_account(index)
+    
+    def delete_requisite(self, index: int) -> bool:
+        """Алиас для remove_requisite"""
+        return self.remove_requisite(index)
 
     def add_payment(self, admin_id: int, card_number: str, owner_name: str, amount: float, payment_link: str):
 
