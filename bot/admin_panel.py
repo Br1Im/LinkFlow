@@ -257,24 +257,29 @@ def create_payment_api_optimized():
                 logger.info(f"✅ УСПЕХ: Платеж создан успешно")
                 logger.info(f"   Payment Link: {result['payment_link']}")
                 logger.info("=" * 80)
+                
+                # Извлекаем qrcId из payment_link
+                payment_link = result['payment_link']
+                qrc_id = ""
+                if payment_link and "qr.nspk.ru/" in payment_link:
+                    # Извлекаем ID между доменом и параметрами
+                    parts = payment_link.split("qr.nspk.ru/")
+                    if len(parts) > 1:
+                        qrc_id = parts[1].split("?")[0]
+                
                 return jsonify({
                     "success": True,
-                    "request_id": result['request_id'],
-                    "order_id": result['order_id'],
-                    "payment_link": result['payment_link'],
-                    "qr_base64": result['qr_base64'],
-                    "processing_time": result['processing_time'],
-                    "message": "Payment created successfully"
+                    "orderId": result['order_id'],
+                    "qrcId": qrc_id,
+                    "qr": payment_link
                 }), 201
             else:
                 logger.error(f"❌ ОШИБКА: {result['error']}")
                 logger.info("=" * 80)
                 return jsonify({
                     "success": False,
-                    "request_id": result['request_id'],
-                    "order_id": result['order_id'],
-                    "error": result['error'],
-                    "processing_time": result['processing_time']
+                    "orderId": result['order_id'],
+                    "error": result['error']
                 }), 500
                 
         except TimeoutError:
@@ -283,11 +288,8 @@ def create_payment_api_optimized():
             logger.info("=" * 80)
             return jsonify({
                 "success": False,
-                "request_id": request_id,
-                "order_id": order_id,
-                "error": "Processing timeout",
-                "message": "Payment processing took longer than 60 seconds",
-                "processing_time": 60
+                "orderId": order_id,
+                "error": "Processing timeout"
             }), 408
             
     except Exception as e:
