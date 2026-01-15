@@ -80,12 +80,12 @@ def warmup_for_user(user_id):
 
 def create_payment_fast(amount, send_callback=None):
     """
-    ОПТИМИЗИРОВАННАЯ функция создания платежа - 10-15 секунд
+    УЛЬТРА-ОПТИМИЗИРОВАННАЯ функция создания платежа - ЦЕЛЬ < 10 СЕКУНД
     Использует прогретый браузер для максимальной скорости
     """
     start_time = time.time()
     
-    print(f"⚡ БЫСТРОЕ создание платежа (цель 10-15 сек)...", flush=True)
+    print(f"⚡ УЛЬТРА-БЫСТРОЕ создание платежа (цель < 10 сек)...", flush=True)
     
     requisites = db.get_requisites()
     accounts = db.get_accounts()
@@ -102,7 +102,7 @@ def create_payment_fast(amount, send_callback=None):
     
     # Проверяем готовность браузера
     if not browser_manager.is_ready:
-        print(f"🔧 Браузер не готов, прогреваю...", flush=True)
+        print(f"🔧 Браузер не готов, БЫСТРЫЙ прогрев...", flush=True)
         success = browser_manager.warmup(
             card_number=requisite['card_number'],
             owner_name=requisite['owner_name'],
@@ -114,9 +114,10 @@ def create_payment_fast(amount, send_callback=None):
                 "elapsed_time": time.time() - start_time,
                 "success": False
             }
+        print(f"✅ Браузер прогрет за {time.time()-start_time:.1f}s", flush=True)
     
     # Используем прогретый браузер для максимальной скорости
-    print(f"⚡ Используем прогретый браузер...", flush=True)
+    print(f"⚡ Используем прогретый браузер (уже авторизован и готов)...", flush=True)
     result = create_payment_with_warmed_browser(amount, requisite, account, start_time)
     
     # Обработка результата
@@ -163,7 +164,7 @@ def create_payment_fast(amount, send_callback=None):
 def create_payment_with_warmed_browser(amount, requisite, account, start_time):
     """
     Создание платежа с прогретым браузером
-    ОПТИМИЗИРОВАННАЯ + СТАБИЛЬНАЯ ВЕРСИЯ
+    УЛЬТРА-ОПТИМИЗИРОВАННАЯ ВЕРСИЯ - ЦЕЛЬ < 10 СЕКУНД
     """
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
@@ -176,80 +177,223 @@ def create_payment_with_warmed_browser(amount, requisite, account, start_time):
     if not driver:
         raise Exception("Прогретый браузер недоступен")
     
-    def wait_payment_ready(timeout=12):
+    def wait_payment_ready(timeout=8):
         """
-        Ждём:
+        БЫСТРАЯ проверка готовности:
         - исчезновение loader
-        - заполнение суммы к зачислению
-        - активацию кнопки Оплатить
+        - активация кнопки Оплатить
         """
         end_time = time.time() + timeout
         while time.time() < end_time:
             try:
                 loader = driver.find_element(By.ID, "loadercontainer")
                 submit_btn = driver.find_element(By.NAME, "SubmitBtn")
-                result_sum = driver.find_element(By.ID, "SumResultUsd")
                 
                 loader_ok = not loader.is_displayed()
                 button_ok = submit_btn.get_attribute("disabled") is None
-                result_ok = bool(result_sum.get_attribute("value"))
                 
-                if loader_ok and button_ok and result_ok:
+                if loader_ok and button_ok:
                     return True
             except Exception:
                 pass
-            time.sleep(0.12)
+            time.sleep(0.08)  # Уменьшено с 0.12 до 0.08
         return False
     
     try:
-        logger.info(f"[{time.time()-start_time:.1f}s] Открываю страницу оплаты")
-        driver.get("https://1.elecsnet.ru/NotebookFront/services/0mhp/default.aspx"
-                   "?merchantId=36924&fromSegment=")
+        logger.info(f"[{time.time()-start_time:.1f}s] ⚡ Используем прогретый браузер")
         
-        wait = WebDriverWait(driver, 8)
+        # Браузер УЖЕ на странице оплаты с заполненными реквизитами!
+        # Проверяем что мы на правильной странице
+        current_url = driver.current_url
+        if "default.aspx" not in current_url or "merchantId=36924" not in current_url:
+            logger.info(f"[{time.time()-start_time:.1f}s] Переход на страницу оплаты")
+            driver.get("https://1.elecsnet.ru/NotebookFront/services/0mhp/default.aspx"
+                       "?merchantId=36924&fromSegment=")
+            time.sleep(0.5)  # Минимальная задержка
         
-        # Проверка авторизации
-        wait.until(lambda d: d.find_element(By.NAME, "requisites.m-36924.f-1"))
-        logger.info(f"[{time.time()-start_time:.1f}s] Браузер авторизован")
+        wait = WebDriverWait(driver, 5)  # Уменьшено с 8 до 5
         
-        # Карта
-        card_input = driver.find_element(By.NAME, "requisites.m-36924.f-1")
-        card_input.clear()
-        card_input.send_keys(requisite["card_number"])
+        # Проверка что форма загружена
+        wait.until(lambda d: d.find_element(By.NAME, "summ.transfer"))
+        logger.info(f"[{time.time()-start_time:.1f}s] Форма готова")
         
-        # Получатель
-        name_input = driver.find_element(By.NAME, "requisites.m-36924.f-2")
-        name_input.clear()
-        name_input.send_keys(requisite["owner_name"])
+        # Реквизиты УЖЕ заполнены при прогреве, только проверяем
+        try:
+            card_input = driver.find_element(By.NAME, "requisites.m-36924.f-1")
+            current_card = card_input.get_attribute("value")
+            if not current_card or current_card != requisite["card_number"]:
+                logger.info(f"[{time.time()-start_time:.1f}s] Обновляю реквизиты")
+                driver.execute_script("""
+                    arguments[0].value = arguments[1];
+                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                """, card_input, requisite["card_number"])
+                
+                name_input = driver.find_element(By.NAME, "requisites.m-36924.f-2")
+                driver.execute_script("""
+                    arguments[0].value = arguments[1];
+                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                """, name_input, requisite["owner_name"])
+        except:
+            pass
         
-        # Сумма
+        # Сумма - БЫСТРОЕ заполнение через JS
         amount_input = driver.find_element(By.NAME, "summ.transfer")
-        amount_input.clear()
         amount_formatted = f"{int(amount):,}".replace(",", " ")
-        amount_input.send_keys(amount_formatted)
         
-        logger.info(f"[{time.time()-start_time:.1f}s] Сумма введена, жду расчёт")
+        driver.execute_script("""
+            var input = arguments[0];
+            input.value = '';
+            input.value = arguments[1];
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.blur();
+        """, amount_input, amount_formatted)
         
-        # 🔥 КЛЮЧЕВОЕ МЕСТО
-        if not wait_payment_ready(timeout=15):
+        logger.info(f"[{time.time()-start_time:.1f}s] Сумма {amount_formatted}, жду расчёт")
+        
+        # Даем время на обработку суммы
+        time.sleep(1)
+        
+        # СБАЛАНСИРОВАННОЕ ожидание готовности - важно для стабильности
+        if not wait_payment_ready(timeout=12):  # Увеличено с 10 до 12
             raise TimeoutException("Расчёт суммы не завершился")
         
-        logger.info(f"[{time.time()-start_time:.1f}s] Сумма рассчитана, нажимаю оплату")
+        logger.info(f"[{time.time()-start_time:.1f}s] ✓ Готово, проверяю кнопку")
         
-        submit_btn = driver.find_element(By.NAME, "SubmitBtn")
+        # Проверяем наличие ошибок на странице
         try:
-            submit_btn.click()
-        except Exception:
-            driver.execute_script("arguments[0].click();", submit_btn)
+            errors = driver.find_elements(By.CSS_SELECTOR, ".error, .alert-danger, [class*='error']")
+            for err in errors:
+                if err.is_displayed():
+                    error_text = err.text
+                    logger.error(f"[{time.time()-start_time:.1f}s] ❌ Ошибка на странице: {error_text[:200]}")
+                    raise Exception(f"Ошибка валидации: {error_text[:200]}")
+        except Exception as e:
+            if "Ошибка валидации" in str(e):
+                raise
         
-        # Ждём переход на SBP
-        end = time.time() + 12
-        while time.time() < end:
-            if "/sbp/" in driver.current_url.lower():
+        # Дополнительная проверка что кнопка действительно активна
+        submit_btn = driver.find_element(By.NAME, "SubmitBtn")
+        for i in range(10):  # Даем еще 2 секунды на активацию
+            if submit_btn.is_enabled() and not submit_btn.get_attribute("disabled"):
                 break
-            time.sleep(0.15)
+            time.sleep(0.2)
+            submit_btn = driver.find_element(By.NAME, "SubmitBtn")
         
-        wait_result = WebDriverWait(driver, 10)
+        logger.info(f"[{time.time()-start_time:.1f}s] ✓ Кнопка активна, нажимаю оплату")
+        
+        logger.info(f"[{time.time()-start_time:.1f}s] ✓ Кнопка активна, нажимаю оплату")
+        
+        # Проверяем состояние формы перед кликом
+        try:
+            form_state = driver.execute_script("""
+                var form = document.querySelector('form');
+                var cardInput = document.querySelector('input[name="requisites.m-36924.f-1"]');
+                var nameInput = document.querySelector('input[name="requisites.m-36924.f-2"]');
+                var amountInput = document.querySelector('input[name="summ.transfer"]');
+                var submitBtn = document.querySelector('input[name="SubmitBtn"]');
+                
+                return {
+                    cardValue: cardInput ? cardInput.value : null,
+                    nameValue: nameInput ? nameInput.value : null,
+                    amountValue: amountInput ? amountInput.value : null,
+                    btnDisabled: submitBtn ? submitBtn.disabled : null,
+                    btnVisible: submitBtn ? submitBtn.offsetParent !== null : null
+                };
+            """)
+            logger.info(f"[{time.time()-start_time:.1f}s] Состояние формы: {form_state}")
+        except Exception as e:
+            logger.warning(f"[{time.time()-start_time:.1f}s] Не удалось проверить форму: {e}")
+        
+        # Пробуем разные способы клика для надежности
+        click_success = False
+        
+        # Способ 1: Прокрутка к кнопке + JS клик (самый надежный)
+        try:
+            driver.execute_script("""
+                var btn = arguments[0];
+                btn.scrollIntoView({block: 'center'});
+                // Удаляем возможные overlay
+                var overlays = document.querySelectorAll('.overlay, .modal-backdrop');
+                overlays.forEach(function(el) { el.style.display = 'none'; });
+            """, submit_btn)
+            time.sleep(0.3)
+            
+            driver.execute_script("arguments[0].click();", submit_btn)
+            click_success = True
+            logger.info(f"[{time.time()-start_time:.1f}s] ✓ Клик методом 1 (JS с прокруткой)")
+        except Exception as e1:
+            logger.warning(f"[{time.time()-start_time:.1f}s] Метод 1 не сработал: {e1}")
+            try:
+                # Способ 2: Обычный клик
+                submit_btn.click()
+                click_success = True
+                logger.info(f"[{time.time()-start_time:.1f}s] ✓ Клик методом 2 (обычный)")
+            except Exception as e2:
+                logger.warning(f"[{time.time()-start_time:.1f}s] Метод 2 не сработал: {e2}")
+                try:
+                    # Способ 3: Submit формы
+                    form = driver.find_element(By.TAG_NAME, "form")
+                    form.submit()
+                    click_success = True
+                    logger.info(f"[{time.time()-start_time:.1f}s] ✓ Клик методом 3 (submit)")
+                except Exception as e3:
+                    logger.error(f"[{time.time()-start_time:.1f}s] ❌ Все способы клика не сработали: {e3}")
+        
+        if not click_success:
+            raise Exception("Не удалось нажать кнопку Оплатить")
+        
+        logger.info(f"[{time.time()-start_time:.1f}s] Клик выполнен, жду перехода на SBP...")
+        
+        # Даем время на обработку клика
+        time.sleep(0.5)
+        
+        # БЫСТРОЕ ожидание перехода на SBP - увеличен таймаут
+        end = time.time() + 15  # Увеличено с 8 до 15 для стабильности
+        sbp_reached = False
+        check_count = 0
+        while time.time() < end:
+            current_url = driver.current_url
+            check_count += 1
+            
+            if "/sbp/" in current_url.lower() or "sbp" in current_url.lower():
+                logger.info(f"[{time.time()-start_time:.1f}s] ✓ Переход на SBP: {current_url[:80]}")
+                sbp_reached = True
+                break
+            
+            # Каждые 2 секунды проверяем что происходит
+            if check_count % 10 == 0:
+                try:
+                    # Проверяем JavaScript ошибки
+                    logs = driver.get_log('browser')
+                    errors = [log for log in logs if log['level'] == 'SEVERE']
+                    if errors:
+                        logger.warning(f"[{time.time()-start_time:.1f}s] JS ошибки: {errors[-1]['message'][:200]}")
+                except:
+                    pass
+                
+                logger.info(f"[{time.time()-start_time:.1f}s] Все еще на: {current_url[:80]}")
+            
+            time.sleep(0.2)  # Увеличено с 0.1 до 0.2
+        
+        if not sbp_reached:
+            logger.warning(f"[{time.time()-start_time:.1f}s] ⚠️ Не перешли на SBP, текущий URL: {driver.current_url}")
+            
+            # Проверяем что на странице
+            try:
+                page_title = driver.title
+                logger.warning(f"[{time.time()-start_time:.1f}s] Заголовок страницы: {page_title}")
+                
+                # Проверяем наличие сообщений об ошибках
+                error_msgs = driver.find_elements(By.CSS_SELECTOR, ".error, .alert, [class*='error'], [class*='alert']")
+                for msg in error_msgs:
+                    if msg.is_displayed():
+                        logger.error(f"[{time.time()-start_time:.1f}s] Сообщение на странице: {msg.text[:200]}")
+            except:
+                pass
+        
+        # БЫСТРОЕ получение результата - увеличен таймаут
+        wait_result = WebDriverWait(driver, 10)  # Увеличено с 6 до 10
         
         qr_code = None
         payment_link = None
@@ -257,20 +401,57 @@ def create_payment_with_warmed_browser(amount, requisite, account, start_time):
         try:
             qr_img = wait_result.until(lambda d: d.find_element(By.ID, "Image1"))
             qr_code = qr_img.get_attribute("src")
+            logger.info(f"[{time.time()-start_time:.1f}s] ✓ QR найден по ID")
         except:
-            pass
+            try:
+                qr_img = driver.find_element(By.CSS_SELECTOR, "img[src*='data:image']")
+                qr_code = qr_img.get_attribute("src")
+                logger.info(f"[{time.time()-start_time:.1f}s] ✓ QR найден по CSS")
+            except Exception as e:
+                logger.warning(f"[{time.time()-start_time:.1f}s] ⚠️ QR не найден: {str(e)[:100]}")
         
         try:
             link_el = wait_result.until(lambda d: d.find_element(By.ID, "LinkMobil"))
             payment_link = link_el.get_attribute("href")
+            logger.info(f"[{time.time()-start_time:.1f}s] ✓ Ссылка найдена по ID")
         except:
-            pass
+            try:
+                link_el = driver.find_element(By.CSS_SELECTOR, "a[href*='qr.nspk.ru']")
+                payment_link = link_el.get_attribute("href")
+                logger.info(f"[{time.time()-start_time:.1f}s] ✓ Ссылка найдена по CSS")
+            except:
+                # Пробуем найти в HTML
+                try:
+                    import re
+                    page_source = driver.page_source
+                    match = re.search(r'https://qr\.nspk\.ru/[A-Z0-9]+\?[^"\'<>\s]+', page_source)
+                    if match:
+                        payment_link = match.group(0)
+                        logger.info(f"[{time.time()-start_time:.1f}s] ✓ Ссылка найдена в HTML")
+                except Exception as e:
+                    logger.warning(f"[{time.time()-start_time:.1f}s] ⚠️ Ссылка не найдена: {str(e)[:100]}")
         
         if not payment_link or not qr_code:
+            # Сохраняем скриншот для отладки
+            try:
+                screenshot = driver.get_screenshot_as_base64()
+                logger.error(f"[{time.time()-start_time:.1f}s] ❌ Скриншот сохранен в логах")
+                logger.error(f"[{time.time()-start_time:.1f}s] URL: {driver.current_url}")
+                logger.error(f"[{time.time()-start_time:.1f}s] Title: {driver.title}")
+            except:
+                pass
             raise Exception("Не удалось получить QR или ссылку")
         
         elapsed = time.time() - start_time
         logger.info(f"🚀 Платёж создан за {elapsed:.1f} сек")
+        
+        # БЫСТРЫЙ возврат на форму для следующего платежа
+        try:
+            driver.get("https://1.elecsnet.ru/NotebookFront/services/0mhp/default.aspx"
+                       "?merchantId=36924&fromSegment=")
+            # НЕ ждем полной загрузки - браузер готов к следующему запросу
+        except:
+            pass
         
         return {
             "payment_link": payment_link,

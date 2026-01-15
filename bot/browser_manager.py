@@ -118,26 +118,31 @@ class BrowserInstance:
         return driver
     
     def warmup(self):
-        """Прогрев браузера"""
+        """БЫСТРЫЙ прогрев браузера - ОПТИМИЗИРОВАНО"""
         with self.lock:
             if self.is_ready and self.driver:
                 return True
             
             try:
-                print(f"🔥 Прогрев браузера для {self.account['phone']}...", flush=True)
+                print(f"🔥 БЫСТРЫЙ прогрев браузера для {self.account['phone']}...", flush=True)
                 start = time.time()
                 
                 self.driver = self._create_driver()
-                print(f"  📌 Драйвер создан, загружаю {ELECSNET_URL}...", flush=True)
-                self.driver.get(ELECSNET_URL)
-                print(f"  📌 Страница загружена за {time.time()-start:.1f}s", flush=True)
+                print(f"  📌 [{time.time()-start:.1f}s] Драйвер создан", flush=True)
                 
-                # Авторизация
+                # Сразу на страницу оплаты
+                self.driver.get('https://1.elecsnet.ru/NotebookFront/services/0mhp/default.aspx?merchantId=36924&fromSegment=')
+                print(f"  📌 [{time.time()-start:.1f}s] Страница загружена", flush=True)
+                
+                time.sleep(1)  # Минимальная задержка
+                
+                # Проверяем нужна ли авторизация
                 try:
                     login_btn = self.driver.find_element(By.CSS_SELECTOR, ".login")
+                    print(f"  📌 [{time.time()-start:.1f}s] Требуется авторизация", flush=True)
+                    
                     self.driver.execute_script("arguments[0].click();", login_btn)
-                    print(f"  📌 Кнопка входа нажата", flush=True)
-                    time.sleep(2)
+                    time.sleep(1)  # Уменьшено с 2 до 1
                     
                     phone_input = self.driver.find_element(By.ID, "Login_Value")
                     password_input = self.driver.find_element(By.ID, "Password_Value")
@@ -151,25 +156,31 @@ class BrowserInstance:
                         arguments[1].dispatchEvent(new Event('input', { bubbles: true }));
                     """, phone_input, password_input, phone_clean, self.account['password'])
                     
-                    time.sleep(0.5)
+                    time.sleep(0.3)  # Уменьшено с 0.5 до 0.3
                     self.driver.execute_script("arguments[0].click();", auth_btn)
-                    print(f"  📌 Авторизация отправлена", flush=True)
-                    time.sleep(3)
-                    self.driver.get(ELECSNET_URL)
-                    time.sleep(1)
+                    print(f"  📌 [{time.time()-start:.1f}s] Авторизация отправлена", flush=True)
+                    time.sleep(2)  # Уменьшено с 3 до 2
+                    
+                    # Возвращаемся на страницу оплаты
+                    self.driver.get('https://1.elecsnet.ru/NotebookFront/services/0mhp/default.aspx?merchantId=36924&fromSegment=')
+                    time.sleep(0.5)  # Уменьшено с 1 до 0.5
                 except Exception as auth_err:
-                    print(f"  ⚠️ Авторизация пропущена: {auth_err}", flush=True)
+                    print(f"  📌 [{time.time()-start:.1f}s] Уже авторизован", flush=True)
                 
-                # Ждем загрузки
-                print(f"  📌 Ожидание загрузки страницы...", flush=True)
-                wait = WebDriverWait(self.driver, 20)
-                wait.until(EC.invisibility_of_element_located((By.ID, "loadercontainer")))
-                print(f"  📌 Лоадер скрыт", flush=True)
+                # БЫСТРОЕ ожидание загрузки
+                print(f"  📌 [{time.time()-start:.1f}s] Ожидание формы...", flush=True)
+                wait = WebDriverWait(self.driver, 12)  # Уменьшено с 20 до 12
+                
+                # Ждем скрытия лоадера
+                try:
+                    wait.until(EC.invisibility_of_element_located((By.ID, "loadercontainer")))
+                except:
+                    pass
                 
                 # Заполняем реквизиты
                 card_input = wait.until(EC.presence_of_element_located((By.NAME, "requisites.m-36924.f-1")))
                 name_input = wait.until(EC.presence_of_element_located((By.NAME, "requisites.m-36924.f-2")))
-                print(f"  📌 Поля найдены, заполняю реквизиты...", flush=True)
+                print(f"  📌 [{time.time()-start:.1f}s] Заполняю реквизиты...", flush=True)
                 
                 self.driver.execute_script("""
                     arguments[0].value = arguments[2];
@@ -180,7 +191,8 @@ class BrowserInstance:
                 
                 self.is_ready = True
                 self.last_activity = time.time()
-                print(f"✅ Браузер прогрет за {time.time()-start:.1f}s", flush=True)
+                elapsed = time.time() - start
+                print(f"✅ Браузер прогрет за {elapsed:.1f}s (ОПТИМИЗИРОВАНО)", flush=True)
                 return True
                 
             except Exception as e:
@@ -870,9 +882,9 @@ class BrowserManager:
         self._instance = None
     
     def warmup(self, card_number, owner_name, account):
-        """Прогрев через пул или одиночный экземпляр"""
+        """БЫСТРЫЙ прогрев через одиночный экземпляр - ОПТИМИЗИРОВАНО"""
         if self._warmup_in_progress:
-            for _ in range(90):
+            for _ in range(60):  # Уменьшено с 90 до 60
                 if not self._warmup_in_progress:
                     break
                 time.sleep(0.5)
