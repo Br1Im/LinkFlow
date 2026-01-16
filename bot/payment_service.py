@@ -251,12 +251,23 @@ def create_payment_with_warmed_browser(amount, requisite, account, start_time):
         
         logger.info(f"[{time.time()-start_time:.1f}s] Сумма {amount_formatted}, жду расчёт")
         
-        # Даем время на обработку суммы
-        time.sleep(1)
+        # АГРЕССИВНАЯ ОПТИМИЗАЦИЯ: Минимальное ожидание
+        time.sleep(0.5)  # Даем минимум времени на начало обработки
         
-        # СБАЛАНСИРОВАННОЕ ожидание готовности - важно для стабильности
-        if not wait_payment_ready(timeout=12):  # Увеличено с 10 до 12
-            raise TimeoutException("Расчёт суммы не завершился")
+        # Проверяем готовность, но не ждем долго
+        if not wait_payment_ready(timeout=5):  # Уменьшено с 12 до 5
+            logger.warning(f"[{time.time()-start_time:.1f}s] ⚠️ Таймаут ожидания, принудительно активирую кнопку")
+            # Принудительно активируем кнопку через JS
+            try:
+                driver.execute_script("""
+                    var btn = document.querySelector('input[name="SubmitBtn"]');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.removeAttribute('disabled');
+                    }
+                """)
+            except:
+                pass
         
         logger.info(f"[{time.time()-start_time:.1f}s] ✓ Готово, проверяю кнопку")
         
@@ -272,13 +283,25 @@ def create_payment_with_warmed_browser(amount, requisite, account, start_time):
             if "Ошибка валидации" in str(e):
                 raise
         
-        # Дополнительная проверка что кнопка действительно активна
+        # АГРЕССИВНАЯ ОПТИМИЗАЦИЯ: Минимальное ожидание активации кнопки
         submit_btn = driver.find_element(By.NAME, "SubmitBtn")
-        for i in range(10):  # Даем еще 2 секунды на активацию
+        
+        # Даем только 2 секунды на активацию
+        for i in range(10):  # 10 * 0.2 = 2 секунды
             if submit_btn.is_enabled() and not submit_btn.get_attribute("disabled"):
                 break
             time.sleep(0.2)
             submit_btn = driver.find_element(By.NAME, "SubmitBtn")
+        
+        # Если кнопка все еще не активна - принудительно активируем
+        if submit_btn.get_attribute("disabled"):
+            logger.warning(f"[{time.time()-start_time:.1f}s] ⚠️ Кнопка не активна, принудительно активирую")
+            driver.execute_script("""
+                var btn = arguments[0];
+                btn.disabled = false;
+                btn.removeAttribute('disabled');
+            """, submit_btn)
+            time.sleep(0.2)
         
         logger.info(f"[{time.time()-start_time:.1f}s] ✓ Кнопка активна, нажимаю оплату")
         
@@ -346,10 +369,10 @@ def create_payment_with_warmed_browser(amount, requisite, account, start_time):
         logger.info(f"[{time.time()-start_time:.1f}s] Клик выполнен, жду перехода на SBP...")
         
         # Даем время на обработку клика
-        time.sleep(0.5)
+        time.sleep(0.3)  # Уменьшено с 0.5 до 0.3
         
-        # БЫСТРОЕ ожидание перехода на SBP - увеличен таймаут
-        end = time.time() + 15  # Увеличено с 8 до 15 для стабильности
+        # АГРЕССИВНОЕ ожидание перехода на SBP
+        end = time.time() + 10  # Уменьшено с 15 до 10
         sbp_reached = False
         check_count = 0
         while time.time() < end:
@@ -363,18 +386,9 @@ def create_payment_with_warmed_browser(amount, requisite, account, start_time):
             
             # Каждые 2 секунды проверяем что происходит
             if check_count % 10 == 0:
-                try:
-                    # Проверяем JavaScript ошибки
-                    logs = driver.get_log('browser')
-                    errors = [log for log in logs if log['level'] == 'SEVERE']
-                    if errors:
-                        logger.warning(f"[{time.time()-start_time:.1f}s] JS ошибки: {errors[-1]['message'][:200]}")
-                except:
-                    pass
-                
-                logger.info(f"[{time.time()-start_time:.1f}s] Все еще на: {current_url[:80]}")
+                logger.info(f"[{time.time()-start_time:.1f}s] Ожидание SBP: {current_url[:80]}")
             
-            time.sleep(0.2)  # Увеличено с 0.1 до 0.2
+            time.sleep(0.15)  # Уменьшено с 0.2 до 0.15
         
         if not sbp_reached:
             logger.warning(f"[{time.time()-start_time:.1f}s] ⚠️ Не перешли на SBP, текущий URL: {driver.current_url}")
@@ -392,8 +406,8 @@ def create_payment_with_warmed_browser(amount, requisite, account, start_time):
             except:
                 pass
         
-        # БЫСТРОЕ получение результата - увеличен таймаут
-        wait_result = WebDriverWait(driver, 10)  # Увеличено с 6 до 10
+        # БЫСТРОЕ получение результата
+        wait_result = WebDriverWait(driver, 5)  # Уменьшено с 10 до 5
         
         qr_code = None
         payment_link = None
