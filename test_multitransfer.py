@@ -21,11 +21,6 @@ def test_multitransfer():
         print("❌ Не удалось инициализировать браузер")
         return False
     
-    # Пауза для изучения страницы
-    print("\n⏸️  Браузер открыт. Изучите страницу multitransfer.ru")
-    print("   Нажмите Enter когда будете готовы продолжить...")
-    input()
-    
     # Тестовые данные
     test_data = {
         "amount": 1000,
@@ -52,9 +47,12 @@ def test_multitransfer():
     else:
         print(f"   ❌ Ошибка: {result.get('error')}")
     
-    # Пауза перед закрытием
+    # Пауза перед закрытием - чтобы изучить результат
     print("\n⏸️  Нажмите Enter чтобы закрыть браузер...")
-    input()
+    try:
+        input()
+    except:
+        time.sleep(5)
     
     # Закрытие
     print("\n4️⃣ Закрытие браузера...")
