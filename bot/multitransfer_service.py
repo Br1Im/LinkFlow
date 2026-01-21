@@ -1,35 +1,35 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-Сервис создания платежей через multitransfer.ru
+╨б╨╛╨╖╨┤╨░╨╜╨╕╨╡ ╨┐╨╗╨░╤В╨╡╨╢╨╡╨╣ ╤З╨╡╤А╨╡╨╖ multitransfer.ru
 """
 
 import time
-import logging
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.chrome.service import Service as ChromeService
 
-logger = logging.getLogger(__name__)
+try:
+    from .mui_helpers import set_mui_input_value, click_mui_element, wait_for_mui_button_enabled
+    from .sender_data import SENDER_DATA
+except ImportError:
+    # ╨Ф╨╗╤П ╨╖╨░╨┐╤Г╤Б╨║╨░ ╨▓╨╜╨╡ ╨┐╨░╨║╨╡╤В╨░
+    from mui_helpers import set_mui_input_value, click_mui_element, wait_for_mui_button_enabled
+    from sender_data import SENDER_DATA
 
-MULTITRANSFER_URL = "https://multitransfer.ru/"
 
-
-class MultiTransferManager:
-    """Менеджер для работы с multitransfer.ru"""
+class MultitransferPayment:
+    """╨Ъ╨╗╨░╤Б╤Б ╨┤╨╗╤П ╤А╨░╨▒╨╛╤В╤Л ╤Б multitransfer.ru"""
     
     def __init__(self):
+        self.url = "https://multitransfer.ru/"
         self.driver = None
-        self.is_ready = False
     
     def _create_driver(self):
-        """Создание драйвера Chrome"""
-        options = ChromeOptions()
-        
-        # Опции для локального тестирования
-        # options.add_argument('--headless=new')  # Закомментировано для отладки
+        """╨б╨╛╨╖╨┤╨░╨╜╨╕╨╡ Chrome ╨┤╤А╨░╨╣╨▓╨╡╤А╨░"""
+        options = webdriver.ChromeOptions()
+        # options.add_argument('--headless=new')  # ╨Ю╤В╨║╨╗╤О╤З╨╡╨╜╨╛ ╨┤╨╗╤П ╨╛╤В╨╗╨░╨┤╨║╨╕
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
@@ -38,326 +38,417 @@ class MultiTransferManager:
         options.add_experimental_option('excludeSwitches', ['enable-logging', 'enable-automation'])
         options.add_experimental_option('useAutomationExtension', False)
         
-        try:
-            # Для Windows
-            driver = webdriver.Chrome(options=options)
-        except Exception as e:
-            logger.error(f"❌ Не удалось создать Chrome драйвер: {e}")
-            raise
-        
+        driver = webdriver.Chrome(options=options)
         driver.set_page_load_timeout(30)
-        driver.implicitly_wait(10)
         return driver
     
-    def initialize(self):
-        """Инициализация браузера"""
-        try:
-            print(f"🔧 Инициализация MultiTransfer браузера...", flush=True)
-            start = time.time()
-            
-            self.driver = self._create_driver()
-            print(f"  📌 Драйвер создан, загружаю {MULTITRANSFER_URL}...", flush=True)
-            
-            self.driver.get(MULTITRANSFER_URL)
-            print(f"  📌 Страница загружена за {time.time()-start:.1f}s", flush=True)
-            
-            self.is_ready = True
-            print(f"✅ MultiTransfer браузер готов за {time.time()-start:.1f}s", flush=True)
-            return True
-            
-        except Exception as e:
-            print(f"❌ Ошибка инициализации: {e}", flush=True)
-            if self.driver:
-                try:
-                    self.driver.quit()
-                except:
-                    pass
-                self.driver = None
-            self.is_ready = False
-            return False
-    
-    def create_payment(self, amount, card_number, owner_name):
+    def login(self, phone=None, password=None):
         """
-        Создание платежа через multitransfer.ru
+        ╨Ш╨╜╨╕╤Ж╨╕╨░╨╗╨╕╨╖╨░╤Ж╨╕╤П (╨░╨▓╤В╨╛╤А╨╕╨╖╨░╤Ж╨╕╤П ╨╜╨╡ ╤В╤А╨╡╨▒╤Г╨╡╤В╤Б╤П ╨┤╨╗╤П multitransfer.ru)
+        """
+        print(f"ЁЯФз ╨Ш╨╜╨╕╤Ж╨╕╨░╨╗╨╕╨╖╨░╤Ж╨╕╤П multitransfer.ru...")
+        
+        self.driver = self._create_driver()
+        self.driver.get(self.url)
+        time.sleep(2)
+        
+        print("тЬЕ ╨б╤В╤А╨░╨╜╨╕╤Ж╨░ ╨╖╨░╨│╤А╤Г╨╢╨╡╨╜╨░")
+        return True
+    
+    def create_payment(self, card_number, owner_name, amount):
+        """
+        ╨б╨╛╨╖╨┤╨░╨╜╨╕╨╡ ╨┐╨╗╨░╤В╨╡╨╢╨░ (React-safe ╨▓╨╡╤А╤Б╨╕╤П)
         
         Args:
-            amount: Сумма платежа (в рублях)
-            card_number: Номер карты получателя
-            owner_name: Имя владельца карты
+            card_number: ╨Э╨╛╨╝╨╡╤А ╨║╨░╤А╤В╤Л ╨┐╨╛╨╗╤Г╤З╨░╤В╨╡╨╗╤П (╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜)
+            owner_name: ╨Ш╨╝╤П ╨▓╨╗╨░╨┤╨╡╨╗╤М╤Ж╨░ ╨║╨░╤А╤В╤Л
+            amount: ╨б╤Г╨╝╨╝╨░ ╨┐╨╗╨░╤В╨╡╨╢╨░ ╨▓ ╤А╤Г╨▒╨╗╤П╤Е
             
         Returns:
-            dict: Результат с payment_link и qr_base64
+            dict: {"payment_link": "...", "qr_base64": "..."}
         """
+        print(f"\nЁЯТ│ ╨б╨╛╨╖╨┤╨░╨╜╨╕╨╡ ╨┐╨╗╨░╤В╨╡╨╢╨░ ╤З╨╡╤А╨╡╨╖ multitransfer.ru")
+        print(f"   ╨Ъ╨░╤А╤В╨░: {card_number}")
+        print(f"   ╨Т╨╗╨░╨┤╨╡╨╗╨╡╤Ж: {owner_name}")
+        print(f"   ╨б╤Г╨╝╨╝╨░: {amount} ╤А╤Г╨▒.")
+        
         start_time = time.time()
         
-        if not self.is_ready or not self.driver:
-            raise Exception("Браузер не инициализирован")
-        
         try:
-            print(f"🚀 Создание платежа через MultiTransfer...", flush=True)
-            print(f"  Сумма: {amount} RUB", flush=True)
-            print(f"  Карта: {card_number}", flush=True)
-            print(f"  Владелец: {owner_name}", flush=True)
-            
             wait = WebDriverWait(self.driver, 20)
             
-            # Шаг 1: Выбрать страну "Узбекистан"
-            print(f"  📌 Выбираю страну Узбекистан...", flush=True)
-            try:
-                # Клик на блок выбора страны (там где Азербайджан по умолчанию)
-                country_block = wait.until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, ".variant-alternative.css-c8d8yl"))
-                )
-                country_block.click()
-                time.sleep(1)
-                
-                # Ищем Узбекистан в выпадающем списке
-                uzbekistan = wait.until(
-                    EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), 'Узбекистан')]"))
-                )
-                uzbekistan.click()
-                print(f"  ✅ Узбекистан выбран", flush=True)
-                time.sleep(1)
-            except Exception as e:
-                print(f"  ⚠️ Не удалось выбрать страну (возможно уже выбран): {e}", flush=True)
+            # ╨и╨░╨│ 1: ╨Т╤Л╨▒╤А╨░╤В╤М ╤Б╤В╤А╨░╨╜╤Г "╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜"
+            print("ЁЯУМ ╨Т╤Л╨▒╨╕╤А╨░╤О ╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜...")
+            country_selector = wait.until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, ".variant-alternative.css-c8d8yl"))
+            )
+            country_selector.click()
+            time.sleep(0.3)
             
-            # Шаг 2: Ввести сумму отправления
-            print(f"  📌 Ввожу сумму {amount} RUB...", flush=True)
+            uzbekistan = wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'variant-alternative') and contains(., '╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜')]"))
+            )
+            uzbekistan.click()
+            time.sleep(0.5)
+            print("тЬЕ ╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜ ╨▓╤Л╨▒╤А╨░╨╜")
+            
+            # ╨и╨░╨│ 2: ╨Т╨▓╨╛╨┤ ╤Б╤Г╨╝╨╝╤Л ╤З╨╡╤А╨╡╨╖ send_keys (React-safe)
+            print(f"ЁЯУМ ╨Т╨▓╨╛╨╢╤Г ╤Б╤Г╨╝╨╝╤Г {amount} RUB (React-safe)...")
             amount_input = wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='0 RUB']"))
             )
-            amount_input.click()
-            amount_input.clear()
-            amount_input.send_keys(str(amount))
-            print(f"  ✅ Сумма введена, жду пересчета...", flush=True)
-            time.sleep(3)  # Ждем пересчета
             
-            # Шаг 3: Нажать кнопку "Продолжить" на главной странице
-            print(f"  📌 Ищу кнопку Продолжить на главной странице...", flush=True)
-            try:
-                # Ждем пока кнопка станет активной (disabled снимется)
-                pay_btn_found = False
-                for i in range(30):
-                    try:
-                        pay_btn = self.driver.find_element(By.ID, "pay")
-                        is_disabled = pay_btn.get_attribute("disabled")
-                        btn_text = pay_btn.text
-                        
-                        if i % 5 == 0:  # Выводим статус каждые 2.5 секунды
-                            print(f"  📌 Кнопка '{btn_text}': disabled={is_disabled}", flush=True)
-                        
-                        if not is_disabled:
-                            print(f"  📌 Кнопка Продолжить активна! Нажимаю...", flush=True)
-                            # Сохраняем скриншот перед кликом
-                            try:
-                                self.driver.save_screenshot("before_continue_click.png")
-                            except:
-                                pass
-                            
-                            self.driver.execute_script("arguments[0].click();", pay_btn)
-                            time.sleep(5)
-                            print(f"  ✅ Кнопка Продолжить нажата", flush=True)
-                            print(f"  📌 Новый URL: {self.driver.current_url}", flush=True)
-                            pay_btn_found = True
-                            break
-                    except Exception as e:
-                        if i == 0:
-                            print(f"  ⚠️ Кнопка #pay не найдена: {e}", flush=True)
-                    time.sleep(0.5)
-                
-                if not pay_btn_found:
-                    print(f"  ⚠️ Кнопка Продолжить так и не активировалась", flush=True)
-                    # Сохраняем скриншот
-                    try:
-                        self.driver.save_screenshot("button_not_active.png")
-                        print(f"  📌 Скриншот: button_not_active.png", flush=True)
-                    except:
-                        pass
-                    
-            except Exception as e:
-                print(f"  ⚠️ Ошибка с кнопкой Продолжить: {e}", flush=True)
+            # ╨Ю╨┤╨╕╨╜ ╤А╨░╨╖ ╨▓╨▓╨╛╨┤╨╕╨╝ ╤Б╤Г╨╝╨╝╤Г ╨┐╨╛╤Б╨╕╨╝╨▓╨╛╨╗╤М╨╜╨╛
+            set_mui_input_value(self.driver, amount_input, amount)
+            print("тЬЕ ╨б╤Г╨╝╨╝╨░ ╨▓╨▓╨╡╨┤╨╡╨╜╨░")
             
-            # Шаг 4: Теперь должна открыться страница со списком банков
-            print(f"  📌 Ищу список банков на новой странице...", flush=True)
-            time.sleep(2)
-            
-            try:
-                # Ищем все карточки банков
-                bank_cards = self.driver.find_elements(By.CSS_SELECTOR, ".home.css-1lvwieb, div[role='button'][aria-label*='банк']")
-                print(f"  📌 Найдено {len(bank_cards)} банков", flush=True)
-                
-                if len(bank_cards) > 0:
-                    # Ищем Uzcard/Humo - последний в списке
-                    humo_card = None
-                    for card in bank_cards:
-                        try:
-                            aria_label = card.get_attribute("aria-label") or ""
-                            card_text = card.text
-                            if "Uzcard" in aria_label or "Humo" in aria_label or "Uzcard" in card_text or "Humo" in card_text:
-                                humo_card = card
-                                print(f"  📌 Найден банк Uzcard/Humo", flush=True)
-                                break
-                        except:
-                            continue
-                    
-                    if not humo_card:
-                        # Если не нашли по имени, берем последний
-                        humo_card = bank_cards[-1]
-                        print(f"  📌 Выбираю последний банк в списке", flush=True)
-                    
-                    # Прокручиваем к карточке и кликаем
-                    self.driver.execute_script("arguments[0].scrollIntoView(true);", humo_card)
-                    time.sleep(0.5)
-                    humo_card.click()
-                    time.sleep(3)
-                    print(f"  ✅ Банк Uzcard/Humo выбран", flush=True)
-                    print(f"  📌 URL после выбора банка: {self.driver.current_url}", flush=True)
-                else:
-                    print(f"  ⚠️ Банки не найдены на странице", flush=True)
-                    
-            except Exception as e:
-                print(f"  ❌ Ошибка выбора банка: {e}", flush=True)
-                raise
-            
-            # Шаг 5: Заполнить данные карты на следующей странице
-            print(f"  📌 Жду загрузки формы...", flush=True)
+            # ╨Ц╨┤╤С╨╝ ╨┐╨╛╨║╨░ React ╨╛╨▒╤А╨░╨▒╨╛╤В╨░╨╡╤В (╨Т╨Р╨Ц╨Э╨Ю: ╤В╨╛╨╗╤М╨║╨╛ ╨╖╨┤╨╡╤Б╤М 3 ╤Б╨╡╨║╤Г╨╜╨┤╤Л!)
             time.sleep(3)
             
-            # Сохраняем скриншот для отладки
-            try:
-                self.driver.save_screenshot("after_bank_selection.png")
-                print(f"  📌 Скриншот сохранен: after_bank_selection.png", flush=True)
-                print(f"  📌 Текущий URL: {self.driver.current_url}", flush=True)
-            except:
-                pass
-            
-            print(f"  📌 Ищу поля для ввода данных...", flush=True)
-            
-            # Ищем все input поля на странице
-            all_inputs = self.driver.find_elements(By.TAG_NAME, "input")
-            print(f"  📌 Найдено {len(all_inputs)} input полей", flush=True)
-            for i, inp in enumerate(all_inputs[:10]):
-                try:
-                    placeholder = inp.get_attribute("placeholder") or ""
-                    name = inp.get_attribute("name") or ""
-                    inp_type = inp.get_attribute("type") or ""
-                    inputmode = inp.get_attribute("inputmode") or ""
-                    print(f"    Input {i+1}: type={inp_type}, inputmode={inputmode}, name={name}, placeholder={placeholder}", flush=True)
-                except:
-                    pass
-            
-            # Ищем поле номера карты - обычно это поле с inputmode="numeric" или placeholder содержит "карт"
-            card_input = None
-            for inp in all_inputs:
-                try:
-                    placeholder = (inp.get_attribute("placeholder") or "").lower()
-                    inputmode = inp.get_attribute("inputmode") or ""
-                    inp_type = inp.get_attribute("type") or ""
-                    
-                    if inputmode == "numeric" or "карт" in placeholder or "card" in placeholder or inp_type == "tel":
-                        card_input = inp
-                        print(f"  📌 Поле карты найдено: placeholder={placeholder}, inputmode={inputmode}", flush=True)
-                        break
-                except:
-                    continue
-            
-            if card_input:
-                card_input.clear()
-                card_input.send_keys(card_number)
-                print(f"  ✅ Номер карты введен", flush=True)
-                time.sleep(1)
+            # ╨и╨░╨│ 3: ╨Ц╨┤╤С╨╝ ╨░╨║╤В╨╕╨▓╨░╤Ж╨╕╨╕ ╨║╨╜╨╛╨┐╨║╨╕ "╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М"
+            print("ЁЯУМ ╨Ю╨╢╨╕╨┤╨░╤О ╨┐╨╛╨┤╤В╨▓╨╡╤А╨╢╨┤╨╡╨╜╨╕╤П ╤Б╤Г╨╝╨╝╤Л React...")
+            if wait_for_mui_button_enabled(self.driver, "pay", timeout=5):
+                print("тЬЕ ╨б╤Г╨╝╨╝╨░ ╨┐╨╛╨┤╤В╨▓╨╡╤А╨╢╨┤╨╡╨╜╨░ ╤Б╨░╨╣╤В╨╛╨╝")
             else:
-                print(f"  ⚠️ Поле карты не найдено", flush=True)
+                print("тЪая╕П ╨Ъ╨╜╨╛╨┐╨║╨░ '╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М' ╨╜╨╡ ╨░╨║╤В╨╕╨▓╨╕╤А╨╛╨▓╨░╨╗╨░╤Б╤М, ╨╜╨╛ ╨┐╤А╨╛╨┤╨╛╨╗╨╢╨░╨╡╨╝")
             
-            # Ищем поле имени владельца - обычно это текстовое поле после поля карты
-            name_input = None
-            for inp in all_inputs:
-                try:
-                    placeholder = (inp.get_attribute("placeholder") or "").lower()
-                    inp_type = inp.get_attribute("type") or ""
-                    
-                    if inp != card_input and (inp_type == "text" and ("имя" in placeholder or "владелец" in placeholder or "name" in placeholder or "фио" in placeholder)):
-                        name_input = inp
-                        print(f"  📌 Поле имени найдено: placeholder={placeholder}", flush=True)
-                        break
-                except:
-                    continue
-            
-            # Если не нашли по placeholder, берем второе текстовое поле
-            if not name_input:
-                text_inputs = [inp for inp in all_inputs if inp.get_attribute("type") == "text" and inp != card_input]
-                if len(text_inputs) > 0:
-                    name_input = text_inputs[0]
-                    print(f"  📌 Поле имени найдено (второе текстовое поле)", flush=True)
-            
-            if name_input:
-                name_input.clear()
-                name_input.send_keys(owner_name)
-                print(f"  ✅ Имя владельца введено", flush=True)
-                time.sleep(1)
-            else:
-                print(f"  ⚠️ Поле имени не найдено", flush=True)
-            
-            # Шаг 6: Найти и нажать кнопку отправки
-            print(f"  📌 Ищу кнопку отправки формы...", flush=True)
-            time.sleep(2)
-            
-            # Ищем все кнопки на странице
-            all_buttons = self.driver.find_elements(By.TAG_NAME, "button")
-            print(f"  📌 Найдено {len(all_buttons)} кнопок", flush=True)
-            
-            submit_btn = None
-            for btn in all_buttons:
-                try:
-                    btn_text = btn.text.lower()
-                    btn_type = btn.get_attribute("type") or ""
-                    if "создать" in btn_text or "оплатить" in btn_text or "продолжить" in btn_text or btn_type == "submit":
-                        print(f"  📌 Найдена кнопка: {btn.text} (type={btn_type})", flush=True)
-                        submit_btn = btn
-                        break
-                except:
-                    continue
-            
-            if submit_btn:
-                self.driver.execute_script("arguments[0].click();", submit_btn)
-                print(f"  ✅ Кнопка отправки нажата", flush=True)
-                time.sleep(3)
-            else:
-                print(f"  ⚠️ Кнопка отправки не найдена", flush=True)
-            
-            # Шаг 6: Получить ссылку и QR код
-            print(f"  📌 Получаю ссылку и QR код...", flush=True)
-            time.sleep(2)
-            
-            # Ищем QR код
-            qr_img = wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "img[alt*='QR'], img[src*='qr'], canvas"))
+            # ╨и╨░╨│ 4: ╨Ю╤В╨║╤А╤Л╤В╤М ╨▒╨╗╨╛╨║ "╨б╨┐╨╛╤Б╨╛╨▒ ╨┐╨╡╤А╨╡╨▓╨╛╨┤╨░"
+            print("ЁЯУМ ╨Ю╤В╨║╤А╤Л╨▓╨░╤О '╨б╨┐╨╛╤Б╨╛╨▒ ╨┐╨╡╤А╨╡╨▓╨╛╨┤╨░'...")
+            transfer_block = wait.until(
+                EC.element_to_be_clickable((
+                    By.XPATH,
+                    "//div[contains(text(),'╨б╨┐╨╛╤Б╨╛╨▒ ╨┐╨╡╤А╨╡╨▓╨╛╨┤╨░')]/ancestor::div[contains(@class,'variant-alternative')]"
+                ))
             )
-            qr_base64 = qr_img.get_attribute("src")
+            click_mui_element(self.driver, transfer_block)
+            print("тЬЕ ╨С╨╗╨╛╨║ ╤Б╨┐╨╛╤Б╨╛╨▒╨╛╨▓ ╨┐╨╡╤А╨╡╨▓╨╛╨┤╨░ ╨╛╤В╨║╤А╤Л╤В")
+            time.sleep(0.5)
             
-            # Ищем ссылку на оплату
-            payment_link = None
+            # ╨и╨░╨│ 5: ╨Т╤Л╨▒╤А╨░╤В╤М Uzcard / Humo ╨┐╨╛ ╤В╨╡╨║╤Б╤В╤Г
+            print("ЁЯУМ ╨Т╤Л╨▒╨╕╤А╨░╤О Uzcard / Humo...")
+            bank_option = wait.until(
+                EC.element_to_be_clickable((
+                    By.XPATH,
+                    "//*[contains(text(),'Uzcard') or contains(text(),'Humo')]"
+                ))
+            )
+            click_mui_element(self.driver, bank_option)
+            print("тЬЕ ╨С╨░╨╜╨║ ╨▓╤Л╨▒╤А╨░╨╜")
+            time.sleep(2)  # ╨Ц╨┤╤С╨╝ ╨┐╨╛╨║╨░ React ╨╛╨▒╤А╨░╨▒╨╛╤В╨░╨╡╤В ╨▓╤Л╨▒╨╛╤А ╨▒╨░╨╜╨║╨░
+            
+            # ╨и╨░╨│ 6: ╨Э╨░╨╢╨░╤В╤М ╨║╨╜╨╛╨┐╨║╤Г "╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М" (╨Э╨Х ╨╖╨░╨┐╨╛╨╗╨╜╤П╨╡╨╝ ╨┤╨░╨╜╨╜╤Л╨╡ ╨║╨░╤А╤В╤Л!)
+            print("ЁЯУМ ╨Э╨░╨╢╨╕╨╝╨░╤О '╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М'...")
+            
+            # ╨Ш╤Й╨╡╨╝ ╨║╨╜╨╛╨┐╨║╤Г "╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М" ╨┐╨╛ ID
             try:
-                link_element = self.driver.find_element(By.CSS_SELECTOR, "a[href*='pay'], a[href*='payment']")
-                payment_link = link_element.get_attribute("href")
+                continue_btn = wait.until(
+                    EC.element_to_be_clickable((By.ID, "pay"))
+                )
+                # ╨Я╤А╨╛╨║╤А╤Г╤З╨╕╨▓╨░╨╡╨╝ ╨║ ╨║╨╜╨╛╨┐╨║╨╡
+                self.driver.execute_script(
+                    "arguments[0].scrollIntoView({block:'center', behavior:'instant'});",
+                    continue_btn
+                )
+                time.sleep(0.5)
+                # ╨Я╤А╨╛╨▒╤Г╨╡╨╝ ╨╛╨▒╤Л╤З╨╜╤Л╨╣ ╨║╨╗╨╕╨║
+                continue_btn.click()
+                print("тЬЕ ╨Ъ╨╜╨╛╨┐╨║╨░ '╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М' ╨╜╨░╨╢╨░╤В╨░")
+                
+                # ╨Ц╨┤╤С╨╝ ╨┐╨╡╤А╨╡╤Е╨╛╨┤╨░ ╨╜╨░ ╤Б╤В╤А╨░╨╜╨╕╤Ж╤Г sender-details
+                wait.until(lambda d: "sender-details" in d.current_url)
+                print("тЬЕ ╨Я╨╡╤А╨╡╤Е╨╛╨┤ ╨╜╨░ ╤Б╤В╤А╨░╨╜╨╕╤Ж╤Г sender-details")
+                time.sleep(2)  # ╨Ц╨┤╤С╨╝ ╨┐╨╛╨╗╨╜╨╛╨╣ ╨╖╨░╨│╤А╤Г╨╖╨║╨╕ ╤Д╨╛╤А╨╝╤Л
+                
+            except Exception as e:
+                print(f"тЪая╕П ╨Ю╤И╨╕╨▒╨║╨░ ╨║╨╗╨╕╨║╨░ ╨┐╨╛ ╨║╨╜╨╛╨┐╨║╨╡: {e}")
+                # ╨Я╤А╨╛╨▒╤Г╨╡╨╝ JS ╨║╨╗╨╕╨║
+                try:
+                    continue_btn = self.driver.find_element(By.ID, "pay")
+                    self.driver.execute_script("arguments[0].click();", continue_btn)
+                    print("тЬЕ ╨Ъ╨╜╨╛╨┐╨║╨░ '╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М' ╨╜╨░╨╢╨░╤В╨░ (JS)")
+                    
+                    # ╨Ц╨┤╤С╨╝ ╨┐╨╡╤А╨╡╤Е╨╛╨┤╨░ ╨╜╨░ ╤Б╤В╤А╨░╨╜╨╕╤Ж╤Г sender-details
+                    wait.until(lambda d: "sender-details" in d.current_url)
+                    print("тЬЕ ╨Я╨╡╤А╨╡╤Е╨╛╨┤ ╨╜╨░ ╤Б╤В╤А╨░╨╜╨╕╤Ж╤Г sender-details")
+                    time.sleep(2)
+                    
+                except Exception as e2:
+                    print(f"тЪая╕П JS ╨║╨╗╨╕╨║ ╤В╨╛╨╢╨╡ ╨╜╨╡ ╤Б╤А╨░╨▒╨╛╤В╨░╨╗: {e2}")
+            
+            # ╨и╨░╨│ 7: ╨Ч╨░╨┐╨╛╨╗╨╜╨╕╤В╤М ╨┤╨░╨╜╨╜╤Л╨╡ ╨┐╨╛╨╗╤Г╤З╨░╤В╨╡╨╗╤П ╨╜╨░ ╤Б╤В╤А╨░╨╜╨╕╤Ж╨╡ sender-details
+            print("ЁЯУМ ╨Ч╨░╨┐╨╛╨╗╨╜╤П╤О ╨┤╨░╨╜╨╜╤Л╨╡ ╨┐╨╛╨╗╤Г╤З╨░╤В╨╡╨╗╤П ╨╕ ╨╛╤В╨┐╤А╨░╨▓╨╕╤В╨╡╨╗╤П...")
+            time.sleep(1)  # ╨Ц╨┤╤С╨╝ ╨╖╨░╨│╤А╤Г╨╖╨║╨╕ ╤Д╨╛╤А╨╝╤Л
+            
+            # ╨д╤Г╨╜╨║╤Ж╨╕╤П ╨┤╨╗╤П ╨┐╨╛╨╕╤Б╨║╨░ ╨╕ ╨╖╨░╨┐╨╛╨╗╨╜╨╡╨╜╨╕╤П ╨┐╨╛╨╗╤П
+            def fill_field(name_pattern, value, field_name):
+                try:
+                    inputs = self.driver.find_elements(By.TAG_NAME, "input")
+                    for inp in inputs:
+                        name_attr = (inp.get_attribute("name") or "").lower()
+                        if name_pattern in name_attr:
+                            inp.clear()
+                            inp.send_keys(value)
+                            print(f"   тЬЕ {field_name}: {value}")
+                            time.sleep(0.2)
+                            return True
+                    return False
+                except Exception as e:
+                    print(f"   тЪая╕П ╨Ю╤И╨╕╨▒╨║╨░ {field_name}: {e}")
+                    return False
+            
+            # ╨д╤Г╨╜╨║╤Ж╨╕╤П ╨┤╨╗╤П ╨▓╤Л╨▒╨╛╤А╨░ ╤Б╤В╤А╨░╨╜╤Л ╨╕╨╖ MUI Autocomplete
+            def select_country(name_pattern, country_name, field_name):
+                try:
+                    # ╨Ш╤Й╨╡╨╝ input ╤Б ╨╜╤Г╨╢╨╜╤Л╨╝ name
+                    inputs = self.driver.find_elements(By.TAG_NAME, "input")
+                    for inp in inputs:
+                        name_attr = (inp.get_attribute("name") or "")
+                        if name_pattern in name_attr:
+                            # ╨Я╤А╨╛╨║╤А╤Г╤З╨╕╨▓╨░╨╡╨╝ ╨║ ╨┐╨╛╨╗╤О
+                            self.driver.execute_script(
+                                "arguments[0].scrollIntoView({block:'center'});",
+                                inp
+                            )
+                            time.sleep(0.3)
+                            
+                            # ╨Ъ╨╗╨╕╨║╨░╨╡╨╝ ╨╜╨░ ╨┐╨╛╨╗╨╡ ╨┤╨╗╤П ╤Д╨╛╨║╤Г╤Б╨░
+                            inp.click()
+                            time.sleep(0.3)
+                            
+                            # ╨Ю╤З╨╕╤Й╨░╨╡╨╝ ╨╕ ╨▓╨▓╨╛╨┤╨╕╨╝ ╨╜╨░╨╖╨▓╨░╨╜╨╕╨╡ ╤Б╤В╤А╨░╨╜╤Л
+                            inp.clear()
+                            time.sleep(0.1)
+                            inp.send_keys(country_name)
+                            time.sleep(0.8)  # ╨Ц╨┤╤С╨╝ ╨┐╨╛╤П╨▓╨╗╨╡╨╜╨╕╤П ╤Б╨┐╨╕╤Б╨║╨░
+                            
+                            # ╨Ш╤Й╨╡╨╝ ╨▓╤Л╨┐╨░╨┤╨░╤О╤Й╨╕╨╣ ╤Б╨┐╨╕╤Б╨╛╨║
+                            try:
+                                # ╨Ц╨┤╤С╨╝ ╨┐╨╛╤П╨▓╨╗╨╡╨╜╨╕╤П ╨╛╨┐╤Ж╨╕╨╣
+                                option = wait.until(
+                                    EC.presence_of_element_located((By.CSS_SELECTOR, "li[role='option']"))
+                                )
+                                time.sleep(0.2)
+                                # ╨Ъ╨╗╨╕╨║╨░╨╡╨╝ ╨╜╨░ ╨┐╨╡╤А╨▓╤Г╤О ╨╛╨┐╤Ж╨╕╤О
+                                option.click()
+                                print(f"   тЬЕ {field_name}: {country_name}")
+                                time.sleep(0.3)
+                                return True
+                            except:
+                                # ╨Х╤Б╨╗╨╕ ╨╜╨╡ ╨╜╨░╤И╨╗╨╕ ╤Б╨┐╨╕╤Б╨╛╨║, ╨┐╤А╨╛╨▒╤Г╨╡╨╝ ╨╜╨░╨╢╨░╤В╤М Enter
+                                inp.send_keys(Keys.ENTER)
+                                print(f"   тЬЕ {field_name}: {country_name} (Enter)")
+                                time.sleep(0.3)
+                                return True
+                    
+                    print(f"   тЪая╕П ╨Я╨╛╨╗╨╡ {field_name} ╨╜╨╡ ╨╜╨░╨╣╨┤╨╡╨╜╨╛ (pattern: {name_pattern})")
+                    return False
+                except Exception as e:
+                    print(f"   тЪая╕П ╨Ю╤И╨╕╨▒╨║╨░ {field_name}: {e}")
+                    return False
+            
+            # ╨Ч╨░╨┐╨╛╨╗╨╜╤П╨╡╨╝ ╨┤╨░╨╜╨╜╤Л╨╡ ╨┐╨╛╨╗╤Г╤З╨░╤В╨╡╨╗╤П
+            fill_field("beneficiaryaccountnumber", card_number, "╨Э╨╛╨╝╨╡╤А ╨║╨░╤А╤В╤Л ╨┐╨╛╨╗╤Г╤З╨░╤В╨╡╨╗╤П")
+            fill_field("beneficiary_firstname", owner_name.split()[0], "╨Ш╨╝╤П ╨┐╨╛╨╗╤Г╤З╨░╤В╨╡╨╗╤П")
+            if len(owner_name.split()) > 1:
+                fill_field("beneficiary_lastname", owner_name.split()[1], "╨д╨░╨╝╨╕╨╗╨╕╤П ╨┐╨╛╨╗╤Г╤З╨░╤В╨╡╨╗╤П")
+            
+            # ╨Ч╨░╨┐╨╛╨╗╨╜╤П╨╡╨╝ ╨┐╨░╤Б╨┐╨╛╤А╤В╨╜╤Л╨╡ ╨┤╨░╨╜╨╜╤Л╨╡ ╨╛╤В╨┐╤А╨░╨▓╨╕╤В╨╡╨╗╤П
+            fill_field("sender_documents_series", SENDER_DATA["passport_series"], "╨б╨╡╤А╨╕╤П ╨┐╨░╤Б╨┐╨╛╤А╤В╨░")
+            fill_field("sender_documents_number", SENDER_DATA["passport_number"], "╨Э╨╛╨╝╨╡╤А ╨┐╨░╤Б╨┐╨╛╤А╤В╨░")
+            fill_field("issuedate", SENDER_DATA["passport_issue_date"], "╨Ф╨░╤В╨░ ╨▓╤Л╨┤╨░╤З╨╕")
+            
+            # ╨б╤В╤А╨░╨╜╨░ ╤А╨╛╨╢╨┤╨╡╨╜╨╕╤П (MUI Autocomplete)
+            select_country("birthPlaceAddress_countryCode", SENDER_DATA["birth_country"], "╨б╤В╤А╨░╨╜╨░ ╤А╨╛╨╢╨┤╨╡╨╜╨╕╤П")
+            
+            # ╨Ь╨╡╤Б╤В╨╛ ╤А╨╛╨╢╨┤╨╡╨╜╨╕╤П
+            fill_field("birthplaceaddress_full", SENDER_DATA["birth_place"], "╨Ь╨╡╤Б╤В╨╛ ╤А╨╛╨╢╨┤╨╡╨╜╨╕╤П")
+            
+            # ╨б╤В╤А╨░╨╜╨░ ╤А╨╡╨│╨╕╤Б╤В╤А╨░╤Ж╨╕╨╕ (MUI Autocomplete)
+            select_country("registrationAddress_countryCode", SENDER_DATA["registration_country"], "╨б╤В╤А╨░╨╜╨░ ╤А╨╡╨│╨╕╤Б╤В╤А╨░╤Ж╨╕╨╕")
+            
+            # ╨Ь╨╡╤Б╤В╨╛ ╤А╨╡╨│╨╕╤Б╤В╤А╨░╤Ж╨╕╨╕
+            fill_field("registrationaddress_full", SENDER_DATA["registration_place"], "╨Ь╨╡╤Б╤В╨╛ ╤А╨╡╨│╨╕╤Б╤В╤А╨░╤Ж╨╕╨╕")
+            
+            # ╨Ы╨╕╤З╨╜╤Л╨╡ ╨┤╨░╨╜╨╜╤Л╨╡ ╨╛╤В╨┐╤А╨░╨▓╨╕╤В╨╡╨╗╤П
+            fill_field("sender_firstname", SENDER_DATA["first_name"], "╨Ш╨╝╤П ╨╛╤В╨┐╤А╨░╨▓╨╕╤В╨╡╨╗╤П")
+            fill_field("sender_lastname", SENDER_DATA["last_name"], "╨д╨░╨╝╨╕╨╗╨╕╤П ╨╛╤В╨┐╤А╨░╨▓╨╕╤В╨╡╨╗╤П")
+            fill_field("birthdate", SENDER_DATA["birth_date"], "╨Ф╨░╤В╨░ ╤А╨╛╨╢╨┤╨╡╨╜╨╕╤П")
+            fill_field("phonenumber", SENDER_DATA["phone"], "╨в╨╡╨╗╨╡╤Д╨╛╨╜")
+            
+            print("тЬЕ ╨Т╤Б╨╡ ╨┤╨░╨╜╨╜╤Л╨╡ ╨╖╨░╨┐╨╛╨╗╨╜╨╡╨╜╤Л")
+            time.sleep(1)
+            
+            # ╨и╨░╨│ 8: ╨Я╨╛╤Б╤В╨░╨▓╨╕╤В╤М ╨│╨░╨╗╨╛╤З╨║╤Г ╤Б╨╛╨│╨╗╨░╤Б╨╕╤П
+            print("ЁЯУМ ╨б╤В╨░╨▓╨╗╤О ╨│╨░╨╗╨╛╤З╨║╤Г ╤Б╨╛╨│╨╗╨░╤Б╨╕╤П...")
+            try:
+                checkbox = self.driver.find_element(By.CSS_SELECTOR, "input[type='checkbox']")
+                if not checkbox.is_selected():
+                    checkbox.click()
+                    print("тЬЕ ╨У╨░╨╗╨╛╤З╨║╨░ ╨┐╨╛╤Б╤В╨░╨▓╨╗╨╡╨╜╨░")
+                    time.sleep(0.5)
+            except Exception as e:
+                print(f"тЪая╕П ╨Ю╤И╨╕╨▒╨║╨░ ╤Б ╨│╨░╨╗╨╛╤З╨║╨╛╨╣: {e}")
+            
+            # ╨и╨░╨│ 9: ╨Э╨░╨╢╨░╤В╤М ╨║╨╜╨╛╨┐╨║╤Г "╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М" (╨┐╨╛╤П╨▓╨╕╤В╤Б╤П ╨║╨░╨┐╤З╨░)
+            print("ЁЯУМ ╨Э╨░╨╢╨╕╨╝╨░╤О ╨║╨╜╨╛╨┐╨║╤Г '╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М' (id=pay)...")
+            try:
+                pay_button = wait.until(
+                    EC.element_to_be_clickable((By.ID, "pay"))
+                )
+                self.driver.execute_script(
+                    "arguments[0].scrollIntoView({block:'center'});",
+                    pay_button
+                )
+                time.sleep(0.5)
+                pay_button.click()
+                print("тЬЕ ╨Ъ╨╜╨╛╨┐╨║╨░ ╨╜╨░╨╢╨░╤В╨░, ╨╛╨╢╨╕╨┤╨░╤О ╨┐╨╛╤П╨▓╨╗╨╡╨╜╨╕╤П ╨║╨░╨┐╤З╨╕...")
+                time.sleep(2)
+            except Exception as e:
+                print(f"тЪая╕П ╨Ю╤И╨╕╨▒╨║╨░ ╨╜╨░╨╢╨░╤В╨╕╤П ╨║╨╜╨╛╨┐╨║╨╕: {e}")
+            
+            # ╨и╨░╨│ 10: ╨а╨╡╤И╨░╨╡╨╝ ╨║╨░╨┐╤З╤Г ╨╡╤Б╨╗╨╕ ╨┐╨╛╤П╨▓╨╕╨╗╨░╤Б╤М
+            print("ЁЯУМ ╨Я╤А╨╛╨▓╨╡╤А╤П╤О ╨╜╨░╨╗╨╕╤З╨╕╨╡ ╨║╨░╨┐╤З╨╕...")
+            try:
+                # ╨Ш╤Й╨╡╨╝ iframe ╤Б ╨║╨░╨┐╤З╨╡╨╣
+                captcha_iframe = wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "iframe[src*='smartcaptcha.yandexcloud.net/checkbox']"))
+                )
+                print("тЪая╕П ╨Ю╨▒╨╜╨░╤А╤Г╨╢╨╡╨╜╨░ Yandex SmartCaptcha!")
+                
+                # ╨Я╨╡╤А╨╡╨║╨╗╤О╤З╨░╨╡╨╝╤Б╤П ╨╜╨░ iframe
+                self.driver.switch_to.frame(captcha_iframe)
+                time.sleep(1)
+                
+                # ╨Ш╤Й╨╡╨╝ ╨║╨╜╨╛╨┐╨║╤Г ╤З╨╡╨║╨▒╨╛╨║╤Б╨░ ╨╕ ╨║╨╗╨╕╨║╨░╨╡╨╝
+                try:
+                    # ╨Ш╤Й╨╡╨╝ ╨║╨╜╨╛╨┐╨║╤Г ╨┐╨╛ ID ╨╕╨╗╨╕ ╨║╨╗╨░╤Б╤Б╤Г
+                    checkbox_button = None
+                    try:
+                        checkbox_button = self.driver.find_element(By.ID, "js-button")
+                    except:
+                        checkbox_button = self.driver.find_element(By.CLASS_NAME, "CheckboxCaptcha-Button")
+                    
+                    if checkbox_button:
+                        # ╨Я╤А╨╛╨║╤А╤Г╤З╨╕╨▓╨░╨╡╨╝ ╨║ ╨║╨╜╨╛╨┐╨║╨╡
+                        self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", checkbox_button)
+                        time.sleep(0.5)
+                        
+                        # ╨Ъ╨╗╨╕╨║╨░╨╡╨╝
+                        checkbox_button.click()
+                        print("тЬЕ ╨Ъ╨╗╨╕╨║╨╜╤Г╨╗ ╨┐╨╛ ╤З╨╡╨║╨▒╨╛╨║╤Б╤Г ╨║╨░╨┐╤З╨╕")
+                        time.sleep(5)  # ╨г╨▓╨╡╨╗╨╕╤З╨╕╨▓╨░╨╡╨╝ ╨╛╨╢╨╕╨┤╨░╨╜╨╕╨╡ ╨┤╨╗╤П ╨┐╨╛╤П╨▓╨╗╨╡╨╜╨╕╤П ╨╝╨╛╨┤╨░╨╗╨║╨╕
+                        
+                        # ╨Т╨╛╨╖╨▓╤А╨░╤Й╨░╨╡╨╝╤Б╤П ╨▓ ╨╛╤Б╨╜╨╛╨▓╨╜╨╛╨╣ ╨║╨╛╨╜╤В╨╡╨║╤Б╤В
+                        self.driver.switch_to.default_content()
+                        
+                        print("тЬЕ ╨Ъ╨░╨┐╤З╨░ ╨┐╤А╨╛╨╣╨┤╨╡╨╜╨░!")
+                    
+                except Exception as e:
+                    print(f"тЪая╕П ╨Ю╤И╨╕╨▒╨║╨░ ╨║╨╗╨╕╨║╨░ ╨┐╨╛ ╨║╨░╨┐╤З╨╡: {e}")
+                    self.driver.switch_to.default_content()
+                    time.sleep(5)
+                    
             except:
-                # Если ссылка не найдена, пробуем получить из текущего URL
-                payment_link = self.driver.current_url
+                print("тЬЕ ╨Ъ╨░╨┐╤З╨░ ╨╜╨╡ ╨╛╨▒╨╜╨░╤А╤Г╨╢╨╡╨╜╨░")
+                
+            time.sleep(2)  # ╨Ф╨╛╨┐╨╛╨╗╨╜╨╕╤В╨╡╨╗╤М╨╜╨╛╨╡ ╨╛╨╢╨╕╨┤╨░╨╜╨╕╨╡ ╨┐╨╛╤П╨▓╨╗╨╡╨╜╨╕╤П ╨╝╨╛╨┤╨░╨╗╨║╨╕
+            
+            # ╨и╨░╨│ 9: ╨Э╨░╨╢╨░╤В╤М ╨║╨╜╨╛╨┐╨║╤Г "╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М" ╨▓ ╨╝╨╛╨┤╨░╨╗╨║╨╡ "╨Я╤А╨╛╨▓╨╡╤А╨║╨░ ╨┤╨░╨╜╨╜╤Л╤Е"
+            print("ЁЯУМ ╨Э╨░╨╢╨╕╨╝╨░╤О ╨║╨╜╨╛╨┐╨║╤Г '╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М' ╨▓ ╨╝╨╛╨┤╨░╨╗╨║╨╡...")
+            try:
+                # ╨Ц╨┤╤С╨╝ ╨┐╨╛╤П╨▓╨╗╨╡╨╜╨╕╤П ╨╝╨╛╨┤╨░╨╗╨║╨╕ ╤Б ╨┐╤А╨╛╨▓╨╡╤А╨║╨╛╨╣ ╨┤╨░╨╜╨╜╤Л╤Е
+                # ╨Ш╤Й╨╡╨╝ ╨╕╨╝╨╡╨╜╨╜╨╛ ╨▒╨╛╨╗╤М╤И╤Г╤О ╨║╨╜╨╛╨┐╨║╤Г ╨▓╨╜╨╕╨╖╤Г (sizeLarge), ╨░ ╨╜╨╡ ╨║╤А╨╡╤Б╤В╨╕╨║
+                final_btn = wait.until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "button.MuiButton-sizeLarge[buttontext='╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М']"))
+                )
+                print("тЬЕ ╨Ь╨╛╨┤╨░╨╗╨║╨░ '╨Я╤А╨╛╨▓╨╡╤А╨║╨░ ╨┤╨░╨╜╨╜╤Л╤Е' ╨┐╨╛╤П╨▓╨╕╨╗╨░╤Б╤М")
+                
+                self.driver.execute_script(
+                    "arguments[0].scrollIntoView({block:'center'});",
+                    final_btn
+                )
+                time.sleep(0.5)
+                
+                # ╨Я╤А╨╛╨▒╤Г╨╡╨╝ ╨╛╨▒╤Л╤З╨╜╤Л╨╣ ╨║╨╗╨╕╨║
+                try:
+                    final_btn.click()
+                    print("тЬЕ ╨Ъ╨╜╨╛╨┐╨║╨░ '╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М' ╨╜╨░╨╢╨░╤В╨░")
+                except:
+                    # ╨Х╤Б╨╗╨╕ ╨╜╨╡ ╤Б╤А╨░╨▒╨╛╤В╨░╨╗, ╨┐╤А╨╛╨▒╤Г╨╡╨╝ JS ╨║╨╗╨╕╨║
+                    self.driver.execute_script("arguments[0].click();", final_btn)
+                    print("тЬЕ ╨Ъ╨╜╨╛╨┐╨║╨░ '╨Я╤А╨╛╨┤╨╛╨╗╨╢╨╕╤В╤М' ╨╜╨░╨╢╨░╤В╨░ (JS)")
+                
+                # ╨Ц╨┤╤С╨╝ ╨┐╨╡╤А╨╡╤Е╨╛╨┤╨░ ╨╜╨░ ╤Б╤В╤А╨░╨╜╨╕╤Ж╤Г payment
+                try:
+                    wait.until(lambda d: "payment" in d.current_url or "result" in d.current_url, timeout=10)
+                    print("тЬЕ ╨Я╨╡╤А╨╡╤Е╨╛╨┤ ╨╜╨░ ╤Б╤В╤А╨░╨╜╨╕╤Ж╤Г ╨╛╨┐╨╗╨░╤В╤Л")
+                except:
+                    print("тЪая╕П ╨Э╨╡ ╨┤╨╛╨╢╨┤╨░╨╗╨╕╤Б╤М ╨┐╨╡╤А╨╡╤Е╨╛╨┤╨░ ╨╜╨░ ╤Б╤В╤А╨░╨╜╨╕╤Ж╤Г ╨╛╨┐╨╗╨░╤В╤Л")
+                
+                time.sleep(3)
+            except Exception as e:
+                print(f"тЪая╕П ╨Ю╤И╨╕╨▒╨║╨░ ╨╜╨░╨╢╨░╤В╨╕╤П ╨║╨╜╨╛╨┐╨║╨╕ ╨▓ ╨╝╨╛╨┤╨░╨╗╨║╨╡: {e}")
+            
+            # ╨и╨░╨│ 10: ╨Я╨╛╨╗╤Г╤З╨╕╤В╤М ╤А╨╡╨╖╤Г╨╗╤М╤В╨░╤В ╤Б╨╛ ╤Б╤В╤А╨░╨╜╨╕╤Ж╤Л ╨╛╨┐╨╗╨░╤В╤Л
+            print("ЁЯУМ ╨Я╨╛╨╗╤Г╤З╨░╤О ╨┤╨░╨╜╨╜╤Л╨╡ ╨┐╨╗╨░╤В╨╡╨╢╨░...")
+            
+            qr_base64 = None
+            payment_link = self.driver.current_url
+            payment_data = {}
+            
+            # ╨Ш╨╖╨▓╨╗╨╡╨║╨░╨╡╨╝ ╨┤╨░╨╜╨╜╤Л╨╡ ╨╕╨╖ ╤В╨░╨▒╨╗╨╕╤Ж╤Л
+            try:
+                # ╨Ш╤Й╨╡╨╝ ╨▓╤Б╨╡ ╤Б╤В╤А╨╛╨║╨╕ ╤В╨░╨▒╨╗╨╕╤Ж╤Л
+                table_rows = self.driver.find_elements(By.CSS_SELECTOR, "tr.MuiTableRow-root")
+                for row in table_rows:
+                    try:
+                        cells = row.find_elements(By.TAG_NAME, "td")
+                        if len(cells) == 2:
+                            key = cells[0].text.strip()
+                            value = cells[1].text.strip()
+                            payment_data[key] = value
+                    except:
+                        continue
+                
+                if payment_data:
+                    print("тЬЕ ╨Ф╨░╨╜╨╜╤Л╨╡ ╨┐╨╗╨░╤В╨╡╨╢╨░ ╨┐╨╛╨╗╤Г╤З╨╡╨╜╤Л:")
+                    for key, value in payment_data.items():
+                        print(f"   тАв {key}: {value}")
+                        
+            except Exception as e:
+                print(f"тЪая╕П ╨Ю╤И╨╕╨▒╨║╨░ ╨╕╨╖╨▓╨╗╨╡╤З╨╡╨╜╨╕╤П ╨┤╨░╨╜╨╜╤Л╤Е: {e}")
+            
+            # ╨Я╨╛╨╕╤Б╨║ QR-╨║╨╛╨┤╨░ (SVG)
+            try:
+                qr_svg = self.driver.find_element(By.CSS_SELECTOR, "svg[viewBox='0 0 37 37']")
+                if qr_svg:
+                    # ╨Я╨╛╨╗╤Г╤З╨░╨╡╨╝ outerHTML SVG
+                    qr_base64 = self.driver.execute_script("return arguments[0].outerHTML;", qr_svg)
+                    print("тЬЕ QR-╨║╨╛╨┤ ╨╜╨░╨╣╨┤╨╡╨╜ (SVG)")
+            except:
+                print("тЪая╕П QR-╨║╨╛╨┤ ╨╜╨╡ ╨╜╨░╨╣╨┤╨╡╨╜")
             
             elapsed = time.time() - start_time
-            print(f"✅ Платеж создан за {elapsed:.1f}s", flush=True)
-            print(f"  Ссылка: {payment_link}", flush=True)
+            
+            # ╨Я╨Р╨г╨Ч╨Р ╨Ф╨Ы╨п ╨Я╨а╨Ю╨б╨Ь╨Ю╨в╨а╨Р
+            print(f"\nтП╕я╕П  ╨Я╨Р╨г╨Ч╨Р 60 ╨б╨Х╨Ъ╨г╨Э╨Ф - ╨Я╤А╨╛╨▓╨╡╤А╤П╨╣ ╨▓╤Б╨╡ ╨╖╨░╨┐╨╛╨╗╨╜╨╡╨╜╨╜╤Л╨╡ ╨┤╨░╨╜╨╜╤Л╨╡!")
+            print(f"   URL: {self.driver.current_url}")
+            time.sleep(60)
+            
+            print(f"тЬЕ ╨Я╨╗╨░╤В╨╡╨╢ ╤Б╨╛╨╖╨┤╨░╨╜ ╨╖╨░ {elapsed:.1f} ╤Б╨╡╨║!")
+            print(f"ЁЯФЧ ╨б╤Б╤Л╨╗╨║╨░: {payment_link}")
             
             return {
                 "payment_link": payment_link,
-                "qr_base64": qr_base64,
+                "qr_code": qr_base64,  # SVG QR-╨║╨╛╨┤╨░
+                "payment_data": payment_data,  # ╨Ф╨╡╤В╨░╨╗╨╕ ╨┐╨╗╨░╤В╨╡╨╢╨░
                 "elapsed_time": elapsed,
                 "success": True
             }
             
         except Exception as e:
             elapsed = time.time() - start_time
-            print(f"❌ Ошибка создания платежа: {e}", flush=True)
+            print(f"тЭМ ╨Ю╤И╨╕╨▒╨║╨░: {e}")
             import traceback
             traceback.print_exc()
             return {
@@ -367,16 +458,11 @@ class MultiTransferManager:
             }
     
     def close(self):
-        """Закрытие браузера"""
+        """╨Ч╨░╨║╤А╤Л╤В╨╕╨╡ ╨▒╤А╨░╤Г╨╖╨╡╤А╨░"""
         if self.driver:
             try:
                 self.driver.quit()
-                print("✅ MultiTransfer браузер закрыт", flush=True)
+                print("тЬЕ ╨С╤А╨░╤Г╨╖╨╡╤А ╨╖╨░╨║╤А╤Л╤В")
             except:
                 pass
             self.driver = None
-        self.is_ready = False
-
-
-# Глобальный экземпляр
-multitransfer_manager = MultiTransferManager()
