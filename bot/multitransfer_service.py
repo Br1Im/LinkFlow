@@ -29,7 +29,7 @@ class MultitransferPayment:
     def _create_driver(self):
         """╨б╨╛╨╖╨┤╨░╨╜╨╕╨╡ Chrome ╨┤╤А╨░╨╣╨▓╨╡╤А╨░"""
         options = webdriver.ChromeOptions()
-        options.add_argument('--headless=new')  # ╨Т╨║╨╗╤О╤З╨░╨╡╨╝ headless ╤А╨╡╨╢╨╕╨╝
+        # options.add_argument('--headless=new')  # ╨Ю╤В╨║╨╗╤О╤З╨╡╨╜╨╛ ╨┤╨╗╤П ╨╛╤В╨╗╨░╨┤╨║╨╕
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
@@ -77,48 +77,34 @@ class MultitransferPayment:
         try:
             wait = WebDriverWait(self.driver, 20)
             
-            # ╨и╨░╨│ 1: ╨Т╤Л╨▒╤А╨░╤В╤М ╤Б╤В╤А╨░╨╜╤Г "╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜" (headless-safe)
+            # ╨и╨░╨│ 1: ╨Т╤Л╨▒╤А╨░╤В╤М ╤Б╤В╤А╨░╨╜╤Г "╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜" - ╨┐╤А╨╛╤Б╤В╨╛ ╨┐╨╡╤А╨╡╨╣╨┤╤С╨╝ ╨┐╨╛ URL
             print("ЁЯУМ ╨Т╤Л╨▒╨╕╤А╨░╤О ╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜...")
-            try:
-                # ╨Ш╤Й╨╡╨╝ ╨▒╨╗╨╛╨║ ╨▓╤Л╨▒╨╛╤А╨░ ╤Б╤В╤А╨░╨╜╤Л
-                country_selector = wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, ".variant-alternative.css-c8d8yl"))
-                )
-                # ╨Я╤А╨╛╨║╤А╤Г╤З╨╕╨▓╨░╨╡╨╝ ╨║ ╤Н╨╗╨╡╨╝╨╡╨╜╤В╤Г
-                self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", country_selector)
-                time.sleep(0.5)
-                # ╨Ъ╨╗╨╕╨║╨░╨╡╨╝ ╤З╨╡╤А╨╡╨╖ JavaScript
-                self.driver.execute_script("arguments[0].click();", country_selector)
-                time.sleep(1)
-                
-                # ╨Ш╤Й╨╡╨╝ ╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜ ╨▓ ╨▓╤Л╨┐╨░╨┤╨░╤О╤Й╨╡╨╝ ╤Б╨┐╨╕╤Б╨║╨╡
-                uzbekistan = wait.until(
-                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜')]"))
-                )
-                # ╨Я╤А╨╛╨║╤А╤Г╤З╨╕╨▓╨░╨╡╨╝
-                self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", uzbekistan)
-                time.sleep(0.5)
-                # ╨Ъ╨╗╨╕╨║╨░╨╡╨╝ ╤З╨╡╤А╨╡╨╖ JavaScript
-                self.driver.execute_script("arguments[0].click();", uzbekistan)
-                time.sleep(1)
-                print("тЬЕ ╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜ ╨▓╤Л╨▒╤А╨░╨╜")
-            except Exception as e:
-                print(f"тЪая╕П ╨Ю╤И╨╕╨▒╨║╨░ ╨▓╤Л╨▒╨╛╤А╨░ ╤Б╤В╤А╨░╨╜╤Л: {e}")
-                # ╨Я╤А╨╛╨▒╤Г╨╡╨╝ ╨░╨╗╤М╤В╨╡╤А╨╜╨░╤В╨╕╨▓╨╜╤Л╨╣ ╤Б╨┐╨╛╤Б╨╛╨▒
-                try:
-                    uzbekistan = self.driver.find_element(By.XPATH, "//div[contains(., '╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜')]")
-                    self.driver.execute_script("arguments[0].click();", uzbekistan)
-                    time.sleep(1)
-                    print("тЬЕ ╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜ ╨▓╤Л╨▒╤А╨░╨╜ (╨░╨╗╤М╤В╨╡╤А╨╜╨░╤В╨╕╨▓╨╜╤Л╨╣ ╤Б╨┐╨╛╤Б╨╛╨▒)")
-                except Exception as e2:
-                    print(f"тЪая╕П ╨Р╨╗╤М╤В╨╡╤А╨╜╨░╤В╨╕╨▓╨╜╤Л╨╣ ╤Б╨┐╨╛╤Б╨╛╨▒ ╤В╨╛╨╢╨╡ ╨╜╨╡ ╤Б╤А╨░╨▒╨╛╤В╨░╨╗: {e2}")
-                    raise
+            self.driver.get("https://multitransfer.ru/uzbekistan")
+            time.sleep(5)  # ╨г╨▓╨╡╨╗╨╕╤З╨╕╨▓╨░╨╡╨╝ ╨╛╨╢╨╕╨┤╨░╨╜╨╕╨╡ ╨╖╨░╨│╤А╤Г╨╖╨║╨╕ React
+            print("тЬЕ ╨г╨╖╨▒╨╡╨║╨╕╤Б╤В╨░╨╜ ╨▓╤Л╨▒╤А╨░╨╜")
             
             # ╨и╨░╨│ 2: ╨Т╨▓╨╛╨┤ ╤Б╤Г╨╝╨╝╤Л ╤З╨╡╤А╨╡╨╖ send_keys (React-safe)
             print(f"ЁЯУМ ╨Т╨▓╨╛╨╢╤Г ╤Б╤Г╨╝╨╝╤Г {amount} RUB (React-safe)...")
-            amount_input = wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='0 RUB']"))
-            )
+            # ╨Я╤А╨╛╨▒╤Г╨╡╨╝ ╤А╨░╨╖╨╜╤Л╨╡ ╤Б╨╡╨╗╨╡╨║╤В╨╛╤А╤Л
+            amount_input = None
+            selectors = [
+                "input[placeholder='0 RUB']",
+                "input[placeholder*='RUB']",
+                "input[type='text'][inputmode='decimal']",
+                ".money-input input"
+            ]
+            
+            for selector in selectors:
+                try:
+                    amount_input = wait.until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                    )
+                    break
+                except:
+                    continue
+            
+            if not amount_input:
+                raise Exception("╨Э╨╡ ╤Г╨┤╨░╨╗╨╛╤Б╤М ╨╜╨░╨╣╤В╨╕ ╨┐╨╛╨╗╨╡ ╨▓╨▓╨╛╨┤╨░ ╤Б╤Г╨╝╨╝╤Л")
             
             # ╨Ю╨┤╨╕╨╜ ╤А╨░╨╖ ╨▓╨▓╨╛╨┤╨╕╨╝ ╤Б╤Г╨╝╨╝╤Г ╨┐╨╛╤Б╨╕╨╝╨▓╨╛╨╗╤М╨╜╨╛
             set_mui_input_value(self.driver, amount_input, amount)
