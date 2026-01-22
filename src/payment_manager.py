@@ -3,24 +3,35 @@
 Менеджер платежей для multitransfer.ru
 """
 
-from .multitransfer_payment import MultitransferPayment
+try:
+    from .multitransfer_payment import MultitransferPayment
+except ImportError:
+    from multitransfer_payment import MultitransferPayment
 
 
 class PaymentManager:
     """Главный класс для управления платежами через multitransfer.ru"""
     
-    def __init__(self):
+    def __init__(self, sender_data=None, headless=True):
+        """
+        Args:
+            sender_data: dict с данными отправителя (опционально)
+            headless: bool - запускать браузер в headless режиме (по умолчанию True)
+        """
         self.multitransfer = None
+        self.sender_data = sender_data
+        self.headless = headless
     
     def initialize(self):
-        """
-        Инициализация multitransfer.ru (авторизация не требуется)
-        """
+        """Инициализация multitransfer.ru"""
         print("\n" + "="*60)
         print("🔧 ИНИЦИАЛИЗАЦИЯ: multitransfer.ru")
         print("="*60)
         
-        self.multitransfer = MultitransferPayment()
+        self.multitransfer = MultitransferPayment(
+            sender_data=self.sender_data,
+            headless=self.headless
+        )
         success = self.multitransfer.login()
         
         if success:
@@ -28,7 +39,7 @@ class PaymentManager:
         
         return success
     
-    def create_payment(self, card_number, owner_name, amount):
+    def create_payment(self, card_number, owner_name, amount, sender_data=None):
         """
         Создать платеж через multitransfer.ru
         
@@ -36,12 +47,15 @@ class PaymentManager:
             card_number: Номер карты получателя (Узбекистан)
             owner_name: Имя владельца карты
             amount: Сумма в рублях
+            sender_data: dict с данными отправителя (опционально)
             
         Returns:
-            dict: Результат с payment_link и qr_base64
+            dict: Результат с payment_link и qr_code
         """
         if self.multitransfer:
-            return self.multitransfer.create_payment(card_number, owner_name, amount)
+            return self.multitransfer.create_payment(
+                card_number, owner_name, amount, sender_data
+            )
         else:
             return {
                 "error": "Сервис не инициализирован. Используйте initialize()",
@@ -56,7 +70,22 @@ class PaymentManager:
 
 # Пример использования
 if __name__ == "__main__":
-    manager = PaymentManager()
+    # Данные отправителя (опционально)
+    sender_data = {
+        "passport_series": "1820",
+        "passport_number": "657875",
+        "passport_issue_date": "22.07.2020",
+        "birth_country": "Россия",
+        "birth_place": "камышин",
+        "first_name": "Дмитрий",
+        "last_name": "Непокрытый",
+        "birth_date": "03.07.2000",
+        "phone": "+79880260334",
+        "registration_country": "Россия",
+        "registration_place": "камышин"
+    }
+    
+    manager = PaymentManager(sender_data=sender_data, headless=False)  # headless=False для видимого браузера
     
     print("\n" + "="*60)
     print("💳 MULTITRANSFER.RU - МЕНЕДЖЕР ПЛАТЕЖЕЙ")

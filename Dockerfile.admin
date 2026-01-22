@@ -35,8 +35,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем файлы проекта
 COPY src/ ./src/
-COPY tests/ ./tests/
-COPY requirements.txt .
+COPY admin/ ./admin/
 
 # Создаем директорию для скриншотов
 RUN mkdir -p /app/screenshots
@@ -45,5 +44,5 @@ RUN mkdir -p /app/screenshots
 ENV DISPLAY=:99
 ENV PYTHONUNBUFFERED=1
 
-# Запускаем Xvfb (виртуальный дисплей) и тесты
-CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 & python -m tests.test_multitransfer"]
+# Запускаем Xvfb (виртуальный дисплей) и админ-панель
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 & python admin/app.py"]

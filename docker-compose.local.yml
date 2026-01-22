@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  linkflow-admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: linkflow-admin
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./admin:/app/admin
+      - ./src:/app/src
+      - ./screenshots:/app/screenshots
+    environment:
+      - DISPLAY=:99
+      - PYTHONUNBUFFERED=1
+      - FLASK_APP=admin/app.py
+      - FLASK_ENV=development
+    command: sh -c "Xvfb :99 -screen 0 1920x1080x24 & python admin/app.py"
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
