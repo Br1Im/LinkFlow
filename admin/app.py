@@ -105,10 +105,11 @@ def process_payment(payment_id, card_number, owner_name, amount, sender_data, pa
     """Обработка платежа в фоновом режиме"""
     try:
         # Создаем платеж через выбранную систему
+        # skip_bank_selection=True для ускорения (банк уже выбран в URL)
         if payment_system == 'elecsnet':
             payment = PaymentManager(sender_data=sender_data, headless=True)
         else:
-            payment = MultitransferPayment(sender_data=sender_data, headless=True)
+            payment = MultitransferPayment(sender_data=sender_data, headless=True, skip_bank_selection=True)
         
         payment.login()
         

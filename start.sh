@@ -16,14 +16,14 @@ fi
 
 # Остановка старых контейнеров
 echo "🛑 Остановка старых контейнеров..."
-docker-compose -f docker-compose.local.yml down 2>/dev/null
+docker-compose down 2>/dev/null
 
 # Сборка и запуск
 echo "🔨 Сборка образа..."
-docker-compose -f docker-compose.local.yml build
+docker-compose build
 
 echo "▶️  Запуск контейнера..."
-docker-compose -f docker-compose.local.yml up -d
+docker-compose up -d
 
 echo ""
 echo "✅ LinkFlow запущен!"
@@ -32,6 +32,6 @@ echo "📍 Админ-панель: http://localhost:5000"
 echo "📊 Список платежей: http://localhost:5000/payments"
 echo ""
 echo "Команды:"
-echo "  Логи:      docker-compose -f docker-compose.local.yml logs -f"
-echo "  Остановка: docker-compose -f docker-compose.local.yml down"
+echo "  Логи:      docker-compose logs -f"
+echo "  Остановка: docker-compose down"
 echo ""

@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  linkflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: linkflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./screenshots:/app/screenshots
+      - ./src:/app/src
+      - ./admin:/app/admin
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DISPLAY=${DISPLAY}
+    network_mode: host
+    restart: unless-stopped

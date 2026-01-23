@@ -3,6 +3,9 @@
 Helpers для работы с MUI (Material-UI) controlled inputs
 """
 
+from selenium.webdriver.common.keys import Keys
+
+
 def set_mui_input_value(driver, element, value):
     """
     React-safe установка значения в MUI controlled input
@@ -18,22 +21,36 @@ def set_mui_input_value(driver, element, value):
     try:
         import time
         
+        # Прокручиваем к элементу
+        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", element)
+        time.sleep(0.2)
+        
         # Фокус на элементе
         element.click()
-        time.sleep(0.1)
+        time.sleep(0.2)
         
-        # Очистка поля
-        element.clear()
+        # Очистка поля через Ctrl+A и Backspace
+        element.send_keys(Keys.CONTROL + "a")
         time.sleep(0.1)
+        element.send_keys(Keys.BACKSPACE)
+        time.sleep(0.2)
         
         # Ввод посимвольно (React ловит каждый символ)
         for char in str(value):
             element.send_keys(char)
-            time.sleep(0.05)  # Минимальная пауза
+            time.sleep(0.08)  # Увеличиваем паузу
+        
+        # Trigger события для React
+        driver.execute_script("""
+            arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+            arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+            arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+        """, element)
+        time.sleep(0.3)
         
         # Клик вне поля для trigger blur
         driver.execute_script("document.body.click()")
-        time.sleep(0.1)
+        time.sleep(0.2)
         
         return True
     except Exception as e:

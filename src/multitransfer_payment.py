@@ -22,10 +22,17 @@ except ImportError:
 class MultitransferPayment:
     """Класс для работы с multitransfer.ru"""
     
-    def __init__(self, sender_data=None, headless=True):
-        self.url = "https://multitransfer.ru/"
+    def __init__(self, sender_data=None, headless=True, skip_bank_selection=False):
+        # Если skip_bank_selection=True, используем URL с уже выбранным банком
+        if skip_bank_selection:
+            # URL с предвыбранным Узбекистаном и Humo
+            self.url = "https://multitransfer.ru/transfer/uzbekistan?paymentSystem=humo"
+        else:
+            self.url = "https://multitransfer.ru/transfer/uzbekistan"
+        
         self.driver = None
         self.headless = headless
+        self.skip_bank_selection = skip_bank_selection
     
     def _create_driver(self):
         """Создание Chrome драйвера"""
@@ -89,22 +96,11 @@ class MultitransferPayment:
         try:
             wait = WebDriverWait(self.driver, 20)
             
-            # Шаг 1: Выбрать страну "Узбекистан"
-            print("📌 Выбираю Узбекистан...")
-            country_selector = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, ".variant-alternative.css-c8d8yl"))
-            )
-            country_selector.click()
-            time.sleep(0.3)
+            # Страна уже выбрана (Узбекистан) через URL
+            print("✅ Узбекистан уже выбран (через URL)")
+            time.sleep(1)
             
-            uzbekistan = wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'variant-alternative') and contains(., 'Узбекистан')]"))
-            )
-            uzbekistan.click()
-            time.sleep(0.5)
-            print("✅ Узбекистан выбран")
-            
-            # Шаг 2: Ввод суммы через send_keys (React-safe)
+            # Шаг 1: Ввод суммы через send_keys (React-safe)
             print(f"📌 Ввожу сумму {amount} RUB (React-safe)...")
             amount_input = wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='0 RUB']"))
@@ -114,41 +110,75 @@ class MultitransferPayment:
             set_mui_input_value(self.driver, amount_input, amount)
             print("✅ Сумма введена")
             
-            # Ждём пока React обработает (ВАЖНО: только здесь 3 секунды!)
-            time.sleep(3)
+            # Ждём пока React обработает (увеличиваем время!)
+            time.sleep(5)
             
-            # Шаг 3: Ждём активации кнопки "Продолжить"
+            # Шаг 2: Ждём активации кнопки "Продолжить"
             print("📌 Ожидаю подтверждения суммы React...")
-            if wait_for_mui_button_enabled(self.driver, "pay", timeout=5):
+            if wait_for_mui_button_enabled(self.driver, "pay", timeout=10):
                 print("✅ Сумма подтверждена сайтом")
             else:
-                print("⚠️ Кнопка 'Продолжить' не активировалась, но продолжаем")
+                print("⚠️ Кнопка 'Продолжить' не активировалась")
             
-            # Шаг 4: Открыть блок "Способ перевода"
-            print("📌 Открываю 'Способ перевода'...")
-            transfer_block = wait.until(
-                EC.element_to_be_clickable((
-                    By.XPATH,
-                    "//div[contains(text(),'Способ перевода')]/ancestor::div[contains(@class,'variant-alternative')]"
-                ))
-            )
-            click_mui_element(self.driver, transfer_block)
-            print("✅ Блок способов перевода открыт")
-            time.sleep(0.5)
+            # Шаги 3-5: Выбор банка и режима (пропускаем если skip_bank_selection=True)
+            if not self.skip_bank_selection:
+                # Шаг 3: Открыть блок "Способ перевода"
+                print("📌 Открываю 'Способ перевода'...")
+                try:
+                    transfer_block = wait.until(
+                        EC.element_to_be_clickable((
+                            By.XPATH,
+                            "//div[contains(text(),'Способ перевода')]/ancestor::div[contains(@class,'css-c8d8yl')]"
+                        ))
+                    )
+                    click_mui_element(self.driver, transfer_block)
+                    print("✅ Блок способов перевода открыт")
+                    time.sleep(0.5)
+                except Exception as e:
+                    print(f"⚠️ Не удалось открыть блок способов перевода: {e}")
+                
+                # Шаг 4: Выбрать Uzcard / Humo по тексту
+                print("📌 Выбираю Uzcard / Humo...")
+                bank_option = wait.until(
+                    EC.element_to_be_clickable((
+                        By.XPATH,
+                        "//*[contains(text(),'Uzcard') or contains(text(),'Humo')]"
+                    ))
+                )
+                click_mui_element(self.driver, bank_option)
+                print("✅ Банк выбран")
+                time.sleep(2)
+                
+                # Шаг 5: Открыть блок "Режим платёжки" и выбрать режим
+                print("📌 Открываю 'Режим платёжки'...")
+                try:
+                    payment_mode_block = wait.until(
+                        EC.element_to_be_clickable((
+                            By.XPATH,
+                            "//div[contains(text(),'Режим платёжки')]/ancestor::div[contains(@class,'css-c8d8yl')]"
+                        ))
+                    )
+                    click_mui_element(self.driver, payment_mode_block)
+                    print("✅ Блок режима платёжки открыт")
+                    time.sleep(0.5)
+                    
+                    # Выбираем первый доступный режим (обычно "Стандартный")
+                    payment_mode_option = wait.until(
+                        EC.element_to_be_clickable((
+                            By.XPATH,
+                            "//div[contains(@class, 'MuiPaper-root')]//div[contains(text(),'Стандартный') or contains(text(),'Быстрый')]"
+                        ))
+                    )
+                    click_mui_element(self.driver, payment_mode_option)
+                    print("✅ Режим платёжки выбран")
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"⚠️ Не удалось выбрать режим платёжки: {e}")
+                    print("   Возможно, режим уже выбран по умолчанию")
+            else:
+                print("✅ Банк Humo уже выбран (через URL)")
             
-            # Шаг 5: Выбрать Uzcard / Humo по тексту
-            print("📌 Выбираю Uzcard / Humo...")
-            bank_option = wait.until(
-                EC.element_to_be_clickable((
-                    By.XPATH,
-                    "//*[contains(text(),'Uzcard') or contains(text(),'Humo')]"
-                ))
-            )
-            click_mui_element(self.driver, bank_option)
-            print("✅ Банк выбран")
-            time.sleep(2)  # Ждём пока React обработает выбор банка
-            
-            # Шаг 6: Нажать кнопку "Продолжить" (НЕ заполняем данные карты!)
+            # Шаг 6: Нажать кнопку "Продолжить"
             print("📌 Нажимаю 'Продолжить'...")
             
             # Ищем кнопку "Продолжить" по ID
