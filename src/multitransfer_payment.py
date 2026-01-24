@@ -523,71 +523,47 @@ class MultitransferPayment:
                     
                 print("📌 Проверяю наличие модалки 'Проверка данных'...")
                 try:
-                    # Пробуем разные селекторы для кнопки
-                    final_btn = None
-                    selectors = [
-                        "button.MuiButton-sizeLarge[buttontext='Продолжить']",
-                        "button.MuiButton-sizeLarge",
-                        "//button[contains(text(), 'Продолжить')]",
-                        "//button[@type='submit']"
-                    ]
+                    # Ждем появления модалки
+                    time.sleep(1)
                     
-                    for selector in selectors:
-                        try:
-                            if selector.startswith("//"):
-                                final_btn = WebDriverWait(self.driver, 5).until(
-                                    EC.element_to_be_clickable((By.XPATH, selector))
-                                )
-                            else:
-                                final_btn = WebDriverWait(self.driver, 5).until(
-                                    EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
-                                )
-                            print(f"✅ Модалка найдена (селектор: {selector})")
-                            break
-                        except:
-                            continue
+                    # Ищем все кнопки "Продолжить" на странице
+                    buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(), 'Продолжить')]")
                     
-                    if not final_btn:
-                        raise Exception("Кнопка 'Продолжить' не найдена")
+                    if not buttons:
+                        # Пробуем альтернативные селекторы
+                        buttons = self.driver.find_elements(By.CSS_SELECTOR, "button.MuiButton-sizeLarge")
                     
-                    self.driver.execute_script(
-                        "arguments[0].scrollIntoView({block:'center'});",
-                        final_btn
-                    )
-                    time.sleep(0.5)
-                    
-                    # Пробуем кликнуть
-                    try:
+                    if buttons:
+                        # Берем последнюю кнопку (обычно это кнопка в модалке)
+                        final_btn = buttons[-1]
+                        print(f"✅ Найдено {len(buttons)} кнопок 'Продолжить', кликаю по последней")
+                        
+                        self.driver.execute_script(
+                            "arguments[0].scrollIntoView({block:'center'});",
+                            final_btn
+                        )
+                        time.sleep(0.3)
+                        
+                        # Кликаем через JS
                         self.driver.execute_script("arguments[0].click();", final_btn)
                         print("✅ Кнопка 'Продолжить' нажата (JS)")
-                    except:
-                        final_btn.click()
-                        print("✅ Кнопка 'Продолжить' нажата")
-                    
-                    # Ждем перехода на страницу оплаты
-                    print("📌 Ожидаю перехода на страницу оплаты...")
-                    transition_found = False
-                    for i in range(50):  # 25 секунд максимум
-                        time.sleep(0.5)
-                        current = self.driver.current_url
-                        if "payment" in current or "result" in current or "/pay/" in current or "finish-transfer" in current:
-                            print(f"✅ Переход на страницу оплаты")
-                            log_step("Переход на страницу оплаты")
-                            transition_found = True
-                            break
                         
-                        # Если через 3 секунды не перешли, пробуем кликнуть еще раз
-                        if i == 6 and not transition_found:
-                            try:
-                                retry_btn = self.driver.find_element(By.CSS_SELECTOR, "button.MuiButton-sizeLarge[buttontext='Продолжить']")
-                                if retry_btn:
-                                    self.driver.execute_script("arguments[0].click();", retry_btn)
-                                    print("🔄 Повторный клик по кнопке")
-                            except:
-                                pass
-                    
-                    if not transition_found:
-                        print(f"⚠️ Не дождались перехода. URL: {self.driver.current_url}")
+                        # Ждем перехода на страницу оплаты
+                        print("📌 Ожидаю перехода на страницу оплаты...")
+                        transition_found = False
+                        for i in range(40):  # 20 секунд максимум
+                            time.sleep(0.5)
+                            current = self.driver.current_url
+                            if "payment" in current or "result" in current or "/pay/" in current or "finish-transfer" in current:
+                                print(f"✅ Переход на страницу оплаты")
+                                log_step("Переход на страницу оплаты")
+                                transition_found = True
+                                break
+                        
+                        if not transition_found:
+                            print(f"⚠️ Не дождались перехода. URL: {self.driver.current_url}")
+                    else:
+                        print("⚠️ Кнопка 'Продолжить' не найдена")
                     
                 except Exception as e:
                     print(f"⚠️ Ошибка с модалкой: {e}")
