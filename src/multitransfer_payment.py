@@ -21,11 +21,13 @@ except ImportError:
 class MultitransferPayment:
     """Класс для работы с multitransfer.ru"""
     
-    def __init__(self, sender_data=None, headless=True, proxy=None):
+    def __init__(self, sender_data=None, headless=True, proxy=None, keep_alive=False):
         self.url = "https://multitransfer.ru/transfer/uzbekistan"
         self.driver = None
         self.headless = headless
         self.proxy = proxy
+        self.keep_alive = keep_alive  # Держать браузер открытым
+        self.is_warmed_up = False  # Флаг прогрева
     
     def _create_driver(self):
         options = webdriver.ChromeOptions()
@@ -89,6 +91,85 @@ class MultitransferPayment:
         print("✅ Страница загружена")
         return True
     
+    def warmup(self):
+        """Прогрев браузера с предвыбором способа оплаты"""
+        if self.is_warmed_up:
+            print("✅ Браузер уже прогрет")
+            return True
+        
+        print("🔥 Прогрев браузера и предвыбор способа оплаты...")
+        start_time = time.time()
+        
+        try:
+            wait = WebDriverWait(self.driver, 20)
+            
+            # Вводим минимальную сумму для активации формы
+            print("📌 Ввожу минимальную сумму для активации...")
+            amount_input = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='0 RUB']"))
+            )
+            set_mui_input_value(self.driver, amount_input, 100)
+            time.sleep(0.5)
+            
+            # Открываем способ перевода
+            print("📌 Открываю 'Способ перевода'...")
+            selectors = [
+                "//div[contains(text(),'Способ перевода')]/ancestor::div[contains(@class,'variant-alternative')]",
+                "//div[contains(text(),'Способ перевода')]",
+                "//*[contains(text(),'Способ перевода')]"
+            ]
+            
+            transfer_block = None
+            for selector in selectors:
+                try:
+                    transfer_block = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
+                    )
+                    break
+                except:
+                    continue
+            
+            if transfer_block:
+                click_mui_element(self.driver, transfer_block)
+                print("✅ Блок способов перевода открыт")
+                
+                # Выбираем Uzcard / Humo
+                print("📌 Предвыбираю Uzcard / Humo...")
+                time.sleep(0.5)  # Ждем появления списка
+                bank_option = wait.until(
+                    EC.element_to_be_clickable((
+                        By.XPATH,
+                        "//*[contains(text(),'Uzcard') or contains(text(),'Humo')]"
+                    ))
+                )
+                click_mui_element(self.driver, bank_option)
+                print("✅ Банк предвыбран")
+                
+                # Закрываем модалку, кликая вне её или нажимая ESC
+                time.sleep(0.3)
+                try:
+                    # Пробуем кликнуть по overlay или нажать ESC
+                    from selenium.webdriver.common.keys import Keys
+                    self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                    print("✅ Модалка закрыта")
+                except:
+                    print("⚠️ Не удалось закрыть модалку, но продолжаем")
+                
+                self.is_warmed_up = True
+                elapsed = time.time() - start_time
+                print(f"✅ Прогрев завершен за {elapsed:.1f}s")
+                print("💡 Теперь можно вводить реальную сумму для создания платежа")
+                return True
+            else:
+                print("⚠️ Не удалось прогреть - способ перевода не найден")
+                return False
+                
+        except Exception as e:
+            print(f"⚠️ Ошибка прогрева: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
     def create_payment(self, card_number, owner_name, amount):
         print(f"\n💳 Создание платежа через multitransfer.ru")
         print(f"   Карта: {card_number}")
@@ -119,52 +200,56 @@ class MultitransferPayment:
             print("✅ Сумма введена")
             log_step("Ввод суммы")
             
-            # Уменьшаем ожидание с 2 до 1.5 секунд
-            time.sleep(1.5)
+            # Уменьшаем ожидание
+            time.sleep(1.0)
             log_step("Ожидание React")
             
-            try:
-                wait.until(EC.element_to_be_clickable((By.ID, "pay")))
-                print("✅ Сумма подтверждена сайтом")
-            except:
-                print("⚠️ Кнопка 'Продолжить' не активировалась, но продолжаем")
-            
-            print("📌 Открываю 'Способ перевода'...")
-            transfer_block = None
-            
-            # Пробуем разные селекторы быстрее
-            selectors = [
-                "//div[contains(text(),'Способ перевода')]/ancestor::div[contains(@class,'variant-alternative')]",
-                "//div[contains(text(),'Способ перевода')]",
-                "//*[contains(text(),'Способ перевода')]"
-            ]
-            
-            for selector in selectors:
+            # Если браузер не прогрет, выбираем способ перевода
+            if not self.is_warmed_up:
                 try:
-                    transfer_block = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, selector))
-                    )
-                    break
+                    wait.until(EC.element_to_be_clickable((By.ID, "pay")))
+                    print("✅ Сумма подтверждена сайтом")
                 except:
-                    continue
-            
-            if not transfer_block:
-                raise Exception("Не удалось найти блок 'Способ перевода'")
-            
-            click_mui_element(self.driver, transfer_block)
-            print("✅ Блок способов перевода открыт")
-            log_step("Открытие способа перевода")
-            
-            print("📌 Выбираю Uzcard / Humo...")
-            bank_option = wait.until(
-                EC.element_to_be_clickable((
-                    By.XPATH,
-                    "//*[contains(text(),'Uzcard') or contains(text(),'Humo')]"
-                ))
-            )
-            click_mui_element(self.driver, bank_option)
-            print("✅ Банк выбран")
-            log_step("Выбор банка")
+                    print("⚠️ Кнопка 'Продолжить' не активировалась, но продолжаем")
+                
+                print("📌 Открываю 'Способ перевода'...")
+                transfer_block = None
+                
+                selectors = [
+                    "//div[contains(text(),'Способ перевода')]/ancestor::div[contains(@class,'variant-alternative')]",
+                    "//div[contains(text(),'Способ перевода')]",
+                    "//*[contains(text(),'Способ перевода')]"
+                ]
+                
+                for selector in selectors:
+                    try:
+                        transfer_block = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                        break
+                    except:
+                        continue
+                
+                if not transfer_block:
+                    raise Exception("Не удалось найти блок 'Способ перевода'")
+                
+                click_mui_element(self.driver, transfer_block)
+                print("✅ Блок способов перевода открыт")
+                log_step("Открытие способа перевода")
+                
+                print("📌 Выбираю Uzcard / Humo...")
+                bank_option = wait.until(
+                    EC.element_to_be_clickable((
+                        By.XPATH,
+                        "//*[contains(text(),'Uzcard') or contains(text(),'Humo')]"
+                    ))
+                )
+                click_mui_element(self.driver, bank_option)
+                print("✅ Банк выбран")
+                log_step("Выбор банка")
+            else:
+                print("✅ Способ оплаты уже выбран (прогрет)")
+                log_step("Пропуск выбора банка")
             
             print("📌 Ожидаю активации кнопки 'Продолжить'...")
             try:
@@ -212,7 +297,7 @@ class MultitransferPayment:
             print("📌 Заполняю данные получателя и отправителя...")
             
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "input")))
-            time.sleep(0.3)  # Уменьшаем с 0.5 до 0.3
+            time.sleep(0.2)  # Уменьшаем с 0.3 до 0.2
             
             def fill_field_by_label(label_text, value, field_name):
                 try:
@@ -390,32 +475,13 @@ class MultitransferPayment:
                 pay_button.click()
                 print("✅ Кнопка нажата, ожидаю перехода...")
                 
-                time.sleep(1)  # Уменьшаем с 2 до 1
+                time.sleep(0.5)  # Уменьшаем с 1 до 0.5
                 log_step("Нажатие кнопки Продолжить")
                 
             except Exception as e:
                 print(f"⚠️ Ошибка нажатия кнопки: {e}")
             
-            print("📌 Проверяю текущий URL...")
             current_url = self.driver.current_url
-            print(f"   URL: {current_url}")
-            
-            try:
-                screenshot_path = "/app/screenshots/debug.png"
-                self.driver.save_screenshot(screenshot_path)
-                print(f"📸 Скриншот сохранён: {screenshot_path}")
-            except Exception as e:
-                print(f"⚠️ Ошибка сохранения скриншота: {e}")
-            
-            try:
-                errors = self.driver.find_elements(By.CSS_SELECTOR, ".MuiFormHelperText-root.Mui-error, [role='alert']")
-                if errors:
-                    print("⚠️ Найдены ошибки на странице:")
-                    for err in errors:
-                        if err.text.strip():
-                            print(f"   • {err.text}")
-            except:
-                pass
             
             if "payment" in current_url or "result" in current_url:
                 print("✅ Уже на странице оплаты!")
@@ -439,23 +505,14 @@ class MultitransferPayment:
                             self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", checkbox_button)
                             checkbox_button.click()
                             print("✅ Кликнул по чекбоксу капчи")
-                            time.sleep(3)  # Уменьшаем с 5 до 3
+                            time.sleep(1)  # Уменьшаем с 2 до 1
                             
                             self.driver.switch_to.default_content()
                             print("✅ Капча пройдена!")
                             log_step("Прохождение капчи")
                             
-                            print("📌 Повторно нажимаю кнопку 'Продолжить'...")
-                            try:
-                                pay_button = wait.until(
-                                    EC.element_to_be_clickable((By.ID, "pay"))
-                                )
-                                pay_button.click()
-                                print("✅ Кнопка нажата после капчи")
-                                time.sleep(2)  # Уменьшаем с 3 до 2
-                                log_step("Повторное нажатие после капчи")
-                            except Exception as e:
-                                print(f"⚠️ Ошибка повторного нажатия: {e}")
+                            # Убираем повторное нажатие - модалка появляется сразу
+                            print("📌 Ожидаю модалку 'Проверка данных'...")
                         
                     except Exception as e:
                         print(f"⚠️ Ошибка клика по капче: {e}")
@@ -466,28 +523,75 @@ class MultitransferPayment:
                     
                 print("📌 Проверяю наличие модалки 'Проверка данных'...")
                 try:
-                    final_btn = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.CSS_SELECTOR, "button.MuiButton-sizeLarge[buttontext='Продолжить']"))
-                    )
-                    print("✅ Модалка 'Проверка данных' появилась")
+                    # Пробуем разные селекторы для кнопки
+                    final_btn = None
+                    selectors = [
+                        "button.MuiButton-sizeLarge[buttontext='Продолжить']",
+                        "button.MuiButton-sizeLarge",
+                        "//button[contains(text(), 'Продолжить')]",
+                        "//button[@type='submit']"
+                    ]
+                    
+                    for selector in selectors:
+                        try:
+                            if selector.startswith("//"):
+                                final_btn = WebDriverWait(self.driver, 5).until(
+                                    EC.element_to_be_clickable((By.XPATH, selector))
+                                )
+                            else:
+                                final_btn = WebDriverWait(self.driver, 5).until(
+                                    EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+                                )
+                            print(f"✅ Модалка найдена (селектор: {selector})")
+                            break
+                        except:
+                            continue
+                    
+                    if not final_btn:
+                        raise Exception("Кнопка 'Продолжить' не найдена")
                     
                     self.driver.execute_script(
                         "arguments[0].scrollIntoView({block:'center'});",
                         final_btn
                     )
+                    time.sleep(0.5)
                     
+                    # Пробуем кликнуть
                     try:
-                        final_btn.click()
-                        print("✅ Кнопка 'Продолжить' нажата")
-                    except:
                         self.driver.execute_script("arguments[0].click();", final_btn)
                         print("✅ Кнопка 'Продолжить' нажата (JS)")
+                    except:
+                        final_btn.click()
+                        print("✅ Кнопка 'Продолжить' нажата")
                     
-                    wait.until(lambda d: "payment" in d.current_url or "result" in d.current_url)
-                    print("✅ Переход на страницу оплаты")
+                    # Ждем перехода на страницу оплаты
+                    print("📌 Ожидаю перехода на страницу оплаты...")
+                    transition_found = False
+                    for i in range(50):  # 25 секунд максимум
+                        time.sleep(0.5)
+                        current = self.driver.current_url
+                        if "payment" in current or "result" in current or "/pay/" in current or "finish-transfer" in current:
+                            print(f"✅ Переход на страницу оплаты")
+                            log_step("Переход на страницу оплаты")
+                            transition_found = True
+                            break
+                        
+                        # Если через 3 секунды не перешли, пробуем кликнуть еще раз
+                        if i == 6 and not transition_found:
+                            try:
+                                retry_btn = self.driver.find_element(By.CSS_SELECTOR, "button.MuiButton-sizeLarge[buttontext='Продолжить']")
+                                if retry_btn:
+                                    self.driver.execute_script("arguments[0].click();", retry_btn)
+                                    print("🔄 Повторный клик по кнопке")
+                            except:
+                                pass
+                    
+                    if not transition_found:
+                        print(f"⚠️ Не дождались перехода. URL: {self.driver.current_url}")
                     
                 except Exception as e:
-                    print(f"⚠️ Модалка не найдена: {e}")
+                    print(f"⚠️ Ошибка с модалкой: {e}")
+                    print(f"   Текущий URL: {self.driver.current_url}")
             
             print("📌 Получаю данные платежа...")
             

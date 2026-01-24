@@ -14,12 +14,16 @@ print("\n" + "="*60)
 print("🐳 DOCKER TEST - Создание платежа")
 print("="*60)
 
-payment = MultitransferPayment(headless=True)
+payment = MultitransferPayment(headless=False, keep_alive=True)  # Визуальный режим с прогревом
 
 try:
     print("\n1️⃣ Инициализация...")
     if payment.login():
         print("✅ Браузер запущен")
+        
+        # Прогреваем браузер
+        print("\n🔥 Прогрев браузера...")
+        payment.warmup()
         
         print("\n2️⃣ Создание платежа...")
         result = payment.create_payment(
