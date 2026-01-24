@@ -119,8 +119,8 @@ class MultitransferPayment:
             print("✅ Сумма введена")
             log_step("Ввод суммы")
             
-            # Уменьшаем ожидание с 3+1 до 2 секунд
-            time.sleep(2)
+            # Уменьшаем ожидание с 2 до 1.5 секунд
+            time.sleep(1.5)
             log_step("Ожидание React")
             
             try:
