@@ -27,7 +27,13 @@ payment_lock = threading.Lock()
 
 @app.route('/')
 def index():
-    """Главная страница"""
+    """Главная страница - админ панель"""
+    return render_template('dashboard.html')
+
+
+@app.route('/old')
+def old_index():
+    """Старая страница"""
     return render_template('index.html', 
                          min_amount=MIN_AMOUNT, 
                          max_amount=MAX_AMOUNT,
