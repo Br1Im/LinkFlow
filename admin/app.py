@@ -110,18 +110,15 @@ def create_payment():
 def process_payment(payment_id, card_number, owner_name, amount, sender_data, payment_system='multitransfer'):
     """Обработка платежа в фоновом режиме"""
     try:
-        # Создаем платеж через выбранную систему
+        # Создаем платеж через выбранную систему (без keep_alive для стабильности)
         if payment_system == 'elecsnet':
             payment = PaymentManager(sender_data=sender_data, headless=True)
         else:
-            payment = MultitransferPayment(sender_data=sender_data, headless=True, keep_alive=True)
+            payment = MultitransferPayment(sender_data=sender_data, headless=True)
         
         payment.login()
         
-        # Прогреваем браузер для ускорения
-        if payment_system == 'multitransfer':
-            payment.warmup()
-        
+        # Убираем warmup для стабильности - создаем платеж сразу
         result = payment.create_payment(
             card_number=card_number,
             owner_name=owner_name,
