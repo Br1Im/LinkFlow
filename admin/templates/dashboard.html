@@ -262,7 +262,7 @@
         /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 24px;
             margin-bottom: 40px;
             animation: fadeInUp 0.6s ease-out;
@@ -442,8 +442,8 @@
             padding: 24px;
             margin-bottom: 16px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            gap: 16px;
             transition: all 0.3s;
             animation: slideIn 0.4s ease-out;
         }
@@ -461,8 +461,14 @@
         
         .payment-item:hover {
             border-color: var(--accent);
-            transform: translateX(5px);
+            transform: translateY(-2px);
             box-shadow: 0 5px 20px var(--shadow);
+        }
+        
+        .payment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
         .payment-info {
@@ -638,39 +644,28 @@
         <aside class="sidebar" id="sidebar">
             <div class="logo-container">
                 <div class="logo">
-                    <div class="logo-icon">💳</div>
                     <span class="logo-text">LinkFlow</span>
                 </div>
             </div>
             
             <nav class="nav-menu">
-                <div class="nav-item active" onclick="showPage('dashboard')">
+                <div class="nav-item active" onclick="showPage('dashboard', event)">
                     <i class="fas fa-home"></i>
                     <span>Главная</span>
                 </div>
-                <div class="nav-item" onclick="showPage('create')">
+                <div class="nav-item" onclick="showPage('create', event)">
                     <i class="fas fa-plus-circle"></i>
                     <span>Создать платёж</span>
                 </div>
-                <div class="nav-item" onclick="showPage('payments')">
+                <div class="nav-item" onclick="showPage('payments', event)">
                     <i class="fas fa-list"></i>
                     <span>История платежей</span>
                 </div>
-                <div class="nav-item" onclick="showPage('settings')">
+                <div class="nav-item" onclick="showPage('settings', event)">
                     <i class="fas fa-cog"></i>
                     <span>Настройки</span>
                 </div>
             </nav>
-            
-            <div class="sidebar-footer">
-                <div class="user-info">
-                    <div class="user-avatar">A</div>
-                    <div class="user-details">
-                        <div class="user-name">Admin</div>
-                        <div class="user-role">Администратор</div>
-                    </div>
-                </div>
-            </div>
         </aside>
         
         <!-- Main Content -->
@@ -682,14 +677,6 @@
                     </button>
                     <h1 class="page-title" id="pageTitle">Главная</h1>
                 </div>
-                <div class="header-actions">
-                    <button class="btn btn-secondary" onclick="loadPayments()">
-                        <i class="fas fa-sync-alt"></i> Обновить
-                    </button>
-                    <button class="btn btn-primary" onclick="showPage('create')">
-                        <i class="fas fa-plus"></i> Создать платёж
-                    </button>
-                </div>
             </header>
             
             <div class="container">
@@ -699,9 +686,6 @@
                         <div class="stat-card">
                             <div class="stat-header">
                                 <div class="stat-icon">📊</div>
-                                <div class="stat-trend trend-up">
-                                    <i class="fas fa-arrow-up"></i> 12%
-                                </div>
                             </div>
                             <div class="stat-label">Всего платежей</div>
                             <div class="stat-value" id="totalPayments">0</div>
@@ -709,9 +693,6 @@
                         <div class="stat-card">
                             <div class="stat-header">
                                 <div class="stat-icon">✅</div>
-                                <div class="stat-trend trend-up">
-                                    <i class="fas fa-arrow-up"></i> 8%
-                                </div>
                             </div>
                             <div class="stat-label">Успешных</div>
                             <div class="stat-value" id="successPayments">0</div>
@@ -726,9 +707,6 @@
                         <div class="stat-card">
                             <div class="stat-header">
                                 <div class="stat-icon">❌</div>
-                                <div class="stat-trend trend-down">
-                                    <i class="fas fa-arrow-down"></i> 3%
-                                </div>
                             </div>
                             <div class="stat-label">Ошибок</div>
                             <div class="stat-value" id="failedPayments">0</div>
@@ -738,7 +716,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h2 class="card-title">Последние платежи</h2>
-                            <button class="btn btn-secondary" onclick="showPage('payments')">
+                            <button class="btn btn-secondary" onclick="showPage('payments', event)">
                                 Показать все
                             </button>
                         </div>
@@ -756,29 +734,6 @@
                         <div id="alert" class="alert"></div>
                         
                         <form id="paymentForm">
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label for="card_number">
-                                        <i class="fas fa-credit-card"></i> Номер карты получателя
-                                    </label>
-                                    <input type="text" id="card_number" name="card_number" 
-                                           value="9860080323894719"
-                                           placeholder="9860080323894719" required
-                                           pattern="[0-9]{16}" maxlength="16">
-                                    <div class="hint">16 цифр (Uzcard/Humo)</div>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="owner_name">
-                                        <i class="fas fa-user"></i> Имя владельца карты
-                                    </label>
-                                    <input type="text" id="owner_name" name="owner_name" 
-                                           value="Nodir Asadullayev"
-                                           placeholder="Nodir Asadullayev" required>
-                                    <div class="hint">Имя и фамилия латиницей</div>
-                                </div>
-                            </div>
-                            
                             <div class="form-grid">
                                 <div class="form-group">
                                     <label for="amount">
@@ -826,6 +781,25 @@
                 
                 <!-- Settings Page -->
                 <div id="settingsPage" class="page-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Данные получателя</h2>
+                        </div>
+                        
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label><i class="fas fa-credit-card"></i> Номер карты получателя</label>
+                                <input type="text" value="9860080323894719" readonly>
+                                <div class="hint">16 цифр (Uzcard/Humo)</div>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-user"></i> Имя владельца карты</label>
+                                <input type="text" value="Nodir Asadullayev" readonly>
+                                <div class="hint">Имя и фамилия латиницей</div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="card">
                         <div class="card-header">
                             <h2 class="card-title">Данные отправителя</h2>
@@ -879,12 +853,23 @@
         }
         
         // Show Page
-        function showPage(pageName) {
+        function showPage(pageName, event) {
             // Update nav items
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
             });
-            event.target.closest('.nav-item').classList.add('active');
+            if (event && event.target) {
+                event.target.closest('.nav-item').classList.add('active');
+            } else {
+                // Если event не передан, находим элемент по pageName
+                const navItems = document.querySelectorAll('.nav-item');
+                navItems.forEach((item, index) => {
+                    const pages = ['dashboard', 'create', 'payments', 'settings'];
+                    if (pages[index] === pageName) {
+                        item.classList.add('active');
+                    }
+                });
+            }
             
             // Update page content
             document.querySelectorAll('.page-content').forEach(page => {
@@ -948,29 +933,33 @@
             
             container.innerHTML = paymentsData.slice().reverse().map(payment => `
                 <div class="payment-item">
-                    <div class="payment-info">
+                    <div class="payment-header">
                         <div class="payment-id">
-                            <i class="fas fa-hashtag"></i> ${payment.id} • 
+                            <i class="fas fa-hashtag"></i> Платёж #${payment.id}
+                        </div>
+                        <span class="status-badge status-${payment.status}">
+                            ${payment.status === 'completed' ? '<i class="fas fa-check-circle"></i> Готово' : 
+                              payment.status === 'processing' ? '<i class="fas fa-spinner fa-spin"></i> Обработка' : 
+                              '<i class="fas fa-times-circle"></i> Ошибка'}
+                        </span>
+                    </div>
+                    <div class="payment-info">
+                        <div class="payment-details">
                             <i class="fas fa-clock"></i> ${new Date(payment.created_at).toLocaleString('ru-RU')}
                         </div>
                         <div class="payment-details">
-                            <i class="fas fa-credit-card"></i> ${payment.card_number} • 
+                            <i class="fas fa-credit-card"></i> ${payment.card_number}
+                        </div>
+                        <div class="payment-details">
                             <i class="fas fa-user"></i> ${payment.owner_name}
                         </div>
                         <div class="payment-amount">${payment.amount} RUB</div>
                         ${payment.result?.payment_link ? `
                             <div class="payment-link">
                                 <i class="fas fa-link"></i> 
-                                <a href="${payment.result.payment_link}" target="_blank">Открыть ссылку</a>
+                                <a href="${payment.result.payment_link}" target="_blank">Открыть ссылку на оплату</a>
                             </div>
                         ` : ''}
-                    </div>
-                    <div>
-                        <span class="status-badge status-${payment.status}">
-                            ${payment.status === 'completed' ? '<i class="fas fa-check-circle"></i> Готово' : 
-                              payment.status === 'processing' ? '<i class="fas fa-spinner fa-spin"></i> Обработка' : 
-                              '<i class="fas fa-times-circle"></i> Ошибка'}
-                        </span>
                     </div>
                 </div>
             `).join('');
@@ -993,23 +982,27 @@
             
             container.innerHTML = recent.map(payment => `
                 <div class="payment-item">
-                    <div class="payment-info">
+                    <div class="payment-header">
                         <div class="payment-id">
-                            <i class="fas fa-hashtag"></i> ${payment.id} • 
-                            <i class="fas fa-clock"></i> ${new Date(payment.created_at).toLocaleString('ru-RU')}
+                            <i class="fas fa-hashtag"></i> Платёж #${payment.id}
                         </div>
-                        <div class="payment-details">
-                            <i class="fas fa-credit-card"></i> ${payment.card_number} • 
-                            <i class="fas fa-user"></i> ${payment.owner_name}
-                        </div>
-                        <div class="payment-amount">${payment.amount} RUB</div>
-                    </div>
-                    <div>
                         <span class="status-badge status-${payment.status}">
                             ${payment.status === 'completed' ? '<i class="fas fa-check-circle"></i> Готово' : 
                               payment.status === 'processing' ? '<i class="fas fa-spinner fa-spin"></i> Обработка' : 
                               '<i class="fas fa-times-circle"></i> Ошибка'}
                         </span>
+                    </div>
+                    <div class="payment-info">
+                        <div class="payment-details">
+                            <i class="fas fa-clock"></i> ${new Date(payment.created_at).toLocaleString('ru-RU')}
+                        </div>
+                        <div class="payment-details">
+                            <i class="fas fa-credit-card"></i> ${payment.card_number}
+                        </div>
+                        <div class="payment-details">
+                            <i class="fas fa-user"></i> ${payment.owner_name}
+                        </div>
+                        <div class="payment-amount">${payment.amount} RUB</div>
                     </div>
                 </div>
             `).join('');
@@ -1020,8 +1013,8 @@
             e.preventDefault();
             
             const formData = {
-                card_number: document.getElementById('card_number').value,
-                owner_name: document.getElementById('owner_name').value,
+                card_number: '9860080323894719',
+                owner_name: 'Nodir Asadullayev',
                 amount: parseInt(document.getElementById('amount').value),
                 payment_system: document.getElementById('payment_system').value
             };
@@ -1065,9 +1058,6 @@
                 submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Создать платёж';
             }
         });
-        
-        // Auto-refresh every 5 seconds
-        setInterval(loadPayments, 5000);
         
         // Initial load
         loadPayments();

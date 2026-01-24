@@ -45,13 +45,34 @@ class MultitransferPayment:
         options.add_experimental_option('excludeSwitches', ['enable-logging', 'enable-automation'])
         options.add_experimental_option('useAutomationExtension', False)
         
+        # Определяем путь к Chrome в зависимости от ОС
         import os
-        if os.path.exists('/usr/bin/google-chrome'):
+        import platform
+        
+        if platform.system() == 'Linux' and os.path.exists('/usr/bin/google-chrome'):
             options.binary_location = '/usr/bin/google-chrome'
+            print("🐧 Используется Linux Chrome")
+        elif platform.system() == 'Windows':
+            # На Windows webdriver-manager сам найдет Chrome
+            print("🪟 Используется Windows Chrome")
         
         from webdriver_manager.chrome import ChromeDriverManager
         from selenium.webdriver.chrome.service import Service
-        service = Service(ChromeDriverManager().install())
+        
+        # Получаем путь к драйверу
+        driver_path = ChromeDriverManager().install()
+        
+        # Исправляем путь, если он указывает на неправильный файл
+        if platform.system() == 'Windows':
+            # ChromeDriverManager иногда возвращает путь к THIRD_PARTY_NOTICES
+            if 'THIRD_PARTY_NOTICES' in driver_path or not driver_path.endswith('.exe'):
+                # Получаем директорию и добавляем правильное имя файла
+                driver_dir = os.path.dirname(driver_path)
+                driver_path = os.path.join(driver_dir, 'chromedriver.exe')
+        
+        print(f"📍 ChromeDriver: {driver_path}")
+        
+        service = Service(driver_path)
         driver = webdriver.Chrome(service=service, options=options)
         driver.set_page_load_timeout(30)
         return driver
@@ -163,7 +184,7 @@ class MultitransferPayment:
                 continue_btn.click()
                 print("✅ Кнопка 'Продолжить' нажата")
                 
-                wait.until(lambda d: "sender-details" in d.current_url, timeout=10)
+                WebDriverWait(self.driver, 10).until(lambda d: "sender-details" in d.current_url)
                 print("✅ Переход на страницу sender-details")
                 
             except Exception as e:
@@ -173,7 +194,7 @@ class MultitransferPayment:
                     self.driver.execute_script("arguments[0].click();", continue_btn)
                     print("✅ Кнопка 'Продолжить' нажата (JS)")
                     
-                    wait.until(lambda d: "sender-details" in d.current_url, timeout=10)
+                    WebDriverWait(self.driver, 10).until(lambda d: "sender-details" in d.current_url)
                     print("✅ Переход на страницу sender-details")
                     
                 except Exception as e2:
