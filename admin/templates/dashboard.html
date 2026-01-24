@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LinkFlow - Админ Панель</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
             margin: 0;
@@ -12,24 +13,162 @@
         }
         
         :root {
-            --bg-primary: #0f1419;
-            --bg-secondary: #1a1f2e;
-            --bg-tertiary: #252d3d;
-            --text-primary: #e4e6eb;
-            --text-secondary: #8b92a4;
-            --accent: #667eea;
-            --accent-hover: #5568d3;
+            --bg-primary: #0a0e27;
+            --bg-secondary: #151932;
+            --bg-tertiary: #1e2139;
+            --bg-card: #252b48;
+            --text-primary: #ffffff;
+            --text-secondary: #a0aec0;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --accent-light: rgba(99, 102, 241, 0.1);
             --success: #10b981;
             --error: #ef4444;
             --warning: #f59e0b;
-            --border: #2d3748;
+            --border: rgba(255, 255, 255, 0.05);
+            --shadow: rgba(0, 0, 0, 0.3);
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
+            overflow-x: hidden;
+        }
+        
+        .app-container {
+            display: flex;
             min-height: 100vh;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar.collapsed {
+            transform: translateX(-280px);
+        }
+        
+        .logo-container {
+            padding: 30px 25px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .logo-text {
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-menu {
+            flex: 1;
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+        
+        .nav-item {
+            padding: 12px 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            font-size: 15px;
+        }
+        
+        .nav-item:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        .nav-item.active {
+            background: var(--accent-light);
+            color: var(--accent);
+            border-left-color: var(--accent);
+        }
+        
+        .nav-item i {
+            width: 20px;
+            text-align: center;
+        }
+        
+        .sidebar-footer {
+            padding: 20px 25px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        
+        .user-details {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .user-role {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .main-content.expanded {
+            margin-left: 0;
         }
         
         .header {
@@ -39,24 +178,50 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
         
-        .logo {
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .menu-toggle {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .menu-toggle:hover {
+            background: var(--bg-card);
+            transform: scale(1.05);
+        }
+        
+        .page-title {
             font-size: 24px;
             font-weight: 700;
-            background: linear-gradient(135deg, var(--accent) 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
         }
         
         .header-actions {
             display: flex;
-            gap: 15px;
+            gap: 12px;
         }
         
         .btn {
             padding: 10px 20px;
-            border-radius: 8px;
+            border-radius: 10px;
             border: none;
             font-size: 14px;
             font-weight: 600;
@@ -68,13 +233,14 @@
         }
         
         .btn-primary {
-            background: var(--accent);
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
             color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
         }
         
         .btn-primary:hover {
-            background: var(--accent-hover);
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
         }
         
         .btn-secondary {
@@ -84,166 +250,219 @@
         }
         
         .btn-secondary:hover {
-            background: var(--bg-secondary);
+            background: var(--bg-card);
         }
         
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
             padding: 40px;
+            max-width: 1600px;
+            margin: 0 auto;
         }
         
+        /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
             margin-bottom: 40px;
+            animation: fadeInUp 0.6s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .stat-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            transition: transform 0.2s;
+            border-radius: 16px;
+            padding: 28px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent) 0%, #8b5cf6 100%);
+            transform: scaleX(0);
+            transition: transform 0.3s;
         }
         
         .stat-card:hover {
-            transform: translateY(-2px);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px var(--shadow);
+            border-color: var(--accent);
+        }
+        
+        .stat-card:hover::before {
+            transform: scaleX(1);
+        }
+        
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            background: var(--accent-light);
+        }
+        
+        .stat-trend {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        
+        .trend-up {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+        
+        .trend-down {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
         }
         
         .stat-label {
             color: var(--text-secondary);
             font-size: 14px;
             margin-bottom: 8px;
+            font-weight: 500;
         }
         
         .stat-value {
-            font-size: 32px;
+            font-size: 36px;
             font-weight: 700;
-            color: var(--text-primary);
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
         
-        .stat-icon {
-            font-size: 24px;
-            margin-bottom: 12px;
-        }
-        
+        /* Card */
         .card {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 30px;
+            border-radius: 16px;
+            padding: 32px;
             margin-bottom: 30px;
+            animation: fadeInUp 0.6s ease-out;
+            animation-delay: 0.2s;
+            animation-fill-mode: both;
         }
         
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
+            margin-bottom: 28px;
         }
         
         .card-title {
-            font-size: 20px;
-            font-weight: 600;
+            font-size: 22px;
+            font-weight: 700;
         }
         
+        /* Form */
         .form-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+            gap: 24px;
         }
         
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
         
         label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             color: var(--text-secondary);
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         input, select, textarea {
             width: 100%;
-            padding: 12px 16px;
+            padding: 14px 18px;
             background: var(--bg-tertiary);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 10px;
             color: var(--text-primary);
-            font-size: 14px;
+            font-size: 15px;
             transition: all 0.2s;
         }
         
         input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            box-shadow: 0 0 0 4px var(--accent-light);
+            background: var(--bg-card);
         }
         
         .hint {
             font-size: 12px;
             color: var(--text-secondary);
-            margin-top: 5px;
+            margin-top: 6px;
         }
         
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 30px;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .tab {
-            padding: 12px 24px;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
-        }
-        
-        .tab.active {
-            color: var(--accent);
-            border-bottom-color: var(--accent);
-        }
-        
-        .tab:hover {
-            color: var(--text-primary);
-        }
-        
-        .tab-content {
-            display: none;
-        }
-        
-        .tab-content.active {
-            display: block;
-        }
-        
+        /* Payment List */
         .payment-list {
-            margin-top: 20px;
+            margin-top: 24px;
         }
         
         .payment-item {
             background: var(--bg-tertiary);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 15px;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            transition: all 0.2s;
+            transition: all 0.3s;
+            animation: slideIn 0.4s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
         
         .payment-item:hover {
             border-color: var(--accent);
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px var(--shadow);
         }
         
         .payment-info {
@@ -253,50 +472,75 @@
         .payment-id {
             font-size: 12px;
             color: var(--text-secondary);
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            font-weight: 600;
         }
         
         .payment-details {
-            font-size: 14px;
-            margin-bottom: 5px;
+            font-size: 15px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
         }
         
         .payment-amount {
-            font-size: 18px;
+            font-size: 24px;
             font-weight: 700;
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .payment-link {
+            margin-top: 8px;
+            font-size: 13px;
+        }
+        
+        .payment-link a {
             color: var(--accent);
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        
+        .payment-link a:hover {
+            color: var(--accent-hover);
+            text-decoration: underline;
         }
         
         .status-badge {
-            padding: 6px 12px;
-            border-radius: 6px;
+            padding: 8px 16px;
+            border-radius: 8px;
             font-size: 12px;
-            font-weight: 600;
+            font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .status-processing {
-            background: rgba(245, 158, 11, 0.1);
+            background: rgba(245, 158, 11, 0.15);
             color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.3);
         }
         
         .status-completed {
-            background: rgba(16, 185, 129, 0.1);
+            background: rgba(16, 185, 129, 0.15);
             color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
         }
         
         .status-failed {
-            background: rgba(239, 68, 68, 0.1);
+            background: rgba(239, 68, 68, 0.15);
             color: var(--error);
+            border: 1px solid rgba(239, 68, 68, 0.3);
         }
         
+        /* Loader */
         .loader {
             border: 3px solid var(--bg-tertiary);
             border-top: 3px solid var(--accent);
             border-radius: 50%;
             width: 20px;
             height: 20px;
-            animation: spin 1s linear infinite;
+            animation: spin 0.8s linear infinite;
             display: inline-block;
         }
         
@@ -305,214 +549,377 @@
             100% { transform: rotate(360deg); }
         }
         
+        /* Alert */
         .alert {
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 24px;
             display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .alert.success {
-            background: rgba(16, 185, 129, 0.1);
+            background: rgba(16, 185, 129, 0.15);
             border: 1px solid var(--success);
             color: var(--success);
         }
         
         .alert.error {
-            background: rgba(239, 68, 68, 0.1);
+            background: rgba(239, 68, 68, 0.15);
             border: 1px solid var(--error);
             color: var(--error);
         }
         
+        /* Empty State */
         .empty-state {
             text-align: center;
-            padding: 60px 20px;
+            padding: 80px 20px;
             color: var(--text-secondary);
         }
         
         .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        .empty-state-text {
+            font-size: 16px;
+        }
+        
+        /* Page Transitions */
+        .page-content {
+            display: none;
+        }
+        
+        .page-content.active {
+            display: block;
+            animation: fadeInUp 0.4s ease-out;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-280px);
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="logo">💳 LinkFlow Admin</div>
-        <div class="header-actions">
-            <button class="btn btn-secondary" onclick="loadPayments()">
-                🔄 Обновить
-            </button>
-            <button class="btn btn-primary" onclick="showTab('create')">
-                ➕ Создать платёж
-            </button>
-        </div>
-    </div>
-    
-    <div class="container">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon">📊</div>
-                <div class="stat-label">Всего платежей</div>
-                <div class="stat-value" id="totalPayments">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">✅</div>
-                <div class="stat-label">Успешных</div>
-                <div class="stat-value" id="successPayments">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">⏳</div>
-                <div class="stat-label">В обработке</div>
-                <div class="stat-value" id="processingPayments">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">❌</div>
-                <div class="stat-label">Ошибок</div>
-                <div class="stat-value" id="failedPayments">0</div>
-            </div>
-        </div>
-        
-        <div class="tabs">
-            <button class="tab active" onclick="showTab('create')">Создать платёж</button>
-            <button class="tab" onclick="showTab('payments')">История платежей</button>
-            <button class="tab" onclick="showTab('settings')">Настройки</button>
-        </div>
-        
-        <div id="createTab" class="tab-content active">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Создание нового платежа</h2>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="logo-container">
+                <div class="logo">
+                    <div class="logo-icon">💳</div>
+                    <span class="logo-text">LinkFlow</span>
                 </div>
-                
-                <div id="alert" class="alert"></div>
-                
-                <form id="paymentForm">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="card_number">Номер карты получателя</label>
-                            <input type="text" id="card_number" name="card_number" 
-                                   value="9860080323894719"
-                                   placeholder="9860080323894719" required
-                                   pattern="[0-9]{16}" maxlength="16">
-                            <div class="hint">16 цифр (Uzcard/Humo)</div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="owner_name">Имя владельца карты</label>
-                            <input type="text" id="owner_name" name="owner_name" 
-                                   value="Nodir Asadullayev"
-                                   placeholder="Nodir Asadullayev" required>
-                            <div class="hint">Имя и фамилия латиницей</div>
-                        </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <div class="nav-item active" onclick="showPage('dashboard')">
+                    <i class="fas fa-home"></i>
+                    <span>Главная</span>
+                </div>
+                <div class="nav-item" onclick="showPage('create')">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Создать платёж</span>
+                </div>
+                <div class="nav-item" onclick="showPage('payments')">
+                    <i class="fas fa-list"></i>
+                    <span>История платежей</span>
+                </div>
+                <div class="nav-item" onclick="showPage('settings')">
+                    <i class="fas fa-cog"></i>
+                    <span>Настройки</span>
+                </div>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar">A</div>
+                    <div class="user-details">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Администратор</div>
                     </div>
-                    
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="amount">Сумма (RUB)</label>
-                            <input type="number" id="amount" name="amount" 
-                                   placeholder="500" required
-                                   min="100" max="15000">
-                            <div class="hint">От 100 до 15000 RUB</div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="payment_system">Платёжная система</label>
-                            <select id="payment_system" name="payment_system" required>
-                                <option value="multitransfer">Multitransfer.ru</option>
-                            </select>
-                            <div class="hint">Выберите платёжную систему</div>
-                        </div>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary" id="submitBtn">
-                        ➕ Создать платёж
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content" id="mainContent">
+            <header class="header">
+                <div class="header-left">
+                    <button class="menu-toggle" onclick="toggleSidebar()">
+                        <i class="fas fa-bars"></i>
                     </button>
-                </form>
-            </div>
-        </div>
-        
-        <div id="paymentsTab" class="tab-content">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">История платежей</h2>
+                    <h1 class="page-title" id="pageTitle">Главная</h1>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="loadPayments()">
+                        <i class="fas fa-sync-alt"></i> Обновить
+                    </button>
+                    <button class="btn btn-primary" onclick="showPage('create')">
+                        <i class="fas fa-plus"></i> Создать платёж
+                    </button>
+                </div>
+            </header>
+            
+            <div class="container">
+                <!-- Dashboard Page -->
+                <div id="dashboardPage" class="page-content active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div class="stat-icon">📊</div>
+                                <div class="stat-trend trend-up">
+                                    <i class="fas fa-arrow-up"></i> 12%
+                                </div>
+                            </div>
+                            <div class="stat-label">Всего платежей</div>
+                            <div class="stat-value" id="totalPayments">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div class="stat-icon">✅</div>
+                                <div class="stat-trend trend-up">
+                                    <i class="fas fa-arrow-up"></i> 8%
+                                </div>
+                            </div>
+                            <div class="stat-label">Успешных</div>
+                            <div class="stat-value" id="successPayments">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div class="stat-icon">⏳</div>
+                            </div>
+                            <div class="stat-label">В обработке</div>
+                            <div class="stat-value" id="processingPayments">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div class="stat-icon">❌</div>
+                                <div class="stat-trend trend-down">
+                                    <i class="fas fa-arrow-down"></i> 3%
+                                </div>
+                            </div>
+                            <div class="stat-label">Ошибок</div>
+                            <div class="stat-value" id="failedPayments">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Последние платежи</h2>
+                            <button class="btn btn-secondary" onclick="showPage('payments')">
+                                Показать все
+                            </button>
+                        </div>
+                        <div id="recentPayments" class="payment-list"></div>
+                    </div>
                 </div>
                 
-                <div id="paymentsList" class="payment-list">
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📭</div>
-                        <div>Платежей пока нет</div>
+                <!-- Create Payment Page -->
+                <div id="createPage" class="page-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Создание нового платежа</h2>
+                        </div>
+                        
+                        <div id="alert" class="alert"></div>
+                        
+                        <form id="paymentForm">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="card_number">
+                                        <i class="fas fa-credit-card"></i> Номер карты получателя
+                                    </label>
+                                    <input type="text" id="card_number" name="card_number" 
+                                           value="9860080323894719"
+                                           placeholder="9860080323894719" required
+                                           pattern="[0-9]{16}" maxlength="16">
+                                    <div class="hint">16 цифр (Uzcard/Humo)</div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="owner_name">
+                                        <i class="fas fa-user"></i> Имя владельца карты
+                                    </label>
+                                    <input type="text" id="owner_name" name="owner_name" 
+                                           value="Nodir Asadullayev"
+                                           placeholder="Nodir Asadullayev" required>
+                                    <div class="hint">Имя и фамилия латиницей</div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="amount">
+                                        <i class="fas fa-ruble-sign"></i> Сумма (RUB)
+                                    </label>
+                                    <input type="number" id="amount" name="amount" 
+                                           placeholder="500" required
+                                           min="100" max="15000">
+                                    <div class="hint">От 100 до 15000 RUB</div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="payment_system">
+                                        <i class="fas fa-building"></i> Платёжная система
+                                    </label>
+                                    <select id="payment_system" name="payment_system" required>
+                                        <option value="multitransfer">Multitransfer.ru</option>
+                                    </select>
+                                    <div class="hint">Выберите платёжную систему</div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary" id="submitBtn" style="width: 100%; margin-top: 20px;">
+                                <i class="fas fa-paper-plane"></i> Создать платёж
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Payments History Page -->
+                <div id="paymentsPage" class="page-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">История платежей</h2>
+                        </div>
+                        
+                        <div id="paymentsList" class="payment-list">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📭</div>
+                                <div class="empty-state-text">Платежей пока нет</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Settings Page -->
+                <div id="settingsPage" class="page-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Данные отправителя</h2>
+                        </div>
+                        
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label><i class="fas fa-user"></i> Имя</label>
+                                <input type="text" value="Дмитрий" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-user"></i> Фамилия</label>
+                                <input type="text" value="Непокрытый" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-calendar"></i> Дата рождения</label>
+                                <input type="text" value="03.07.2000" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-phone"></i> Телефон</label>
+                                <input type="text" value="+79880260334" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-id-card"></i> Серия паспорта</label>
+                                <input type="text" value="1820" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-id-card"></i> Номер паспорта</label>
+                                <input type="text" value="657875" readonly>
+                            </div>
+                        </div>
+                        
+                        <div class="hint" style="margin-top: 24px;">
+                            <i class="fas fa-info-circle"></i> Для изменения данных отредактируйте файл src/sender_data.py
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <div id="settingsTab" class="tab-content">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Данные отправителя</h2>
-                </div>
-                
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Имя</label>
-                        <input type="text" value="Дмитрий" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Фамилия</label>
-                        <input type="text" value="Непокрытый" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Дата рождения</label>
-                        <input type="text" value="03.07.2000" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Телефон</label>
-                        <input type="text" value="+79880260334" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Серия паспорта</label>
-                        <input type="text" value="1820" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Номер паспорта</label>
-                        <input type="text" value="657875" readonly>
-                    </div>
-                </div>
-                
-                <div class="hint" style="margin-top: 20px;">
-                    💡 Для изменения данных отредактируйте файл src/sender_data.py
-                </div>
-            </div>
-        </div>
+        </main>
     </div>
     
     <script>
         let paymentsData = [];
         
-        function showTab(tabName) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        // Toggle Sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+        }
+        
+        // Show Page
+        function showPage(pageName) {
+            // Update nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.nav-item').classList.add('active');
             
-            event.target.classList.add('active');
-            document.getElementById(tabName + 'Tab').classList.add('active');
+            // Update page content
+            document.querySelectorAll('.page-content').forEach(page => {
+                page.classList.remove('active');
+            });
+            document.getElementById(pageName + 'Page').classList.add('active');
             
-            if (tabName === 'payments') {
+            // Update page title
+            const titles = {
+                'dashboard': 'Главная',
+                'create': 'Создать платёж',
+                'payments': 'История платежей',
+                'settings': 'Настройки'
+            };
+            document.getElementById('pageTitle').textContent = titles[pageName];
+            
+            if (pageName === 'payments' || pageName === 'dashboard') {
                 loadPayments();
             }
         }
         
+        // Load Payments
         async function loadPayments() {
             try {
                 const response = await fetch('/api/payments');
                 paymentsData = await response.json();
                 updateStats();
                 renderPayments();
+                renderRecentPayments();
             } catch (error) {
                 console.error('Ошибка загрузки платежей:', error);
             }
         }
         
+        // Update Stats
         function updateStats() {
             const total = paymentsData.length;
             const completed = paymentsData.filter(p => p.status === 'completed').length;
@@ -525,6 +932,7 @@
             document.getElementById('failedPayments').textContent = failed;
         }
         
+        // Render Payments
         function renderPayments() {
             const container = document.getElementById('paymentsList');
             
@@ -532,38 +940,82 @@
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-state-icon">📭</div>
-                        <div>Платежей пока нет</div>
+                        <div class="empty-state-text">Платежей пока нет</div>
                     </div>
                 `;
                 return;
             }
             
-            container.innerHTML = paymentsData.reverse().map(payment => `
+            container.innerHTML = paymentsData.slice().reverse().map(payment => `
                 <div class="payment-item">
                     <div class="payment-info">
-                        <div class="payment-id">ID: ${payment.id} • ${new Date(payment.created_at).toLocaleString('ru-RU')}</div>
+                        <div class="payment-id">
+                            <i class="fas fa-hashtag"></i> ${payment.id} • 
+                            <i class="fas fa-clock"></i> ${new Date(payment.created_at).toLocaleString('ru-RU')}
+                        </div>
                         <div class="payment-details">
-                            ${payment.card_number} • ${payment.owner_name}
+                            <i class="fas fa-credit-card"></i> ${payment.card_number} • 
+                            <i class="fas fa-user"></i> ${payment.owner_name}
                         </div>
                         <div class="payment-amount">${payment.amount} RUB</div>
                         ${payment.result?.payment_link ? `
-                            <div style="margin-top: 8px;">
-                                <a href="${payment.result.payment_link}" target="_blank" style="color: var(--accent); font-size: 12px;">
-                                    🔗 Открыть ссылку
-                                </a>
+                            <div class="payment-link">
+                                <i class="fas fa-link"></i> 
+                                <a href="${payment.result.payment_link}" target="_blank">Открыть ссылку</a>
                             </div>
                         ` : ''}
                     </div>
                     <div>
                         <span class="status-badge status-${payment.status}">
-                            ${payment.status === 'completed' ? '✅ Готово' : 
-                              payment.status === 'processing' ? '⏳ Обработка' : '❌ Ошибка'}
+                            ${payment.status === 'completed' ? '<i class="fas fa-check-circle"></i> Готово' : 
+                              payment.status === 'processing' ? '<i class="fas fa-spinner fa-spin"></i> Обработка' : 
+                              '<i class="fas fa-times-circle"></i> Ошибка'}
                         </span>
                     </div>
                 </div>
             `).join('');
         }
         
+        // Render Recent Payments
+        function renderRecentPayments() {
+            const container = document.getElementById('recentPayments');
+            const recent = paymentsData.slice(-5).reverse();
+            
+            if (recent.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <div class="empty-state-text">Платежей пока нет</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = recent.map(payment => `
+                <div class="payment-item">
+                    <div class="payment-info">
+                        <div class="payment-id">
+                            <i class="fas fa-hashtag"></i> ${payment.id} • 
+                            <i class="fas fa-clock"></i> ${new Date(payment.created_at).toLocaleString('ru-RU')}
+                        </div>
+                        <div class="payment-details">
+                            <i class="fas fa-credit-card"></i> ${payment.card_number} • 
+                            <i class="fas fa-user"></i> ${payment.owner_name}
+                        </div>
+                        <div class="payment-amount">${payment.amount} RUB</div>
+                    </div>
+                    <div>
+                        <span class="status-badge status-${payment.status}">
+                            ${payment.status === 'completed' ? '<i class="fas fa-check-circle"></i> Готово' : 
+                              payment.status === 'processing' ? '<i class="fas fa-spinner fa-spin"></i> Обработка' : 
+                              '<i class="fas fa-times-circle"></i> Ошибка'}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Form Submit
         document.getElementById('paymentForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -592,29 +1044,32 @@
                 if (data.success) {
                     alert.className = 'alert success';
                     alert.style.display = 'block';
-                    alert.textContent = '✅ Платеж создается... Проверяйте статус в истории';
+                    alert.innerHTML = '<i class="fas fa-check-circle"></i> Платеж создается... Проверяйте статус в истории';
                     
                     setTimeout(() => {
-                        showTab('payments');
+                        showPage('dashboard');
                         loadPayments();
+                        alert.style.display = 'none';
                     }, 2000);
                 } else {
                     alert.className = 'alert error';
                     alert.style.display = 'block';
-                    alert.textContent = '❌ ' + data.error;
+                    alert.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + data.error;
                 }
             } catch (error) {
                 alert.className = 'alert error';
                 alert.style.display = 'block';
-                alert.textContent = '❌ Ошибка: ' + error.message;
+                alert.innerHTML = '<i class="fas fa-exclamation-circle"></i> Ошибка: ' + error.message;
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '➕ Создать платёж';
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Создать платёж';
             }
         });
         
-        // Автообновление каждые 5 секунд
+        // Auto-refresh every 5 seconds
         setInterval(loadPayments, 5000);
+        
+        // Initial load
         loadPayments();
     </script>
 </body>
