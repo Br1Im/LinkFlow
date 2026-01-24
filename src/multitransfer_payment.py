@@ -145,15 +145,23 @@ class MultitransferPayment:
                 click_mui_element(self.driver, bank_option)
                 print("✅ Банк предвыбран")
                 
-                # Закрываем модалку, кликая вне её или нажимая ESC
-                time.sleep(0.3)
+                # Закрываем модалку и очищаем состояние
+                time.sleep(0.5)
                 try:
-                    # Пробуем кликнуть по overlay или нажать ESC
+                    # Нажимаем ESC для закрытия модалки
                     from selenium.webdriver.common.keys import Keys
                     self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-                    print("✅ Модалка закрыта")
-                except:
-                    print("⚠️ Не удалось закрыть модалку, но продолжаем")
+                    time.sleep(0.3)
+                    
+                    # Перезагружаем страницу для чистого состояния
+                    print("📌 Перезагружаю страницу для чистого состояния...")
+                    self.driver.get(self.url)
+                    WebDriverWait(self.driver, 10).until(
+                        EC.presence_of_element_located((By.TAG_NAME, "body"))
+                    )
+                    print("✅ Страница перезагружена")
+                except Exception as e:
+                    print(f"⚠️ Ошибка при очистке: {e}")
                 
                 self.is_warmed_up = True
                 elapsed = time.time() - start_time
