@@ -89,10 +89,10 @@ class MultitransferPayment:
             set_mui_input_value(self.driver, amount_input, amount)
             print("✅ Сумма введена")
             
-            time.sleep(5)
+            time.sleep(3)
             
             print("📌 Ожидаю подтверждения суммы React...")
-            time.sleep(2)
+            time.sleep(1)
             
             try:
                 wait.until(EC.element_to_be_clickable((By.ID, "pay")))
@@ -148,7 +148,7 @@ class MultitransferPayment:
             except:
                 print("⚠️ Кнопка не активировалась, но продолжаем")
             
-            time.sleep(2)
+            time.sleep(1)
             
             print("📌 Нажимаю 'Продолжить'...")
             
@@ -182,6 +182,7 @@ class MultitransferPayment:
             print("📌 Заполняю данные получателя и отправителя...")
             
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "input")))
+            time.sleep(0.5)
             
             def fill_field_by_label(label_text, value, field_name):
                 try:
@@ -200,10 +201,9 @@ class MultitransferPayment:
                     print(f"   ⚠️ Ошибка {field_name}: {e}")
                     return False
             
-            def fill_field(name_pattern, value, field_name, retries=3):
+            def fill_field(name_pattern, value, field_name, retries=2):
                 for attempt in range(retries):
                     try:
-                        time.sleep(0.5)
                         inputs = self.driver.find_elements(By.TAG_NAME, "input")
                         for inp in inputs:
                             try:
@@ -214,18 +214,10 @@ class MultitransferPayment:
                                 if (name_pattern.lower() in name_attr.lower() or 
                                     name_pattern.lower() in placeholder.lower() or 
                                     name_pattern.lower() in aria_label.lower()):
-                                    self.driver.execute_script(
-                                        "arguments[0].scrollIntoView({block:'center'});",
-                                        inp
-                                    )
-                                    time.sleep(0.3)
                                     
                                     inp.click()
-                                    time.sleep(0.2)
                                     inp.clear()
-                                    time.sleep(0.2)
                                     inp.send_keys(value)
-                                    time.sleep(0.2)
                                     
                                     print(f"   ✅ {field_name}: {value}")
                                     return True
@@ -233,18 +225,14 @@ class MultitransferPayment:
                                 continue
                         
                         if attempt < retries - 1:
-                            print(f"   ⚠️ Попытка {attempt + 1}/{retries} для {field_name}")
-                            time.sleep(1)
+                            time.sleep(0.5)
                         else:
-                            print(f"   ⚠️ Поле {field_name} не найдено после {retries} попыток")
                             return False
                             
                     except Exception as e:
                         if attempt < retries - 1:
-                            print(f"   ⚠️ Ошибка {field_name} (попытка {attempt + 1}): {e}")
-                            time.sleep(1)
+                            time.sleep(0.5)
                         else:
-                            print(f"   ⚠️ Ошибка {field_name}: {e}")
                             return False
                 return False
             
@@ -284,6 +272,8 @@ class MultitransferPayment:
                     return False
             
             fill_field("beneficiaryaccountnumber", card_number, "Номер карты получателя")
+            fill_field("beneficiaryaccountnumber", card_number, "Номер карты получателя (повтор)")
+            time.sleep(0.3)
             fill_field("beneficiary_firstname", owner_name.split()[0], "Имя получателя")
             if len(owner_name.split()) > 1:
                 fill_field("beneficiary_lastname", owner_name.split()[1], "Фамилия получателя")
@@ -295,17 +285,9 @@ class MultitransferPayment:
             select_country("birthPlaceAddress_countryCode", SENDER_DATA["birth_country"], "Страна рождения")
             
             try:
-                birth_place_input = WebDriverWait(self.driver, 5).until(
+                birth_place_input = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "input[name='birthPlaceAddress_full']"))
                 )
-                print("   ✅ Поле 'Место рождения' найдено")
-                time.sleep(1)
-                
-                self.driver.execute_script(
-                    "arguments[0].scrollIntoView({block:'center'});",
-                    birth_place_input
-                )
-                time.sleep(0.5)
                 
                 self.driver.execute_script(
                     f"arguments[0].value = '{SENDER_DATA['birth_place']}';",
@@ -321,17 +303,9 @@ class MultitransferPayment:
             select_country("registrationAddress_countryCode", SENDER_DATA["registration_country"], "Страна регистрации")
             
             try:
-                reg_place_input = WebDriverWait(self.driver, 5).until(
+                reg_place_input = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "input[name='registrationAddress_full']"))
                 )
-                print("   ✅ Поле 'Место регистрации' найдено")
-                time.sleep(1)
-                
-                self.driver.execute_script(
-                    "arguments[0].scrollIntoView({block:'center'});",
-                    reg_place_input
-                )
-                time.sleep(0.5)
                 
                 self.driver.execute_script(
                     f"arguments[0].value = '{SENDER_DATA['registration_place']}';",
@@ -357,31 +331,23 @@ class MultitransferPayment:
                     EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='checkbox']"))
                 )
                 
-                self.driver.execute_script(
-                    "arguments[0].scrollIntoView({block:'center'});",
-                    checkbox_container
-                )
-                time.sleep(1)
-                
                 if not checkbox_container.is_selected():
                     try:
                         checkbox_container.click()
-                        print("✅ Галочка поставлена (прямой клик)")
+                        print("✅ Галочка поставлена")
                     except:
                         parent = checkbox_container.find_element(By.XPATH, "./..")
                         parent.click()
-                        print("✅ Галочка поставлена (клик по родителю)")
+                        print("✅ Галочка поставлена")
                 else:
                     print("✅ Галочка уже стоит")
                     
-                time.sleep(1)
-                
             except Exception as e:
                 print(f"⚠️ Ошибка с галочкой: {e}")
                 try:
                     checkbox_label = self.driver.find_element(By.XPATH, "//span[contains(@class, 'MuiCheckbox')]")
                     checkbox_label.click()
-                    print("✅ Галочка поставлена (клик по MUI элементу)")
+                    print("✅ Галочка поставлена")
                 except Exception as e2:
                     print(f"⚠️ Не удалось поставить галочку: {e2}")
             
@@ -390,14 +356,10 @@ class MultitransferPayment:
                 pay_button = wait.until(
                     EC.element_to_be_clickable((By.ID, "pay"))
                 )
-                self.driver.execute_script(
-                    "arguments[0].scrollIntoView({block:'center'});",
-                    pay_button
-                )
                 pay_button.click()
                 print("✅ Кнопка нажата, ожидаю перехода...")
                 
-                time.sleep(3)
+                time.sleep(2)
                 
             except Exception as e:
                 print(f"⚠️ Ошибка нажатия кнопки: {e}")
