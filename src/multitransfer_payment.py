@@ -145,29 +145,22 @@ class MultitransferPayment:
                 click_mui_element(self.driver, bank_option)
                 print("✅ Банк предвыбран")
                 
-                # Закрываем модалку и очищаем поле суммы
-                time.sleep(0.5)
+                # Просто ждем закрытия модалки автоматически
+                time.sleep(1.0)
+                
+                # Пробуем закрыть модалку через ESC
                 try:
-                    # Нажимаем ESC для закрытия модалки
                     from selenium.webdriver.common.keys import Keys
                     self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-                    time.sleep(0.5)
-                    
-                    # Очищаем поле суммы
-                    print("📌 Очищаю поле суммы...")
-                    amount_input = self.driver.find_element(By.CSS_SELECTOR, "input[placeholder='0 RUB']")
-                    amount_input.clear()
-                    # Вводим 0 чтобы сбросить состояние
-                    amount_input.send_keys("0")
-                    amount_input.clear()
-                    print("✅ Поле суммы очищено")
-                except Exception as e:
-                    print(f"⚠️ Ошибка при очистке: {e}")
+                    time.sleep(0.3)
+                    print("✅ Модалка закрыта")
+                except:
+                    print("⚠️ Модалка может быть еще открыта")
                 
                 self.is_warmed_up = True
                 elapsed = time.time() - start_time
                 print(f"✅ Прогрев завершен за {elapsed:.1f}s")
-                print("💡 Теперь можно вводить реальную сумму для создания платежа")
+                print("💡 Браузер готов, банк выбран, можно создавать платеж")
                 return True
             else:
                 print("⚠️ Не удалось прогреть - способ перевода не найден")
@@ -204,6 +197,17 @@ class MultitransferPayment:
             amount_input = wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='0 RUB']"))
             )
+            
+            # Если браузер прогрет, сначала очищаем старое значение
+            if self.is_warmed_up:
+                print("📌 Очищаю старое значение (браузер прогрет)...")
+                try:
+                    amount_input.click()
+                    time.sleep(0.2)
+                    amount_input.clear()
+                    time.sleep(0.2)
+                except Exception as e:
+                    print(f"⚠️ Ошибка очистки: {e}")
             
             set_mui_input_value(self.driver, amount_input, amount)
             print("✅ Сумма введена")
