@@ -145,21 +145,22 @@ class MultitransferPayment:
                 click_mui_element(self.driver, bank_option)
                 print("✅ Банк предвыбран")
                 
-                # Закрываем модалку и очищаем состояние
+                # Закрываем модалку и очищаем поле суммы
                 time.sleep(0.5)
                 try:
                     # Нажимаем ESC для закрытия модалки
                     from selenium.webdriver.common.keys import Keys
                     self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-                    time.sleep(0.3)
+                    time.sleep(0.5)
                     
-                    # Перезагружаем страницу для чистого состояния
-                    print("📌 Перезагружаю страницу для чистого состояния...")
-                    self.driver.get(self.url)
-                    WebDriverWait(self.driver, 10).until(
-                        EC.presence_of_element_located((By.TAG_NAME, "body"))
-                    )
-                    print("✅ Страница перезагружена")
+                    # Очищаем поле суммы
+                    print("📌 Очищаю поле суммы...")
+                    amount_input = self.driver.find_element(By.CSS_SELECTOR, "input[placeholder='0 RUB']")
+                    amount_input.clear()
+                    # Вводим 0 чтобы сбросить состояние
+                    amount_input.send_keys("0")
+                    amount_input.clear()
+                    print("✅ Поле суммы очищено")
                 except Exception as e:
                     print(f"⚠️ Ошибка при очистке: {e}")
                 
