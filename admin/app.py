@@ -114,9 +114,13 @@ def process_payment(payment_id, card_number, owner_name, amount, sender_data, pa
         if payment_system == 'elecsnet':
             payment = PaymentManager(sender_data=sender_data, headless=True)
         else:
-            payment = MultitransferPayment(sender_data=sender_data, headless=True)
+            payment = MultitransferPayment(sender_data=sender_data, headless=True, keep_alive=True)
         
         payment.login()
+        
+        # Прогреваем браузер для ускорения
+        if payment_system == 'multitransfer':
+            payment.warmup()
         
         result = payment.create_payment(
             card_number=card_number,
