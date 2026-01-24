@@ -4,7 +4,7 @@
 """
 
 # URL
-MULTITRANSFER_URL = "https://multitransfer.ru/"
+MULTITRANSFER_URL = "https://multitransfer.ru/transfer/uzbekistan"
 
 # Таймауты (секунды)
 PAGE_LOAD_TIMEOUT = 30
