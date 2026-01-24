@@ -1039,10 +1039,14 @@
                             <i class="fas fa-user"></i> ${payment.owner_name}
                         </div>
                         <div class="payment-amount">${payment.amount} RUB</div>
-                        ${payment.result?.payment_link ? `
-                            <div class="payment-link">
-                                <i class="fas fa-link"></i> 
-                                <a href="${payment.result.payment_link}" target="_blank">Открыть ссылку на оплату</a>
+                        ${payment.result?.elapsed_time ? `
+                            <div class="payment-details">
+                                <i class="fas fa-stopwatch"></i> Создан за ${payment.result.elapsed_time.toFixed(1)}с
+                            </div>
+                        ` : ''}
+                        ${payment.result?.qr_code ? `
+                            <div class="payment-qr">
+                                ${payment.result.qr_code}
                             </div>
                         ` : ''}
                     </div>
@@ -1088,10 +1092,14 @@
                             <i class="fas fa-user"></i> ${payment.owner_name}
                         </div>
                         <div class="payment-amount">${payment.amount} RUB</div>
-                        ${payment.result?.payment_link ? `
-                            <div class="payment-link">
-                                <i class="fas fa-link"></i> 
-                                <a href="${payment.result.payment_link}" target="_blank">Открыть ссылку на оплату</a>
+                        ${payment.result?.elapsed_time ? `
+                            <div class="payment-details">
+                                <i class="fas fa-stopwatch"></i> Создан за ${payment.result.elapsed_time.toFixed(1)}с
+                            </div>
+                        ` : ''}
+                        ${payment.result?.qr_code ? `
+                            <div class="payment-qr">
+                                ${payment.result.qr_code}
                             </div>
                         ` : ''}
                     </div>
