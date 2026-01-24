@@ -524,6 +524,79 @@
             text-decoration: none;
         }
         
+        /* QR Code */
+        .payment-qr {
+            margin-top: 16px;
+            padding: 16px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .payment-qr svg {
+            width: 200px;
+            height: 200px;
+        }
+        
+        /* Status Modal */
+        .status-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .status-modal.active {
+            display: flex;
+        }
+        
+        .status-modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+        
+        .status-modal-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        .status-modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        
+        .status-modal-text {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+        
+        .status-modal-qr {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            display: inline-block;
+        }
+        
+        .status-modal-qr svg {
+            width: 250px;
+            height: 250px;
+        }
+        
         .status-badge {
             padding: 8px 16px;
             border-radius: 8px;
@@ -1053,15 +1126,11 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert.className = 'alert success';
-                    alert.style.display = 'block';
-                    alert.innerHTML = '<i class="fas fa-check-circle"></i> Платеж создается... Проверяйте статус в истории';
+                    // Показываем модалку со статусом
+                    showStatusModal(data.payment_id);
                     
-                    setTimeout(() => {
-                        showPage('dashboard');
-                        loadPayments();
-                        alert.style.display = 'none';
-                    }, 2000);
+                    // Очищаем форму
+                    document.getElementById('paymentForm').reset();
                 } else {
                     alert.className = 'alert error';
                     alert.style.display = 'block';
@@ -1079,6 +1148,104 @@
         
         // Initial load
         loadPayments();
+        
+        // Status Modal
+        let statusModalInterval = null;
+        let currentPaymentId = null;
+        
+        function showStatusModal(paymentId) {
+            currentPaymentId = paymentId;
+            const modal = document.getElementById('statusModal');
+            modal.classList.add('active');
+            
+            // Обновляем статус каждые 2 секунды
+            updatePaymentStatus();
+            statusModalInterval = setInterval(updatePaymentStatus, 2000);
+        }
+        
+        function hideStatusModal() {
+            const modal = document.getElementById('statusModal');
+            modal.classList.remove('active');
+            if (statusModalInterval) {
+                clearInterval(statusModalInterval);
+                statusModalInterval = null;
+            }
+            currentPaymentId = null;
+        }
+        
+        async function updatePaymentStatus() {
+            if (!currentPaymentId) return;
+            
+            try {
+                const response = await fetch(`/api/payment/${currentPaymentId}`);
+                const payment = await response.json();
+                
+                const modalIcon = document.getElementById('statusModalIcon');
+                const modalTitle = document.getElementById('statusModalTitle');
+                const modalText = document.getElementById('statusModalText');
+                const modalQr = document.getElementById('statusModalQr');
+                const modalClose = document.getElementById('statusModalClose');
+                
+                if (payment.status === 'processing') {
+                    modalIcon.innerHTML = '<i class="fas fa-spinner fa-spin" style="color: var(--warning);"></i>';
+                    modalTitle.textContent = 'Создание платежа...';
+                    modalText.textContent = 'Пожалуйста, подождите. Это может занять до 20 секунд.';
+                    modalQr.innerHTML = '';
+                    modalClose.style.display = 'none';
+                } else if (payment.status === 'completed') {
+                    modalIcon.innerHTML = '<i class="fas fa-check-circle" style="color: var(--success);"></i>';
+                    modalTitle.textContent = 'Платеж создан!';
+                    modalText.innerHTML = `Время создания: ${payment.result?.elapsed_time?.toFixed(1) || '?'}с`;
+                    
+                    if (payment.result?.qr_code) {
+                        modalQr.innerHTML = payment.result.qr_code;
+                    }
+                    
+                    modalClose.style.display = 'block';
+                    
+                    // Останавливаем обновление
+                    if (statusModalInterval) {
+                        clearInterval(statusModalInterval);
+                        statusModalInterval = null;
+                    }
+                    
+                    // Обновляем список платежей
+                    loadPayments();
+                } else if (payment.status === 'failed') {
+                    modalIcon.innerHTML = '<i class="fas fa-times-circle" style="color: var(--error);"></i>';
+                    modalTitle.textContent = 'Ошибка создания платежа';
+                    modalText.textContent = payment.result?.error || 'Неизвестная ошибка';
+                    modalQr.innerHTML = '';
+                    modalClose.style.display = 'block';
+                    
+                    // Останавливаем обновление
+                    if (statusModalInterval) {
+                        clearInterval(statusModalInterval);
+                        statusModalInterval = null;
+                    }
+                    
+                    // Обновляем список платежей
+                    loadPayments();
+                }
+            } catch (error) {
+                console.error('Ошибка обновления статуса:', error);
+            }
+        }
     </script>
+    
+    <!-- Status Modal -->
+    <div id="statusModal" class="status-modal">
+        <div class="status-modal-content">
+            <div id="statusModalIcon" class="status-modal-icon">
+                <i class="fas fa-spinner fa-spin" style="color: var(--warning);"></i>
+            </div>
+            <h2 id="statusModalTitle" class="status-modal-title">Создание платежа...</h2>
+            <p id="statusModalText" class="status-modal-text">Пожалуйста, подождите</p>
+            <div id="statusModalQr" class="status-modal-qr"></div>
+            <button id="statusModalClose" class="btn btn-primary" onclick="hideStatusModal()" style="display: none;">
+                Закрыть
+            </button>
+        </div>
+    </div>
 </body>
 </html>
