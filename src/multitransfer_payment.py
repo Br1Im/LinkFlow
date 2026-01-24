@@ -96,6 +96,14 @@ class MultitransferPayment:
         print(f"   Сумма: {amount} руб.")
         
         start_time = time.time()
+        step_time = start_time
+        
+        def log_step(step_name):
+            nonlocal step_time
+            elapsed = time.time() - step_time
+            total = time.time() - start_time
+            print(f"⏱️  {step_name}: {elapsed:.1f}s (всего: {total:.1f}s)")
+            step_time = time.time()
         
         try:
             wait = WebDriverWait(self.driver, 20)
@@ -109,11 +117,11 @@ class MultitransferPayment:
             
             set_mui_input_value(self.driver, amount_input, amount)
             print("✅ Сумма введена")
+            log_step("Ввод суммы")
             
-            time.sleep(3)
-            
-            print("📌 Ожидаю подтверждения суммы React...")
-            time.sleep(1)
+            # Уменьшаем ожидание с 3+1 до 2 секунд
+            time.sleep(2)
+            log_step("Ожидание React")
             
             try:
                 wait.until(EC.element_to_be_clickable((By.ID, "pay")))
@@ -124,31 +132,28 @@ class MultitransferPayment:
             print("📌 Открываю 'Способ перевода'...")
             transfer_block = None
             
-            try:
-                transfer_block = wait.until(
-                    EC.element_to_be_clickable((
-                        By.XPATH,
-                        "//div[contains(text(),'Способ перевода')]/ancestor::div[contains(@class,'variant-alternative')]"
-                    ))
-                )
-            except:
+            # Пробуем разные селекторы быстрее
+            selectors = [
+                "//div[contains(text(),'Способ перевода')]/ancestor::div[contains(@class,'variant-alternative')]",
+                "//div[contains(text(),'Способ перевода')]",
+                "//*[contains(text(),'Способ перевода')]"
+            ]
+            
+            for selector in selectors:
                 try:
-                    transfer_block = wait.until(
-                        EC.element_to_be_clickable((
-                            By.XPATH,
-                            "//div[contains(text(),'Способ перевода')]"
-                        ))
+                    transfer_block = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
                     )
+                    break
                 except:
-                    transfer_block = wait.until(
-                        EC.element_to_be_clickable((
-                            By.XPATH,
-                            "//*[contains(text(),'Способ перевода')]"
-                        ))
-                    )
+                    continue
+            
+            if not transfer_block:
+                raise Exception("Не удалось найти блок 'Способ перевода'")
             
             click_mui_element(self.driver, transfer_block)
             print("✅ Блок способов перевода открыт")
+            log_step("Открытие способа перевода")
             
             print("📌 Выбираю Uzcard / Humo...")
             bank_option = wait.until(
@@ -159,6 +164,7 @@ class MultitransferPayment:
             )
             click_mui_element(self.driver, bank_option)
             print("✅ Банк выбран")
+            log_step("Выбор банка")
             
             print("📌 Ожидаю активации кнопки 'Продолжить'...")
             try:
@@ -169,7 +175,8 @@ class MultitransferPayment:
             except:
                 print("⚠️ Кнопка не активировалась, но продолжаем")
             
-            time.sleep(1)
+            # Убираем лишний sleep
+            time.sleep(0.5)
             
             print("📌 Нажимаю 'Продолжить'...")
             
@@ -186,6 +193,7 @@ class MultitransferPayment:
                 
                 WebDriverWait(self.driver, 10).until(lambda d: "sender-details" in d.current_url)
                 print("✅ Переход на страницу sender-details")
+                log_step("Переход на sender-details")
                 
             except Exception as e:
                 print(f"⚠️ Ошибка клика по кнопке: {e}")
@@ -196,6 +204,7 @@ class MultitransferPayment:
                     
                     WebDriverWait(self.driver, 10).until(lambda d: "sender-details" in d.current_url)
                     print("✅ Переход на страницу sender-details")
+                    log_step("Переход на sender-details (JS)")
                     
                 except Exception as e2:
                     print(f"⚠️ JS клик тоже не сработал: {e2}")
@@ -203,7 +212,7 @@ class MultitransferPayment:
             print("📌 Заполняю данные получателя и отправителя...")
             
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "input")))
-            time.sleep(0.5)
+            time.sleep(0.3)  # Уменьшаем с 0.5 до 0.3
             
             def fill_field_by_label(label_text, value, field_name):
                 try:
@@ -294,7 +303,7 @@ class MultitransferPayment:
             
             fill_field("beneficiaryaccountnumber", card_number, "Номер карты получателя")
             fill_field("beneficiaryaccountnumber", card_number, "Номер карты получателя (повтор)")
-            time.sleep(0.3)
+            time.sleep(0.2)  # Уменьшаем с 0.3 до 0.2
             fill_field("beneficiary_firstname", owner_name.split()[0], "Имя получателя")
             if len(owner_name.split()) > 1:
                 fill_field("beneficiary_lastname", owner_name.split()[1], "Фамилия получателя")
@@ -345,6 +354,7 @@ class MultitransferPayment:
             fill_field("phonenumber", SENDER_DATA["phone"], "Телефон")
             
             print("✅ Все данные заполнены")
+            log_step("Заполнение данных")
             
             print("📌 Ставлю галочку согласия...")
             try:
@@ -380,7 +390,8 @@ class MultitransferPayment:
                 pay_button.click()
                 print("✅ Кнопка нажата, ожидаю перехода...")
                 
-                time.sleep(2)
+                time.sleep(1)  # Уменьшаем с 2 до 1
+                log_step("Нажатие кнопки Продолжить")
                 
             except Exception as e:
                 print(f"⚠️ Ошибка нажатия кнопки: {e}")
@@ -428,10 +439,11 @@ class MultitransferPayment:
                             self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", checkbox_button)
                             checkbox_button.click()
                             print("✅ Кликнул по чекбоксу капчи")
-                            time.sleep(5)
+                            time.sleep(3)  # Уменьшаем с 5 до 3
                             
                             self.driver.switch_to.default_content()
                             print("✅ Капча пройдена!")
+                            log_step("Прохождение капчи")
                             
                             print("📌 Повторно нажимаю кнопку 'Продолжить'...")
                             try:
@@ -440,7 +452,8 @@ class MultitransferPayment:
                                 )
                                 pay_button.click()
                                 print("✅ Кнопка нажата после капчи")
-                                time.sleep(3)
+                                time.sleep(2)  # Уменьшаем с 3 до 2
+                                log_step("Повторное нажатие после капчи")
                             except Exception as e:
                                 print(f"⚠️ Ошибка повторного нажатия: {e}")
                         
@@ -510,10 +523,14 @@ class MultitransferPayment:
             except:
                 print("⚠️ QR-код не найден")
             
+            log_step("Получение данных платежа")
+            
             elapsed = time.time() - start_time
             
             print(f"\n✅ Платеж создан за {elapsed:.1f} сек!")
             print(f"🔗 Ссылка: {payment_link}")
+            print(f"\n📊 Распределение времени:")
+            print(f"   Общее время: {elapsed:.1f}s")
             
             return {
                 "payment_link": payment_link,
