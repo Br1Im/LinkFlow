@@ -14,8 +14,81 @@
 - Может не работать с капчей
 - Нужно поддерживать при изменении API
 
+## Как использовать
+
+### Шаг 1: Перехват HTTP-запросов
+
+Запусти скрипт для перехвата запросов:
+
+```bash
+cd LinkFlow
+python3 src/methods/requests_api/capture_requests.py
+```
+
+Скрипт откроет браузер. Создай платёж вручную, а скрипт перехватит все HTTP-запросы.
+
+### Шаг 2: Анализ API
+
+Проанализируй перехваченные запросы:
+
+```bash
+python3 src/methods/requests_api/analyze_api.py
+```
+
+Скрипт покажет:
+- Какие эндпоинты используются
+- Какие данные отправляются
+- Какие заголовки нужны
+
+### Шаг 3: Реализация
+
+Открой `multitransfer_payment.py` и реализуй метод `create_payment()` на основе анализа.
+
+Пример структуры:
+
+```python
+def create_payment(self, card_number, owner_name, amount):
+    # Шаг 1: Создать черновик
+    response = self.session.post(
+        f"{self.base_url}/api/v1/transfers/draft",
+        json={
+            "country": "uzbekistan",
+            "amount": amount,
+            "paymentSystem": "humo"
+        }
+    )
+    transfer_id = response.json()['id']
+    
+    # Шаг 2: Добавить получателя
+    self.session.post(
+        f"{self.base_url}/api/v1/transfers/{transfer_id}/recipient",
+        json={
+            "cardNumber": card_number,
+            "firstName": owner_name.split()[0],
+            "lastName": owner_name.split()[1]
+        }
+    )
+    
+    # И так далее...
+```
+
+### Шаг 4: Тестирование
+
+```bash
+python3 src/methods/requests_api/multitransfer_payment.py
+```
+
+## Файлы
+
+- `capture_requests.py` - перехват HTTP-запросов
+- `analyze_api.py` - анализ перехваченных запросов
+- `multitransfer_payment.py` - реализация через requests
+- `captured_requests.json` - результат перехвата (создаётся автоматически)
+
 ## TODO
+- [x] Создать скрипт для перехвата запросов
+- [x] Создать скрипт для анализа API
 - [ ] Исследовать API multitransfer.ru
 - [ ] Реализовать создание платежа через API
 - [ ] Добавить обработку ошибок
-- [ ] Решить проблему с капчей
+- [ ] Решить проблему с капчей (если есть)
