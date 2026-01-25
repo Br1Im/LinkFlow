@@ -13,7 +13,8 @@ from datetime import datetime
 import json
 import threading
 
-from src.multitransfer_payment import MultitransferPayment
+# Импортируем из Selenium метода (можно переключить на другой метод)
+from src.methods.selenium import MultitransferPayment
 from src.payment_manager import PaymentManager
 from src.config import EXAMPLE_SENDER_DATA, EXAMPLE_RECIPIENT_DATA, MIN_AMOUNT, MAX_AMOUNT, PAYMENT_MODES
 
