@@ -9,8 +9,14 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
 import json
 import time
+import sys
+import os
+
+# Добавляем путь к src
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 
 def capture_network_requests():
     """
@@ -20,6 +26,11 @@ def capture_network_requests():
     
     # Настройка Chrome для логирования сетевых запросов
     options = webdriver.ChromeOptions()
+    options.add_argument('--headless=new')  # Headless режим
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--window-size=1920,1080')
     options.add_argument('--disable-blink-features=AutomationControlled')
     options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
     
@@ -33,21 +44,41 @@ def capture_network_requests():
     try:
         # Открываем страницу
         print("\n📌 Открываю https://multitransfer.ru/transfer/uzbekistan...")
-        driver.get("https://multitransfer.ru/transfer/uzbekistan")
+        driver.get("https://multitransfer.ru/transfer/uzbekistan?paymentSystem=humo")
         time.sleep(3)
         
-        print("\n⏸️  ИНСТРУКЦИЯ:")
-        print("1. Введи сумму")
-        print("2. Выбери способ перевода (Humo)")
-        print("3. Нажми 'Продолжить'")
-        print("4. Заполни данные")
-        print("5. Нажми 'Продолжить' до конца")
-        print("\nКогда закончишь, нажми Enter в консоли...")
+        print("📌 Автоматически создаю платёж для перехвата запросов...")
         
-        input("\n⏸️  Нажми Enter когда закончишь создание платежа...")
+        # Импортируем данные
+        from src.sender_data import SENDER_DATA
+        from src.config import EXAMPLE_RECIPIENT_DATA
         
-        # Получаем логи производительности
+        # Вводим сумму
+        print("   Ввожу сумму...")
+        amount_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='0 RUB']"))
+        )
+        amount_input.click()
+        time.sleep(0.2)
+        for char in str(500):
+            amount_input.send_keys(char)
+            time.sleep(0.05)
+        time.sleep(2)
+        
+        # Нажимаем Продолжить
+        print("   Нажимаю Продолжить...")
+        try:
+            continue_btn = driver.find_element(By.ID, "pay")
+            driver.execute_script("arguments[0].click();", continue_btn)
+            time.sleep(3)
+        except:
+            pass
+        
+        print("   Ожидаю загрузки формы...")
+        time.sleep(5)
+        
         print("\n🔍 Анализирую перехваченные запросы...")
+        # Получаем логи производительности
         logs = driver.get_log('performance')
         
         for entry in logs:
@@ -60,7 +91,7 @@ def capture_network_requests():
                     url = request['url']
                     
                     # Интересуют только запросы к multitransfer.ru API
-                    if 'multitransfer.ru' in url and ('/api/' in url or '/transfer/' in url):
+                    if 'multitransfer.ru' in url and ('/api/' in url or '/transfer/' in url or 'graphql' in url):
                         captured_requests.append({
                             'url': url,
                             'method': request['method'],
@@ -79,7 +110,7 @@ def capture_network_requests():
                     response = log['params']['response']
                     url = response['url']
                     
-                    if 'multitransfer.ru' in url and ('/api/' in url or '/transfer/' in url):
+                    if 'multitransfer.ru' in url and ('/api/' in url or '/transfer/' in url or 'graphql' in url):
                         print(f"\n📥 Ответ от: {url}")
                         print(f"   Status: {response['status']}")
                         
@@ -106,7 +137,6 @@ def capture_network_requests():
         return captured_requests
         
     finally:
-        input("\n⏸️  Нажми Enter чтобы закрыть браузер...")
         driver.quit()
 
 

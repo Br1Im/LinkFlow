@@ -13,8 +13,19 @@ from datetime import datetime
 import json
 import threading
 
-# Импортируем из Selenium метода (можно переключить на другой метод)
-from src.methods.selenium import MultitransferPayment
+# Выбор метода автоматизации через переменную окружения
+PAYMENT_METHOD = os.getenv('PAYMENT_METHOD', 'selenium')
+
+if PAYMENT_METHOD == 'playwright':
+    print(f"🎭 Используется Playwright метод")
+    from src.methods.playwright import MultitransferPayment
+elif PAYMENT_METHOD == 'selenium':
+    print(f"🌐 Используется Selenium метод")
+    from src.methods.selenium import MultitransferPayment
+else:
+    print(f"⚠️ Неизвестный метод {PAYMENT_METHOD}, используется Selenium")
+    from src.methods.selenium import MultitransferPayment
+
 from src.payment_manager import PaymentManager
 from src.config import EXAMPLE_SENDER_DATA, EXAMPLE_RECIPIENT_DATA, MIN_AMOUNT, MAX_AMOUNT, PAYMENT_MODES
 
