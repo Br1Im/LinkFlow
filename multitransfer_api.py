@@ -86,12 +86,25 @@ class MultitransferAPI:
             }
         }
         
+        print(f"🔄 Отправляю запрос создания платежа...")
+        print(f"📝 URL: {url}")
+        print(f"📝 Payload: {payload}")
+        
         response = self.session.post(url, json=payload, headers=self._get_headers(with_token=True))
         
-        if response.status_code == 200:
-            return response.json()["transferId"]
+        print(f"📊 Status: {response.status_code}")
+        print(f"📊 Response: {response.text}")
         
-        return None
+        if response.status_code == 200:
+            data = response.json()
+            if "transferId" in data:
+                return data["transferId"]
+            else:
+                print(f"❌ transferId не найден в ответе: {data}")
+                return None
+        else:
+            print(f"❌ Ошибка HTTP {response.status_code}: {response.text}")
+            return None
     
     def get_qr_link(self, transaction_id: str) -> Optional[str]:
         """Получает QR-ссылку по transaction_id"""
