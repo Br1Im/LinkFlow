@@ -73,15 +73,15 @@ class MultitransferAPI:
                 "paymentInstrument": {"type": "ANONYMOUS_CARD"}
             },
             "sender": {
-                "lastName": "Непокрытый", "firstName": "Дмитрий",
-                "phoneNumber": "79880260334", "birthDate": "2000-07-03T12:00:00",
+                "lastName": "Ivanov", "firstName": "Dmitry",
+                "phoneNumber": "+79880260334", "birthDate": "2000-07-03",
                 "addresses": {
-                    "birthPlaceAddress": {"full": "Камыш", "countryCode": "RUS"},
-                    "registrationAddress": {"full": "Камыш", "countryCode": "RUS"}
+                    "birthPlaceAddress": {"full": "Kamysh", "countryCode": "RUS"},
+                    "registrationAddress": {"full": "Kamysh", "countryCode": "RUS"}
                 },
                 "documents": [{
-                    "type": "21", "number": "657875", "series": "1820",
-                    "issueDate": "2020-07-22T12:00:00", "countryCode": "RUS"
+                    "type": "10", "number": "657875", "series": "1820",
+                    "issueDate": "2020-07-22", "countryCode": "RUS"
                 }]
             }
         }
