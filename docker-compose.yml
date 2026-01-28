@@ -1,0 +1,21 @@
+version: '3.3'
+
+services:
+  linkflow-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: linkflow-api
+    ports:
+      - "5001:5001"
+    environment:
+      - DISPLAY=:99
+      - PYTHONUNBUFFERED=1
+    command: sh -c "Xvfb :99 -screen 0 1920x1080x24 & python admin/api.py"
+    restart: always
+    volumes:
+      - ./screenshots:/app/screenshots
+      - shared-storage:/tmp
+
+volumes:
+  shared-storage:
