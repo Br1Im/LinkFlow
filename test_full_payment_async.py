@@ -29,8 +29,8 @@ SENDER_DATA = {
 }
 
 
-async def fill_field_async(page, pattern: str, value: str, field_name: str):
-    """Асинхронное заполнение поля"""
+async def fill_field_async(page, pattern: str, value: str, field_name: str, use_typing: bool = False):
+    """Асинхронное заполнение поля с проверкой"""
     try:
         inputs = await page.locator('input').all()
         
@@ -41,24 +41,67 @@ async def fill_field_async(page, pattern: str, value: str, field_name: str):
             if pattern.lower() in name_attr.lower() or pattern.lower() in placeholder.lower():
                 print(f"   🎯 {field_name}")
                 
-                # Используем JavaScript для быстрой установки
-                await inp.evaluate("""
-                    (element, value) => {
-                        element.focus();
-                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                            window.HTMLInputElement.prototype, 
-                            'value'
-                        ).set;
-                        nativeInputValueSetter.call(element, value);
+                # Пробуем заполнить до 3 раз
+                for retry in range(3):
+                    if use_typing:
+                        # Посимвольный ввод для React полей
+                        await inp.click()
+                        await page.wait_for_timeout(50)
+                        await inp.fill("")  # Очищаем
+                        await page.wait_for_timeout(50)
                         
-                        element.dispatchEvent(new Event('input', { bubbles: true }));
-                        element.dispatchEvent(new Event('change', { bubbles: true }));
-                        element.blur();
-                    }
-                """, value)
+                        for char in value:
+                            await inp.type(char, delay=10)
+                        
+                        await page.wait_for_timeout(50)
+                        await inp.blur()
+                    else:
+                        # Быстрый JavaScript ввод для обычных полей
+                        await inp.evaluate("""
+                            (element, value) => {
+                                element.focus();
+                                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                                    window.HTMLInputElement.prototype, 
+                                    'value'
+                                ).set;
+                                nativeInputValueSetter.call(element, value);
+                                
+                                element.dispatchEvent(new Event('input', { bubbles: true }));
+                                element.dispatchEvent(new Event('change', { bubbles: true }));
+                                element.blur();
+                            }
+                        """, value)
+                    
+                    await page.wait_for_timeout(100)
+                    
+                    # Проверяем что поле не красное (нет ошибки)
+                    is_error = await inp.evaluate("""
+                        (element) => {
+                            const parent = element.closest('div');
+                            if (!parent) return false;
+                            
+                            // Проверяем наличие текста ошибки
+                            const errorText = parent.querySelector('p');
+                            if (errorText && errorText.textContent.includes('Обязательное поле')) {
+                                return true;
+                            }
+                            
+                            // Проверяем красную обводку
+                            const styles = window.getComputedStyle(element);
+                            return styles.borderColor.includes('rgb(244, 67, 54)') || 
+                                   styles.borderColor.includes('rgb(211, 47, 47)');
+                        }
+                    """)
+                    
+                    if not is_error:
+                        print(f"   ✅ {field_name}")
+                        return True
+                    elif retry < 2:
+                        print(f"   ⚠️ {field_name}: ошибка валидации, повторяю...")
+                        await page.wait_for_timeout(100)
                 
-                print(f"   ✅ {field_name}")
-                return True
+                print(f"   ❌ {field_name}: не прошло валидацию после 3 попыток")
+                return False
         
         print(f"   ⚠️ {field_name}: не найдено")
         return False
@@ -117,14 +160,15 @@ async def fill_all_fields_parallel(page, card_number: str, owner_name: str):
     first_name = owner_parts[0] if len(owner_parts) > 0 else ""
     last_name = owner_parts[1] if len(owner_parts) > 1 else ""
     
-    # Запускаем заполнение ТЕКСТОВЫХ полей ПАРАЛЛЕЛЬНО
+    # СНАЧАЛА заполняем поля получателя ПОСЛЕДОВАТЕЛЬНО (посимвольный ввод не работает параллельно)
+    print("\n📝 Заполняю поля получателя...")
+    await fill_field_async(page, "beneficiaryAccountNumber", card_number, "Номер карты", use_typing=True)
+    await fill_field_async(page, "beneficiary_firstname", first_name, "Имя получателя", use_typing=True)
+    await fill_field_async(page, "beneficiary_lastname", last_name, "Фамилия получателя", use_typing=True)
+    
+    # ПОТОМ заполняем остальные поля ПАРАЛЛЕЛЬНО (быстрый JS ввод)
+    print("\n⚡ Заполняю остальные поля параллельно...")
     await asyncio.gather(
-        # Получатель - используем правильные селекторы
-        fill_field_async(page, "transfer_beneficiaryaccountnumber", card_number, "Номер карты"),
-        fill_field_async(page, "transfer_beneficiary_firstname", first_name, "Имя получателя"),
-        fill_field_async(page, "transfer_beneficiary_lastname", last_name, "Фамилия получателя"),
-        fill_field_async(page, "beneficiary_firstname", first_name, "Имя получателя 2"),
-        fill_field_async(page, "beneficiary_lastname", last_name, "Фамилия получателя 2"),
         
         # Паспорт
         fill_field_async(page, "sender_documents_series", SENDER_DATA["passport_series"], "Серия паспорта"),
@@ -232,21 +276,28 @@ async def test_full_payment_async():
             
             # Ввод суммы с retry
             commission_ok = False
-            for attempt in range(5):
+            for attempt in range(10):  # Увеличиваем с 5 до 10 попыток
                 if attempt > 0:
                     print(f"   🔄 Попытка #{attempt + 1}")
                 
-                # Закрываем модалку
+                # СНАЧАЛА закрываем модалку если есть
                 try:
-                    await page.evaluate("""
+                    modal_closed = await page.evaluate("""
                         () => {
                             const buttons = document.querySelectorAll('button[buttontext="Понятно"]');
+                            let closed = false;
                             buttons.forEach(btn => {
-                                if (btn.textContent.includes('Понятно')) btn.click();
+                                if (btn.textContent.includes('Понятно')) {
+                                    btn.click();
+                                    closed = true;
+                                }
                             });
+                            return closed;
                         }
                     """)
-                    await page.wait_for_timeout(50)
+                    if modal_closed:
+                        print("   ⚠️ Модалка закрыта, повторяю ввод...")
+                        await page.wait_for_timeout(500)  # Увеличиваем с 200 до 500
                 except:
                     pass
                 
@@ -269,23 +320,24 @@ async def test_full_payment_async():
                 
                 await page.wait_for_timeout(200)
                 
-                # Проверяем комиссию
+                # Проверяем комиссию с коротким таймаутом
                 try:
                     await page.wait_for_function("""
                         () => {
                             const input = document.querySelector('input[placeholder*="UZS"]');
                             return input && input.value && input.value !== '0 UZS' && input.value !== '';
                         }
-                    """, timeout=2000)  # Уменьшаем с 3000 до 2000
+                    """, timeout=800)  # Увеличиваем с 500 до 800
                     print("✅ Комиссия")
                     commission_ok = True
                     break
                 except:
-                    if attempt < 4:
-                        await page.wait_for_timeout(200)  # Уменьшаем с 300 до 200
+                    # Комиссия не посчиталась - проверяем модалку и повторяем
+                    if attempt < 9:
+                        await page.wait_for_timeout(100)
             
             if not commission_ok:
-                raise Exception("Не удалось рассчитать комиссию за 5 попыток")
+                raise Exception("Не удалось рассчитать комиссию за 10 попыток")
             
             # Выбор способа платежа
             transfer_selectors = [
