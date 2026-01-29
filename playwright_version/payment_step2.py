@@ -175,22 +175,19 @@ def fill_sender_details(page: Page, card_number: str, owner_name: str):
                 if is_card_field:
                     print(f"   🎯 Поле карты (name: {name_attr}, placeholder: {placeholder})")
                     
-                    # УЛЬТРА быстрые действия
+                    # Используем fill() для MUI полей - он триггерит правильные события
                     inp.click()
-                    page.wait_for_timeout(10)
+                    page.wait_for_timeout(50)
                     
-                    # Мгновенная очистка и ввод
-                    page.keyboard.press('Control+A')
-                    page.keyboard.press('Delete')
-                    page.wait_for_timeout(5)
+                    # Очищаем и заполняем через fill()
+                    inp.fill('')
+                    page.wait_for_timeout(30)
+                    inp.fill(card_number)
+                    page.wait_for_timeout(50)
                     
-                    # Мгновенный ввод номера карты
-                    page.keyboard.type(card_number, delay=8)
-                    page.wait_for_timeout(15)
-                    
-                    # Мгновенный переход
+                    # Tab для blur события
                     page.keyboard.press('Tab')
-                    page.wait_for_timeout(10)
+                    page.wait_for_timeout(50)
                     
                     # Проверяем что значение установилось
                     try:
