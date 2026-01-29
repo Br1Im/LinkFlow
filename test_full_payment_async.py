@@ -259,10 +259,10 @@ async def test_full_payment_async():
                 
                 for char in str(amount):
                     await page.keyboard.type(char)
-                    await page.wait_for_timeout(50)
+                    await page.wait_for_timeout(30)  # Уменьшаем с 50 до 30
                 
                 await page.keyboard.press('Enter')
-                await page.wait_for_timeout(300)
+                await page.wait_for_timeout(200)  # Уменьшаем с 300 до 200
                 
                 # Проверяем комиссию
                 try:
@@ -277,7 +277,7 @@ async def test_full_payment_async():
                     break
                 except:
                     if attempt < 4:
-                        await page.wait_for_timeout(500)
+                        await page.wait_for_timeout(300)  # Уменьшаем с 500 до 300
             
             if not commission_ok:
                 raise Exception("Не удалось рассчитать комиссию за 5 попыток")
@@ -317,7 +317,7 @@ async def test_full_payment_async():
                     continue
             
             # Ждем активации кнопки
-            await page.wait_for_timeout(1000)
+            await page.wait_for_timeout(500)  # Уменьшаем с 1000 до 500
             
             try:
                 await page.wait_for_function("""

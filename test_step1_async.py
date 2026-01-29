@@ -93,10 +93,10 @@ async def test_step1_multiple_times(runs=5):
                     
                     for char in str(amount):
                         await page.keyboard.type(char)
-                        await page.wait_for_timeout(50)
+                        await page.wait_for_timeout(30)  # Уменьшаем с 50 до 30
                     
                     await page.keyboard.press('Enter')
-                    await page.wait_for_timeout(300)
+                    await page.wait_for_timeout(200)  # Уменьшаем с 300 до 200
                     
                     # Проверяем комиссию
                     try:
@@ -161,8 +161,8 @@ async def test_step1_multiple_times(runs=5):
                 if not bank_selected:
                     raise Exception("Не удалось выбрать Uzcard")
                 
-                # Даем время на обработку выбора
-                await page.wait_for_timeout(1000)  # Увеличиваем с 500 до 1000
+                # Ждем активации кнопки
+                await page.wait_for_timeout(500)  # Уменьшаем с 1000 до 500
                 
                 # Проверяем что кнопка стала активной
                 print("   ⏳ Жду активации кнопки...")
