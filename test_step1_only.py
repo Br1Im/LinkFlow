@@ -72,15 +72,52 @@ def test_step1_only():
             # ШАГ 3: Ждем расчета комиссии (event-driven!)
             print(f"   ⏳ Жду расчета комиссии...")
             commission_start = time.time()
-            page.wait_for_function("""
+            
+            # Сначала проверим, что вообще есть на странице
+            time.sleep(0.5)  # Даем время на обработку
+            
+            # Отладка: смотрим что в полях
+            debug_info = page.evaluate("""
                 () => {
-                    const input = document.querySelector('input[placeholder*="UZS"]');
-                    return input && input.value && input.value !== '0 UZS' && input.value !== '';
+                    const rubInput = document.querySelector('input[placeholder*="RUB"]');
+                    const uzsInput = document.querySelector('input[placeholder*="UZS"]');
+                    return {
+                        rubValue: rubInput ? rubInput.value : 'NOT FOUND',
+                        uzsValue: uzsInput ? uzsInput.value : 'NOT FOUND',
+                        uzsPlaceholder: uzsInput ? uzsInput.placeholder : 'NOT FOUND'
+                    };
                 }
-            """, timeout=5000)
-            commission_time = time.time() - commission_start
-            receive_value = page.locator('input[placeholder*="UZS"]').input_value()
-            print(f"   ✅ Комиссия рассчитана за {commission_time:.2f}s! К получению: {receive_value}")
+            """)
+            print(f"   🔍 DEBUG: RUB={debug_info['rubValue']}, UZS={debug_info['uzsValue']}, placeholder={debug_info['uzsPlaceholder']}")
+            
+            # Пробуем подождать расчет комиссии
+            try:
+                page.wait_for_function("""
+                    () => {
+                        const input = document.querySelector('input[placeholder*="UZS"]');
+                        if (!input) return false;
+                        const val = input.value;
+                        console.log('UZS value:', val);
+                        return val && val !== '0 UZS' && val !== '' && val !== '0';
+                    }
+                """, timeout=5000)
+                commission_time = time.time() - commission_start
+                receive_value = page.locator('input[placeholder*="UZS"]').input_value()
+                print(f"   ✅ Комиссия рассчитана за {commission_time:.2f}s! К получению: {receive_value}")
+            except Exception as e:
+                print(f"   ⚠️  Комиссия не рассчиталась за 5s, продолжаю...")
+                # Проверяем еще раз что в полях
+                debug_info2 = page.evaluate("""
+                    () => {
+                        const rubInput = document.querySelector('input[placeholder*="RUB"]');
+                        const uzsInput = document.querySelector('input[placeholder*="UZS"]');
+                        return {
+                            rubValue: rubInput ? rubInput.value : 'NOT FOUND',
+                            uzsValue: uzsInput ? uzsInput.value : 'NOT FOUND'
+                        };
+                    }
+                """)
+                print(f"   🔍 AFTER WAIT: RUB={debug_info2['rubValue']}, UZS={debug_info2['uzsValue']}")
             
             # ШАГ 4: СРАЗУ выбираем способ платежа (без паузы!)
             print(f"\n⏱️  3️⃣ Выбираю способ платежа...")

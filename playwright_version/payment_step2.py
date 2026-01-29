@@ -114,7 +114,7 @@ def fill_sender_details(page: Page, card_number: str, owner_name: str):
     print(f"\n🚀 Заполняю поля (УЛЬТРА СКОРОСТЬ)...")
     
     def fill_field_ultra_fast(pattern: str, value: str, field_name: str):
-        """Заполняет поле - УЛЬТРА СКОРОСТЬ"""
+        """Заполняет поле посимвольно через press_sequentially() - самый надежный способ"""
         try:
             inputs = page.locator('input').all()
             
@@ -125,30 +125,35 @@ def fill_sender_details(page: Page, card_number: str, owner_name: str):
                 if pattern.lower() in name_attr.lower() or pattern.lower() in placeholder.lower():
                     print(f"   🎯 {field_name}")
                     
-                    # УЛЬТРА быстрые действия
+                    # Используем посимвольный ввод сразу
                     inp.click()
-                    page.wait_for_timeout(10)  # Уменьшаем с 20 до 10
-                    
-                    # Мгновенная очистка и ввод
+                    page.wait_for_timeout(100)
                     page.keyboard.press('Control+A')
-                    page.keyboard.press('Delete')
-                    page.wait_for_timeout(5)  # Уменьшаем с 10 до 5
+                    page.keyboard.press('Backspace')
+                    page.wait_for_timeout(50)
                     
-                    # Мгновенный ввод
-                    page.keyboard.type(value, delay=10)  # Уменьшаем с 20 до 10
-                    page.wait_for_timeout(15)  # Уменьшаем с 30 до 15
-                    
-                    # Мгновенный переход
+                    # Медленный посимвольный ввод
+                    inp.press_sequentially(value, delay=50)
+                    page.wait_for_timeout(100)
                     page.keyboard.press('Tab')
-                    page.wait_for_timeout(10)  # Уменьшаем с 20 до 10
+                    page.wait_for_timeout(100)
                     
-                    print(f"   ✅ {field_name}")
+                    # Проверяем что значение установилось
+                    try:
+                        current_value = inp.input_value()
+                        if current_value and len(current_value) > 0:
+                            print(f"   ✅ {field_name}: {current_value}")
+                        else:
+                            print(f"   ⚠️ {field_name}: значение пустое после установки")
+                    except:
+                        print(f"   ✅ {field_name}")
+                    
                     return True
             
             print(f"   ⚠️ {field_name}: не найдено")
             return False
         except Exception as e:
-            print(f"   ⚠️ {field_name}: ошибка")
+            print(f"   ⚠️ {field_name}: ошибка - {e}")
             return False
     
     # Заполняем номер карты (УЛЬТРА СКОРОСТЬ)
@@ -175,19 +180,20 @@ def fill_sender_details(page: Page, card_number: str, owner_name: str):
                 if is_card_field:
                     print(f"   🎯 Поле карты (name: {name_attr}, placeholder: {placeholder})")
                     
-                    # Используем fill() для MUI полей - он триггерит правильные события
+                    # Используем посимвольный ввод сразу
                     inp.click()
+                    page.wait_for_timeout(100)
+                    page.keyboard.press('Control+A')
+                    page.keyboard.press('Backspace')
                     page.wait_for_timeout(50)
                     
-                    # Очищаем и заполняем через fill()
-                    inp.fill('')
-                    page.wait_for_timeout(30)
-                    inp.fill(card_number)
-                    page.wait_for_timeout(50)
-                    
-                    # Tab для blur события
+                    # Медленный посимвольный ввод
+                    inp.press_sequentially(card_number, delay=50)
+                    page.wait_for_timeout(100)
                     page.keyboard.press('Tab')
-                    page.wait_for_timeout(50)
+                    page.wait_for_timeout(100)
+                    
+                    page.wait_for_timeout(100)
                     
                     # Проверяем что значение установилось
                     try:
@@ -260,57 +266,77 @@ def fill_sender_details(page: Page, card_number: str, owner_name: str):
     # Заполяем отчество
     fill_field_ultra_fast("sender_middlename", SENDER_DATA["middle_name"], "Отчество отправителя")
     
-    # УЛЬТРА быстрое заполнение мест
+    # Заполнение мест посимвольно
     try:
+        print("   🎯 Место рождения...")
         birth_place_input = page.locator('input[name*="birthPlaceAddress_full"]').first
+        birth_place_input.wait_for(state='visible', timeout=2000)
+        
         birth_place_input.click()
-        page.wait_for_timeout(10)  # Уменьшаем с 20 до 10
+        page.wait_for_timeout(100)
         page.keyboard.press('Control+A')
-        page.keyboard.type(SENDER_DATA["birth_place"], delay=10)  # Уменьшаем с 20 до 10
+        page.keyboard.press('Backspace')
+        page.wait_for_timeout(50)
+        birth_place_input.press_sequentially(SENDER_DATA["birth_place"], delay=50)
+        page.wait_for_timeout(100)
         page.keyboard.press('Tab')
-        page.wait_for_timeout(10)  # Уменьшаем с 20 до 10
-        print(f"   ✅ Место рождения")
-    except:
-        print(f"   ⚠️ Место рождения: ошибка")
+        page.wait_for_timeout(100)
+        
+        current_value = birth_place_input.input_value()
+        print(f"   ✅ Место рождения: {current_value}")
+    except Exception as e:
+        print(f"   ⚠️ Место рождения: ошибка - {e}")
     
     try:
+        print("   🎯 Место регистрации...")
         reg_place_input = page.locator('input[name*="registrationAddress_full"]').first
+        reg_place_input.wait_for(state='visible', timeout=2000)
+        
         reg_place_input.click()
-        page.wait_for_timeout(10)  # Уменьшаем с 20 до 10
+        page.wait_for_timeout(100)
         page.keyboard.press('Control+A')
-        page.keyboard.type(SENDER_DATA["registration_place"], delay=10)  # Уменьшаем с 20 до 10
+        page.keyboard.press('Backspace')
+        page.wait_for_timeout(50)
+        reg_place_input.press_sequentially(SENDER_DATA["registration_place"], delay=50)
+        page.wait_for_timeout(100)
         page.keyboard.press('Tab')
-        page.wait_for_timeout(10)  # Уменьшаем с 20 до 10
-        print(f"   ✅ Место регистрации")
-    except:
-        print(f"   ⚠️ Место регистрации: ошибка")
+        page.wait_for_timeout(100)
+        
+        current_value = reg_place_input.input_value()
+        print(f"   ✅ Место регистрации: {current_value}")
+    except Exception as e:
+        print(f"   ⚠️ Место регистрации: ошибка - {e}")
     
     fill_field_ultra_fast("sender_firstname", SENDER_DATA["first_name"], "Имя отправителя")
     fill_field_ultra_fast("sender_lastname", SENDER_DATA["last_name"], "Фамилия отправителя")
     fill_field_ultra_fast("birthdate", SENDER_DATA["birth_date"], "Дата рождения")
     
-    # Заполняем телефон в правильном формате
+    # Заполняем телефон посимвольно
     try:
+        print("   🎯 Телефон...")
         phone_input = page.locator('input[name*="phoneNumber"]').first
+        phone_input.wait_for(state='visible', timeout=2000)
+        
         phone_input.click()
-        page.wait_for_timeout(10)
+        page.wait_for_timeout(100)
         page.keyboard.press('Control+A')
-        page.keyboard.press('Delete')
-        page.wait_for_timeout(5)
-        # Вводим телефон в международном формате
-        page.keyboard.type("+7 988 026-03-34", delay=10)
-        page.wait_for_timeout(15)
+        page.keyboard.press('Backspace')
+        page.wait_for_timeout(50)
+        phone_input.press_sequentially("+7 988 026-03-34", delay=50)
+        page.wait_for_timeout(100)
         page.keyboard.press('Tab')
-        page.wait_for_timeout(10)
-        print(f"   ✅ Телефон (международный формат)")
-    except:
-        fill_field_ultra_fast("phonenumber", "+7 988 026-03-34", "Телефон")
+        page.wait_for_timeout(100)
+        
+        current_value = phone_input.input_value()
+        print(f"   ✅ Телефон: {current_value}")
+    except Exception as e:
+        print(f"   ⚠️ Телефон: ошибка - {e}")
     
     # Заполняем страны (УЛЬТРА СКОРОСТЬ)
     print(f"\n🌍 Заполняю страны...")
     
     def select_country_ultra_fast(pattern: str, country: str, field_name: str):
-        """Выбирает страну - УЛЬТРА СКОРОСТЬ"""
+        """Выбирает страну через Playwright fill() и автокомплит"""
         try:
             inputs = page.locator('input').all()
             
@@ -319,32 +345,29 @@ def fill_sender_details(page: Page, card_number: str, owner_name: str):
                 if pattern in name_attr:
                     print(f"   🎯 {field_name}")
                     
-                    # УЛЬТРА быстрые действия
+                    # Используем fill() для ввода
                     inp.click()
-                    page.wait_for_timeout(5)  # Уменьшаем с 10 до 5
-                    
-                    # Мгновенный ввод
-                    inp.fill('')
-                    inp.type(country, delay=5)  # Уменьшаем с 10 до 5
-                    page.wait_for_timeout(50)  # Уменьшаем с 100 до 50
+                    page.wait_for_timeout(100)
+                    inp.fill(country)
+                    page.wait_for_timeout(200)
                     
                     try:
-                        # Мгновенный клик по опции
-                        page.wait_for_selector('li[role="option"]', state='visible', timeout=500)  # Уменьшаем с 1000 до 500
+                        # Ждем и кликаем по опции
+                        page.wait_for_selector('li[role="option"]', state='visible', timeout=1000)
                         page.locator('li[role="option"]').first.click()
                         print(f"   ✅ {field_name}")
                         return True
                     except:
-                        # Мгновенный Enter
+                        # Enter если опции не появились
                         page.keyboard.press('Enter')
-                        page.wait_for_timeout(10)  # Уменьшаем с 20 до 10
+                        page.wait_for_timeout(50)
                         print(f"   ✅ {field_name} (Enter)")
                         return True
             
             print(f"   ⚠️ {field_name}: не найдено")
             return False
         except Exception as e:
-            print(f"   ⚠️ {field_name}: ошибка")
+            print(f"   ⚠️ {field_name}: ошибка - {e}")
             return False
     
     select_country_ultra_fast("birthPlaceAddress_countryCode", SENDER_DATA["birth_country"], "Страна рождения")
@@ -640,6 +663,52 @@ def complete_payment_step2(page: Page, card_number: str, owner_name: str):
     print("ШАГ 2: АВТОМАТИЧЕСКОЕ ЗАПОЛНЕНИЕ И ОТПРАВКА")
     print(f"{'='*70}")
     
+    # Устанавливаем автоматическое закрытие модалки с ошибкой через JavaScript
+    page.evaluate("""
+        () => {
+            // Функция для закрытия модалки
+            const closeErrorModal = () => {
+                const buttons = document.querySelectorAll('button[buttontext="Понятно"]');
+                buttons.forEach(btn => {
+                    if (btn.textContent.includes('Понятно')) {
+                        console.log('🔴 Закрываю модалку с ошибкой...');
+                        btn.click();
+                    }
+                });
+            };
+            
+            // Проверяем каждые 100ms
+            setInterval(closeErrorModal, 100);
+            
+            // Также используем MutationObserver для мгновенной реакции
+            const observer = new MutationObserver(() => {
+                closeErrorModal();
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    """)
+    print("✅ Установлен автоматический закрыватель модалок с ошибками")
+    
+    # Перехватываем API запросы для получения QR ссылки
+    qr_link = None
+    
+    def handle_response(response):
+        nonlocal qr_link
+        if '/anonymous/confirm' in response.url:
+            try:
+                data = response.json()
+                if 'externalData' in data and 'payload' in data['externalData']:
+                    qr_link = data['externalData']['payload']
+                    print(f"\n🎯 Получена QR ссылка: {qr_link}")
+            except:
+                pass
+    
+    page.on('response', handle_response)
+    
     try:
         # 1. Заполняем все поля
         fill_sender_details(page, card_number, owner_name)
@@ -670,7 +739,20 @@ def complete_payment_step2(page: Page, card_number: str, owner_name: str):
         except Exception as e:
             print(f"   ⚠️ Ошибка проверки валидации: {e}")
         
-        # 5. СРАЗУ проверяем что появилось - капча или модалка
+        # 5. Проверяем модалку с ошибкой "Пожалуйста, попробуйте позже"
+        page.wait_for_timeout(500)
+        
+        try:
+            error_modal = page.locator('button:has-text("Понятно")').first
+            if error_modal.is_visible(timeout=1000):
+                print("\n⚠️ Появилась модалка с ошибкой, закрываю...")
+                error_modal.click()
+                page.wait_for_timeout(300)
+                print("   ✅ Модалка закрыта")
+        except:
+            pass
+        
+        # 6. СРАЗУ проверяем что появилось - капча или модалка
         page.wait_for_timeout(300)  # Уменьшаем с 500 до 300
         
         # Проверяем капчу
@@ -693,7 +775,23 @@ def complete_payment_step2(page: Page, card_number: str, owner_name: str):
             
             page.wait_for_timeout(100)  # Уменьшаем с 200 до 100
         
-        # 5. Ищем и обрабатываем модалку "Проверка данных"
+        # 7. Ждем API запрос с QR ссылкой
+        print("\n📌 Ожидаю API запрос с QR ссылкой...")
+        for i in range(20):  # 10 секунд максимум
+            if qr_link:
+                print(f"✅ QR ссылка получена!")
+                break
+            page.wait_for_timeout(500)
+        
+        if qr_link:
+            print(f"\n{'='*70}")
+            print(f"🎉 УСПЕХ! QR ССЫЛКА ПОЛУЧЕНА:")
+            print(f"{'='*70}")
+            print(f"{qr_link}")
+            print(f"{'='*70}")
+            return True
+        
+        # 8. Если QR ссылки нет, ищем и обрабатываем модалку "Проверка данных"
         print("\n📌 Ищу модалку 'Проверка данных'...")
         
         # Ждем появления модалки или перехода

@@ -46,6 +46,35 @@ def test_full_payment():
         page = context.new_page()
         
         try:
+            # Устанавливаем автоматическое закрытие модалки с ошибкой через JavaScript
+            page.evaluate("""
+                () => {
+                    // Функция для закрытия модалки
+                    const closeErrorModal = () => {
+                        const buttons = document.querySelectorAll('button[buttontext="Понятно"]');
+                        buttons.forEach(btn => {
+                            if (btn.textContent.includes('Понятно')) {
+                                console.log('🔴 Закрываю модалку с ошибкой...');
+                                btn.click();
+                            }
+                        });
+                    };
+                    
+                    // Проверяем каждые 100ms
+                    setInterval(closeErrorModal, 100);
+                    
+                    // Также используем MutationObserver для мгновенной реакции
+                    const observer = new MutationObserver(() => {
+                        closeErrorModal();
+                    });
+                    
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true
+                    });
+                }
+            """)
+            
             # ============ ЭТАП 1: ВВОД СУММЫ И ВЫБОР СПОСОБА ============
             print(f"\n{'='*70}")
             print("ЭТАП 1: ВВОД СУММЫ И ВЫБОР СПОСОБА ПЛАТЕЖА")
@@ -57,6 +86,7 @@ def test_full_payment():
             page.goto("https://multitransfer.ru/transfer/uzbekistan", wait_until='domcontentloaded')
             page_load_time = time.time() - page_load_start
             print(f"   ✅ DOM загружен за {page_load_time:.2f}s")
+            print(f"   ✅ Установлен автоматический закрыватель модалок с ошибками")
             
             # Ждем поля
             print(f"   ⏳ Жду появления поля...")
@@ -69,55 +99,82 @@ def test_full_payment():
             # НАЧАЛО ЭТАПА 1
             step1_start = time.time()
             
-            # Ввод суммы
+            # Ввод суммы с retry логикой
             print(f"\n⏱️  Ввожу сумму {amount} RUB...")
-            amount_input.click()
-            page.keyboard.press('Control+A')
-            page.keyboard.press('Backspace')
             
             amount_str = str(int(amount))
-            for char in amount_str:
-                page.keyboard.type(char)
+            commission_calculated = False
+            max_retries = 3
             
-            page.keyboard.press('Enter')
-            
-            # Проверяем что сумма действительно введена
-            page.wait_for_timeout(200)  # Даем React время обработать
-            current_value = amount_input.input_value()
-            print(f"   ✅ Значение в поле: {current_value}")
-            
-            # Если сумма не введена правильно - пробуем через fill
-            if amount_str not in current_value:
-                print(f"   ⚠️ Сумма не введена, пробую через fill()...")
-                amount_input.fill(amount_str)
+            for attempt in range(max_retries):
+                if attempt > 0:
+                    print(f"   🔄 Попытка #{attempt + 1}...")
+                
+                # Вводим через клавиатуру
+                amount_input.click()
+                page.wait_for_timeout(100)
+                page.keyboard.press('Control+A')
+                page.keyboard.press('Backspace')
+                page.wait_for_timeout(50)
+                
+                for char in amount_str:
+                    page.keyboard.type(char)
+                    page.wait_for_timeout(50)  # Небольшая задержка между символами
+                
+                # Триггерим события через JavaScript для надежности
+                amount_input.evaluate("""
+                    (element) => {
+                        element.dispatchEvent(new Event('input', { bubbles: true }));
+                        element.dispatchEvent(new Event('change', { bubbles: true }));
+                        element.dispatchEvent(new Event('blur', { bubbles: true }));
+                    }
+                """)
+                
                 page.keyboard.press('Enter')
-                page.wait_for_timeout(200)
-                current_value = amount_input.input_value()
-                print(f"   ✅ Новое значение: {current_value}")
+                page.wait_for_timeout(300)  # Даем время на обработку
+                
+                # Проверяем что комиссия рассчиталась
+                print(f"   ⏳ Жду расчета комиссии (попытка {attempt + 1}/{max_retries})...")
+                
+                try:
+                    page.wait_for_function("""
+                        () => {
+                            const input = document.querySelector('input[placeholder*="UZS"]');
+                            if (!input) return false;
+                            const val = input.value;
+                            return val && val !== '0 UZS' && val !== '' && val !== '0';
+                        }
+                    """, timeout=3000)
+                    
+                    receive_value = page.locator('input[placeholder*="UZS"]').input_value()
+                    print(f"   ✅ Комиссия рассчитана! К получению: {receive_value}")
+                    commission_calculated = True
+                    break
+                except:
+                    # Отладка: смотрим что в полях
+                    debug_info = page.evaluate("""
+                        () => {
+                            const rubInput = document.querySelector('input[placeholder*="RUB"]');
+                            const uzsInput = document.querySelector('input[placeholder*="UZS"]');
+                            return {
+                                rubValue: rubInput ? rubInput.value : 'NOT FOUND',
+                                uzsValue: uzsInput ? uzsInput.value : 'NOT FOUND'
+                            };
+                        }
+                    """)
+                    print(f"   ⚠️ Комиссия не рассчиталась. RUB={debug_info['rubValue']}, UZS={debug_info['uzsValue']}")
+                    
+                    if attempt < max_retries - 1:
+                        print(f"   🔄 Пробую еще раз...")
+                        page.wait_for_timeout(500)
+            
+            if not commission_calculated:
+                print(f"   ❌ Не удалось рассчитать комиссию за {max_retries} попыток!")
+                raise Exception("Комиссия не рассчиталась - проверьте ввод суммы")
             
             amount_fill_time = time.time() - step1_start
             print(f"   ✅ Сумма введена за {amount_fill_time:.2f}s")
-            
-            # Расчет комиссии
-            print(f"   ⏳ Жду расчета комиссии...")
-            commission_start = time.time()
-            try:
-                page.wait_for_function("""
-                    () => {
-                        const input = document.querySelector('input[placeholder*="UZS"]');
-                        return input && input.value && input.value !== '0 UZS' && input.value !== '';
-                    }
-                """, timeout=8000)  # Увеличиваем таймаут
-                commission_time = time.time() - commission_start
-                receive_value = page.locator('input[placeholder*="UZS"]').input_value()
-                print(f"   ✅ Комиссия рассчитана за {commission_time:.2f}s! К получению: {receive_value}")
-            except:
-                commission_time = time.time() - commission_start
-                print(f"   ❌ Комиссия не рассчиталась за {commission_time:.2f}s!")
-                # Делаем скриншот
-                page.screenshot(path="./debug_commission_error.png")
-                print(f"   📸 Скриншот: debug_commission_error.png")
-                raise Exception("Комиссия не рассчиталась - проверьте ввод суммы")
+            commission_time = amount_fill_time  # Для статистики
             
             # Выбор способа платежа
             print(f"\n⏱️  Выбираю способ платежа...")
@@ -211,8 +268,7 @@ def test_full_payment():
             print(f"   └─ Итого загрузка:        {page_load_time + field_wait_time:.2f}s")
             print(f"")
             print(f"⚡ ЭТАП 1 (Ввод суммы и выбор):")
-            print(f"   Ввод суммы:               {amount_fill_time:.2f}s")
-            print(f"   Расчет комиссии:          {commission_time:.2f}s")
+            print(f"   Ввод суммы + комиссия:    {amount_fill_time:.2f}s")
             print(f"   Выбор способа + банк:     {payment_method_time:.2f}s")
             print(f"   Ожидание кнопки:          {button_wait_time:.2f}s")
             print(f"   └─ Итого этап 1:          {step1_time:.2f}s")
