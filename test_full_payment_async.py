@@ -382,22 +382,83 @@ async def test_full_payment_async():
             # Капча
             print("📌 Проверяю капчу...")
             try:
-                captcha_frame = page.frame_locator('iframe[src*="smartcaptcha"]')
-                await captcha_frame.locator('#js-button').click(timeout=3000)
-                await page.wait_for_timeout(500)
-                print("✅ Капча пройдена")
+                # Ждем появления iframe капчи
+                captcha_iframe_selector = 'iframe[src*="smartcaptcha.yandexcloud.net/checkbox"]'
+                await page.wait_for_selector(captcha_iframe_selector, state='visible', timeout=2000)
+                print("   ⚠️ Капча найдена!")
                 
-                # После капчи снова жмем кнопку
-                await page.locator('#pay').evaluate('el => el.click()')
-                print("✅ Кнопка после капчи")
+                await page.wait_for_timeout(500)
+                
+                # Имитируем движение мыши к капче
+                try:
+                    iframe_element = page.locator(captcha_iframe_selector)
+                    bbox = await iframe_element.bounding_box()
+                    if bbox:
+                        center_x = bbox['x'] + bbox['width'] / 2
+                        center_y = bbox['y'] + bbox['height'] / 2
+                        
+                        # Плавное движение
+                        await page.mouse.move(center_x - 50, center_y - 50)
+                        await page.wait_for_timeout(200)
+                        await page.mouse.move(center_x, center_y)
+                        await page.wait_for_timeout(300)
+                        print("   🤖 Движение мыши")
+                except:
+                    pass
+                
+                # Работа с iframe
+                captcha_frame = page.frame_locator(captcha_iframe_selector)
+                checkbox_button = captcha_frame.locator('#js-button')
+                
+                await checkbox_button.wait_for(state='visible', timeout=3000)
+                print("   ✅ Кнопка капчи найдена")
+                
+                # Пробуем разные способы клика
+                clicked = False
+                
+                # Способ 1: Обычный клик
+                try:
+                    await checkbox_button.click(timeout=3000)
+                    print("   ✅ Капча кликнута (обычный клик)")
+                    clicked = True
+                except Exception as e:
+                    print(f"   ⚠️ Обычный клик не удался: {str(e)[:50]}")
+                
+                # Способ 2: Force клик
+                if not clicked:
+                    try:
+                        await checkbox_button.click(force=True, timeout=3000)
+                        print("   ✅ Капча кликнута (force клик)")
+                        clicked = True
+                    except Exception as e:
+                        print(f"   ⚠️ Force клик не удался: {str(e)[:50]}")
+                
+                # Способ 3: JS клик
+                if not clicked:
+                    try:
+                        await checkbox_button.evaluate('el => el.click()')
+                        print("   ✅ Капча кликнута (JS клик)")
+                        clicked = True
+                    except Exception as e:
+                        print(f"   ⚠️ JS клик не удался: {str(e)[:50]}")
+                
+                if clicked:
+                    await page.wait_for_timeout(1000)  # Увеличиваем с 500 до 1000
+                    
+                    # После капчи снова жмем кнопку
+                    await page.locator('#pay').evaluate('el => el.click()')
+                    print("   ✅ Кнопка после капчи")
+                else:
+                    print("   ❌ Не удалось кликнуть капчу")
+                
             except Exception as e:
-                print(f"⚠️ Капча не найдена или ошибка: {str(e)[:50]}")
-            
-            await page.wait_for_timeout(1000)
+                print(f"   ⚠️ Капча не найдена: {str(e)[:80]}")
             
             # Модалка подтверждения
             print("📌 Ищу модалку подтверждения...")
             try:
+                await page.wait_for_timeout(1000)
+                
                 buttons = await page.locator('button').all()
                 continue_buttons = []
                 
@@ -412,11 +473,16 @@ async def test_full_payment_async():
                 if len(continue_buttons) > 1:
                     # Кликаем по последней кнопке (в модалке)
                     await continue_buttons[-1].evaluate('el => el.click()')
-                    print(f"✅ Модалка: нажата кнопка ({len(continue_buttons)} найдено)")
+                    print(f"   ✅ Модалка: нажата кнопка ({len(continue_buttons)} найдено)")
+                    
+                    # Ждем изменения URL
+                    await page.wait_for_timeout(2000)
+                    current_url = page.url
+                    print(f"   📍 URL после модалки: {current_url}")
                 else:
-                    print(f"⚠️ Модалка: найдено {len(continue_buttons)} кнопок")
+                    print(f"   ⚠️ Модалка: найдено {len(continue_buttons)} кнопок")
             except Exception as e:
-                print(f"⚠️ Модалка: {e}")
+                print(f"   ⚠️ Модалка: {e}")
             
             # Ждем QR ссылку
             print("📌 Ожидаю QR ссылку...")
