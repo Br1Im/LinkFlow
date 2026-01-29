@@ -246,23 +246,28 @@ async def test_full_payment_async():
                             });
                         }
                     """)
-                    await page.wait_for_timeout(100)
+                    await page.wait_for_timeout(50)
                 except:
                     pass
                 
-                # Вводим
-                await amount_input.click(force=True)
-                await page.wait_for_timeout(100)
-                await page.keyboard.press('Control+A')
-                await page.keyboard.press('Backspace')
-                await page.wait_for_timeout(50)
+                # Вводим через JavaScript (быстрее чем клавиатура)
+                await amount_input.evaluate(f"""
+                    (element) => {{
+                        element.focus();
+                        element.click();
+                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                            window.HTMLInputElement.prototype, 
+                            'value'
+                        ).set;
+                        nativeInputValueSetter.call(element, '{amount}');
+                        element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        element.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        element.dispatchEvent(new KeyboardEvent('keydown', {{ key: 'Enter', bubbles: true }}));
+                        element.dispatchEvent(new KeyboardEvent('keyup', {{ key: 'Enter', bubbles: true }}));
+                    }}
+                """)
                 
-                for char in str(amount):
-                    await page.keyboard.type(char)
-                    await page.wait_for_timeout(30)  # Уменьшаем с 50 до 30
-                
-                await page.keyboard.press('Enter')
-                await page.wait_for_timeout(200)  # Уменьшаем с 300 до 200
+                await page.wait_for_timeout(200)
                 
                 # Проверяем комиссию
                 try:
@@ -271,13 +276,13 @@ async def test_full_payment_async():
                             const input = document.querySelector('input[placeholder*="UZS"]');
                             return input && input.value && input.value !== '0 UZS' && input.value !== '';
                         }
-                    """, timeout=3000)
+                    """, timeout=2000)  # Уменьшаем с 3000 до 2000
                     print("✅ Комиссия")
                     commission_ok = True
                     break
                 except:
                     if attempt < 4:
-                        await page.wait_for_timeout(300)  # Уменьшаем с 500 до 300
+                        await page.wait_for_timeout(200)  # Уменьшаем с 300 до 200
             
             if not commission_ok:
                 raise Exception("Не удалось рассчитать комиссию за 5 попыток")
@@ -317,7 +322,7 @@ async def test_full_payment_async():
                     continue
             
             # Ждем активации кнопки
-            await page.wait_for_timeout(500)  # Уменьшаем с 1000 до 500
+            await page.wait_for_timeout(300)  # Уменьшаем с 500 до 300
             
             try:
                 await page.wait_for_function("""
@@ -325,7 +330,7 @@ async def test_full_payment_async():
                         const btn = document.getElementById('pay');
                         return btn && !btn.disabled;
                     }
-                """, timeout=10000)
+                """, timeout=5000)  # Уменьшаем с 10000 до 5000
             except:
                 # Повторный клик по Uzcard
                 await page.evaluate("""
@@ -336,13 +341,13 @@ async def test_full_payment_async():
                         if (uzcardBtn) uzcardBtn.click();
                     }
                 """)
-                await page.wait_for_timeout(1000)
+                await page.wait_for_timeout(500)
                 await page.wait_for_function("""
                     () => {
                         const btn = document.getElementById('pay');
                         return btn && !btn.disabled;
                     }
-                """, timeout=10000)
+                """, timeout=5000)  # Уменьшаем с 10000 до 5000
             
             await page.locator('#pay').evaluate('el => el.click()')
             await page.wait_for_url('**/sender-details**', timeout=10000)
