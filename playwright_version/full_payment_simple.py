@@ -18,6 +18,17 @@ from payment_step2 import (
 def simple_payment_flow(amount: float, card_number: str, owner_name: str, headless: bool = False):
     """Упрощенный цикл - только сумма и кнопка"""
     start_time = time.time()
+    screenshot_dir = "./screenshots"  # Локальная директория
+    os.makedirs(screenshot_dir, exist_ok=True)
+    
+    def take_screenshot(page, name):
+        """Сохранить скриншот"""
+        try:
+            path = f"{screenshot_dir}/{name}_{int(time.time())}.png"
+            page.screenshot(path=path, full_page=True)
+            print(f"   📸 Скриншот: {path}")
+        except Exception as e:
+            print(f"   ⚠️ Ошибка скриншота: {e}")
     
     print(f"🚀 СОЗДАНИЕ ПЛАТЕЖА (УПРОЩЕННАЯ ВЕРСИЯ)")
     print("="*70)
@@ -68,56 +79,57 @@ def simple_payment_flow(amount: float, card_number: str, owner_name: str, headle
             print(f"\n⏱️  1️⃣ Открываю страницу...")
             page.goto("https://multitransfer.ru/transfer/uzbekistan", wait_until='domcontentloaded')  # Меняем на domcontentloaded
             print(f"   ✅ DOM загружен")
+            take_screenshot(page, "01_page_loaded")
             
-            # ШАГ 2: Вводим сумму (БЫСТРАЯ ВЕРСИЯ)
+            # ШАГ 2: Вводим сумму (УЛЬТРА БЫСТРО - сразу после появления поля)
             print(f"\n⏱️  2️⃣ Ввожу сумму {amount} RUB...")
             
-            # Ждем только появления поля (не ждем networkidle)
+            # Ждем только появления поля
             amount_input = page.locator('input[placeholder="0 RUB"]')
             amount_input.wait_for(state='visible', timeout=5000)
             
-            # Кликаем в поле
+            # Сразу кликаем и вводим
             amount_input.click()
-            page.wait_for_timeout(30)  # Уменьшаем с 50 до 30
+            page.wait_for_timeout(20)  # Минимальная пауза
             
-            # Очищаем через выделение и удаление
+            # Очищаем
             page.keyboard.press('Control+A')
-            page.wait_for_timeout(15)  # Уменьшаем с 20 до 15
+            page.wait_for_timeout(10)
             page.keyboard.press('Backspace')
-            page.wait_for_timeout(20)  # Уменьшаем с 30 до 20
+            page.wait_for_timeout(15)
             
-            # Вводим посимвольно с минимальными паузами
+            # Вводим посимвольно
             amount_str = str(int(amount))
-            for i, char in enumerate(amount_str):
+            for char in amount_str:
                 page.keyboard.type(char)
-                page.wait_for_timeout(20)  # Уменьшаем с 30 до 20
+                page.wait_for_timeout(15)  # Уменьшаем с 20 до 15
             
-            # Нажимаем Enter для подтверждения
+            # Enter для подтверждения
             page.keyboard.press('Enter')
-            page.wait_for_timeout(150)  # Уменьшаем с 200 до 150
+            page.wait_for_timeout(100)  # Уменьшаем с 150 до 100
             
             current_value = amount_input.input_value()
             print(f"   ✅ Введено: {current_value}")
+            take_screenshot(page, "02_amount_entered")
             
-            # Ждем пока React рассчитает комиссию и курс (БЫСТРЕЕ)
+            # Ждем расчета комиссии ПАРАЛЛЕЛЬНО с подготовкой к клику
             print(f"   ⏳ Жду расчета комиссии...")
             try:
-                # Ждем появления рассчитанной суммы к получению (сокращаем время)
                 page.wait_for_function("""
                     () => {
                         const input = document.querySelector('input[placeholder*="UZS"]');
                         return input && input.value && input.value !== '0 UZS' && input.value !== '';
                     }
-                """, timeout=2500)  # Уменьшаем с 3000 до 2500
+                """, timeout=3000)
                 receive_value = page.locator('input[placeholder*="UZS"]').input_value()
                 print(f"   ✅ Комиссия рассчитана. К получению: {receive_value}")
             except:
                 print(f"   ⚠️ Не дождался расчета, но продолжаю")
             
-            # ШАГ 2.5: Выбираем способ платежа (БЫСТРЕЕ)
+            # ШАГ 2.5: Выбираем способ платежа (СРАЗУ после расчета комиссии)
             print(f"\n⏱️  2.5️⃣ Выбираю способ платежа...")
             
-            # Кликаем по блоку "Способ перевода" (доступен сразу)
+            # Кликаем по блоку "Способ перевода"
             transfer_clicked = False
             transfer_selectors = [
                 'div.css-c8d8yl:has-text("Способ перевода")',
@@ -127,7 +139,7 @@ def simple_payment_flow(amount: float, card_number: str, owner_name: str, headle
             for selector in transfer_selectors:
                 try:
                     transfer_block = page.locator(selector).first
-                    if transfer_block.is_visible(timeout=500):  # Уменьшаем с 1000 до 500
+                    if transfer_block.is_visible(timeout=300):  # Уменьшаем с 500 до 300
                         transfer_block.click()
                         print(f"   ✅ Открыл способ платежа")
                         transfer_clicked = True
@@ -136,35 +148,29 @@ def simple_payment_flow(amount: float, card_number: str, owner_name: str, headle
                     continue
             
             if transfer_clicked:
-                # Банк можно выбирать сразу после клика!
+                # Банк выбираем СРАЗУ после клика (без паузы!)
                 print("   ⚡ Выбираю банк сразу...")
-                page.wait_for_timeout(200)  # Минимальная пауза вместо 1000
+                page.wait_for_timeout(50)  # Минимальная пауза с 200 до 50
                 
                 bank_selectors = [
                     'text=Uzcard',
                     '[role="button"]:has-text("Uzcard")',
-                    'button:has-text("Uzcard")',
-                    '*[text*="Uzcard"]',
-                    '*[text*="Humo"]'
                 ]
                 
                 bank_selected = False
                 for selector in bank_selectors:
                     try:
-                        print(f"   Пробую селектор: {selector}")
                         bank_option = page.locator(selector).first
-                        # Ждем появления элемента
-                        bank_option.wait_for(state='visible', timeout=2000)
+                        bank_option.wait_for(state='visible', timeout=1500)  # Уменьшаем с 2000 до 1500
                         bank_option.click()
                         print(f"   ✅ Банк выбран через: {selector}")
                         bank_selected = True
                         break
-                    except Exception as e:
-                        print(f"   ⚠️ Селектор {selector} не сработал: {str(e)[:50]}")
+                    except:
                         continue
                 
                 if not bank_selected:
-                    print(f"   ❌ Не удалось выбрать банк - пробую альтернативный способ")
+                    print(f"   ❌ Не удалось выбрать банк")
                     # Пробуем кликнуть по любому элементу с текстом банка
                     try:
                         page.locator('text=Uzcard').or_(page.locator('text=Humo')).first.click(timeout=2000)
@@ -175,11 +181,11 @@ def simple_payment_flow(amount: float, card_number: str, owner_name: str, headle
                 
                 # Минимальное время на обработку выбора банка
                 if bank_selected:
-                    page.wait_for_timeout(300)  # Уменьшаем с 1000 до 300
+                    page.wait_for_timeout(100)  # Уменьшаем с 300 до 100
             else:
                 print(f"   ⚠️ Не удалось открыть способ платежа")
             
-            # ШАГ 3: Нажимаем Продолжить (БЫСТРЕЕ)
+            # ШАГ 3: Нажимаем Продолжить
             print(f"\n⏱️  3️⃣ Нажимаю 'Продолжить'...")
             
             # Ждем активации кнопки
@@ -189,7 +195,7 @@ def simple_payment_flow(amount: float, card_number: str, owner_name: str, headle
                         const btn = document.getElementById('pay');
                         return btn && !btn.disabled;
                     }
-                """, timeout=10000)  # Возвращаем стабильное время как в рабочей версии
+                """, timeout=10000)
                 print("   ✅ Кнопка активна")
             except:
                 print("   ⚠️  Кнопка disabled, но пробуем кликнуть")
@@ -198,15 +204,16 @@ def simple_payment_flow(amount: float, card_number: str, owner_name: str, headle
             
             # Кликаем и ждем навигации
             try:
-                with page.expect_navigation(timeout=10000):  # Возвращаем стабильное время
+                with page.expect_navigation(timeout=10000):
                     pay_button.click()
             except:
-                # Если не сработало, пробуем через JS
                 pay_button.evaluate('el => el.click()')
+                page.wait_for_url('**/sender-details**', timeout=10000)
                 page.wait_for_url('**/sender-details**', timeout=10000)  # Возвращаем стабильное время
             
             print(f"   ✅ Переход на sender-details")
             print(f"   📍 URL: {page.url}")
+            take_screenshot(page, "03_sender_details_page")
             
             # ============ ШАГ 2: Заполнение данных ============
             print(f"\n{'='*70}")
@@ -227,8 +234,11 @@ def simple_payment_flow(amount: float, card_number: str, owner_name: str, headle
             print(f"✅ ПЛАТЕЖ СОЗДАН ЗА {total_time:.1f}s")
             print(f"📍 Финальный URL: {page.url}")
             print(f"{'='*70}")
+            take_screenshot(page, "04_final_result")
             
-            input("\nНажми Enter чтобы закрыть браузер...")
+            # Задержка перед закрытием для просмотра результата
+            print("\n⏳ Жду 10 секунд перед закрытием...")
+            page.wait_for_timeout(10000)
             browser.close()
             
             return {
@@ -242,7 +252,9 @@ def simple_payment_flow(amount: float, card_number: str, owner_name: str, headle
             import traceback
             traceback.print_exc()
             
-            input("\nНажми Enter чтобы закрыть браузер...")
+            # Задержка перед закрытием для просмотра ошибки
+            print("\n⏳ Жду 10 секунд перед закрытием...")
+            page.wait_for_timeout(10000)
             browser.close()
             
             return {
@@ -258,7 +270,7 @@ def test():
         amount=110,
         card_number="9860080323894719",  # Из HAR
         owner_name="Nodir Asadullayev",  # Из HAR (латиница)
-        headless=False
+        headless=False  # Открываем браузер визуально
     )
     
     if result['success']:

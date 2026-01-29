@@ -1,0 +1,21 @@
+FROM mcr.microsoft.com/playwright/python:v1.41.0-jammy
+
+WORKDIR /app
+
+# Установка зависимостей
+COPY requirements.txt .
+RUN pip install --no-cache-dir playwright flask
+
+# Установка браузеров Playwright
+RUN playwright install chromium
+
+# Копирование кода
+COPY playwright_version/ ./playwright_version/
+COPY src/ ./src/
+
+# Создание директории для скриншотов
+RUN mkdir -p /app/screenshots
+
+EXPOSE 5002
+
+CMD ["python", "playwright_version/full_payment_simple.py"]
