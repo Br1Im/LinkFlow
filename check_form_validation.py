@@ -202,7 +202,7 @@ class FormValidator:
             card_input = self.page.locator('input[name="transfer_beneficiaryAccountNumber"]').first
             await card_input.click()
             await card_input.fill('')
-            await card_input.type('9860080323894719', delay=20)
+            await card_input.type('9860606753188378', delay=20)
             await self.page.wait_for_timeout(500)
             print("✅ Номер карты заполнен\n")
             

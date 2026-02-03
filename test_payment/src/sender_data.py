@@ -62,6 +62,11 @@ def get_random_sender_data():
         addr = addr.strip(',').strip()
         # Убираем лишние пробелы
         addr = ' '.join(addr.split())
+        # Добавляем пробелы после запятых если их нет
+        addr = addr.replace(',', ', ')
+        # Убираем двойные пробелы после запятых
+        while ',  ' in addr:
+            addr = addr.replace(',  ', ', ')
         return addr
     
     birth_place = clean_address(row[7])

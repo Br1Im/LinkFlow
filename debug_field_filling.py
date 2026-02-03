@@ -164,8 +164,8 @@ async def main():
         # Список полей для проверки
         fields_to_test = [
             # Получатель
-            ('transfer_beneficiaryAccountNumber', '9860080323894719', 'Номер карты получателя'),
-            ('beneficiary_firstName', 'Nodir', 'Имя получателя'),
+            ('transfer_beneficiaryAccountNumber', '9860606753188378', 'Номер карты получателя'),
+            ('beneficiary_firstName', 'ASIYA', 'Имя получателя'),
             ('beneficiary_lastName', 'Asadullayev', 'Фамилия получателя'),
             
             # Отправитель

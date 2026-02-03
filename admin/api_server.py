@@ -111,8 +111,8 @@ def create_payment():
             }), 400
         
         # Данные получателя (фиксированные)
-        card_number = '9860080323894719'
-        owner_name = 'Nodir Asadullayev'
+        card_number = '9860606753188378'
+        owner_name = 'ASIYA ESEMURATOVA'
         
         # Режим работы зависит от наличия Playwright
         if PLAYWRIGHT_AVAILABLE:

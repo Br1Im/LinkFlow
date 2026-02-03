@@ -23,8 +23,8 @@ API_URL = os.getenv('API_URL', 'http://localhost:5001')
 API_TOKEN = os.getenv('API_TOKEN', '-3uVLlbWyy90eapOGkv70C2ZltaYTxq-HtDbq-DtlLo')
 
 # Данные получателя по умолчанию
-DEFAULT_CARD = '9860080323894719'
-DEFAULT_OWNER = 'Nodir Asadullayev'
+DEFAULT_CARD = '9860606753188378'
+DEFAULT_OWNER = 'ASIYA ESEMURATOVA'
 
 # Блокировка для предотвращения одновременной генерации
 payment_lock = threading.Lock()

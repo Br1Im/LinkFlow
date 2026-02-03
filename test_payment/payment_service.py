@@ -988,8 +988,8 @@ async def main():
             
             result = await service.create_payment_link(
                 amount=110,
-                card_number="9860080323894719",
-                owner_name="Nodir Asadullayev"
+                card_number="9860606753188378",
+                owner_name="ASIYA ESEMURATOVA"
             )
             
             results.append(result)
