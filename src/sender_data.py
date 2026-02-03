@@ -7,7 +7,7 @@ SENDER_DATA = {
     # Паспортные данные
     "passport_series": "1820",
     "passport_number": "657875",
-    "passport_issue_date": "22.07.2020",
+    "passport_issue_date": "2020-07-22",  # Формат YYYY-MM-DD
     
     # Место рождения
     "birth_country": "Россия",
@@ -16,7 +16,8 @@ SENDER_DATA = {
     # Личные данные
     "first_name": "Дмитрий",
     "last_name": "Непокрытый",
-    "birth_date": "03.07.2000",
+    "middle_name": "",  # Отчество (если есть)
+    "birth_date": "2000-07-03",  # Формат YYYY-MM-DD
     
     # Контакты
     "phone": "+79880260334",

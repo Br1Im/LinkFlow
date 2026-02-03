@@ -1,0 +1,497 @@
+#!/usr/bin/env python3
+"""
+Современная админ-панель для создания платёжных ссылок с SQLite БД
+Тёмная тема, крутой дизайн, постоянное хранение данных
+"""
+
+from flask import Flask, render_template, request, jsonify, send_from_directory
+import os
+import csv
+import io
+from datetime import datetime, timedelta
+import random
+import time
+import threading
+
+# Import database module
+import database as db
+
+app = Flask(__name__)
+
+# API конфигурация
+API_URL = os.getenv('API_URL', 'http://localhost:5001')
+API_TOKEN = os.getenv('API_TOKEN', '-3uVLlbWyy90eapOGkv70C2ZltaYTxq-HtDbq-DtlLo')
+
+# Данные получателя по умолчанию
+DEFAULT_CARD = '9860080323894719'
+DEFAULT_OWNER = 'Nodir Asadullayev'
+
+# Блокировка для предотвращения одновременной генерации
+payment_lock = threading.Lock()
+current_generation = {
+    'in_progress': False,
+    'order_id': None,
+    'started_at': None
+}
+
+
+def init_default_settings():
+    """Initialize default settings if not exist"""
+    settings = db.get_all_settings()
+    
+    if not settings:
+        default_settings = {
+            'api_url': API_URL,
+            'api_token': API_TOKEN,
+            'max_amount': 120000,
+            'min_amount': 100,
+            'auto_retry': True,
+            'notifications_enabled': True,
+            'default_card': DEFAULT_CARD,
+            'default_owner': DEFAULT_OWNER
+        }
+        db.update_settings(default_settings)
+        db.add_log('info', 'Настройки по умолчанию инициализированы')
+
+
+def generate_demo_data():
+    """Генерация демо-данных отключена - используем реальные данные"""
+    pass  # Демо-данные больше не генерируются
+
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    """Отдача статических файлов"""
+    return send_from_directory('static', filename)
+
+
+@app.route('/')
+def index():
+    """Главная страница админки"""
+    return render_template('admin_v3.html')
+
+
+@app.route('/v2')
+def index_v2():
+    """Версия 2 админки"""
+    return render_template('admin_v2.html')
+
+
+@app.route('/test')
+def test():
+    """Тестовая страница"""
+    return '<h1>Server is working!</h1><p>Go to <a href="/">Admin Panel</a></p>'
+
+
+@app.route('/v1')
+def index_v1():
+    """Старая версия админки"""
+    return render_template('admin.html')
+
+
+@app.route('/api/create-payment', methods=['POST'])
+def create_payment():
+    """Создание платежа через реальный API на порту 5001"""
+    global current_generation
+    
+    try:
+        data = request.get_json()
+        
+        amount = data.get('amount')
+        # ID заказа генерируется автоматически
+        order_id = data.get('orderId') or f'ORD-{int(time.time())}-{random.randint(1000, 9999)}'
+        
+        if not amount:
+            return jsonify({
+                'success': False,
+                'error': 'Сумма обязательна'
+            }), 400
+        
+        # Проверка блокировки
+        if current_generation['in_progress']:
+            elapsed = (datetime.now() - current_generation['started_at']).total_seconds()
+            return jsonify({
+                'success': False,
+                'error': f'Уже генерируется платёж {current_generation["order_id"]}. Попробуйте через {max(0, int(60 - elapsed))} сек.',
+                'in_progress': True,
+                'current_order': current_generation['order_id'],
+                'elapsed_time': round(elapsed, 1)
+            }), 409
+        
+        # Валидация суммы
+        try:
+            amount = int(amount)
+            settings = db.get_all_settings()
+            min_amount = settings.get('min_amount', 100)
+            max_amount = settings.get('max_amount', 120000)
+            
+            if amount < min_amount or amount > max_amount:
+                return jsonify({
+                    'success': False,
+                    'error': f'Сумма должна быть от {min_amount} до {max_amount} RUB'
+                }), 400
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Неверный формат суммы'
+            }), 400
+        
+        # Устанавливаем блокировку
+        with payment_lock:
+            current_generation['in_progress'] = True
+            current_generation['order_id'] = order_id
+            current_generation['started_at'] = datetime.now()
+        
+        try:
+            # Засекаем время начала
+            start_time = time.time()
+            
+            # Получаем настройки
+            settings = db.get_all_settings()
+            card = settings.get('default_card', DEFAULT_CARD)
+            owner = settings.get('default_owner', DEFAULT_OWNER)
+            api_url = settings.get('api_url', API_URL)
+            api_token = settings.get('api_token', API_TOKEN)
+            
+            # Отправляем запрос на реальный API (порт 5001)
+            import requests
+            
+            api_payload = {
+                'amount': amount,
+                'orderId': order_id
+            }
+            
+            headers = {
+                'Authorization': f'Bearer {api_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            db.add_log('info', f'Отправка запроса на API: {api_url}/api/payment для заказа {order_id}')
+            
+            response = requests.post(
+                f'{api_url}/api/payment',
+                json=api_payload,
+                headers=headers,
+                timeout=120  # 2 минуты таймаут
+            )
+            
+            # Вычисляем время генерации
+            generation_time = time.time() - start_time
+            
+            # Генерируем ID платежа
+            all_payments = db.get_all_payments()
+            payment_id = f'PAY-{len(all_payments) + 1}'
+            
+            if response.status_code == 201:
+                # Успешный ответ от API
+                api_data = response.json()
+                
+                payment_data = {
+                    'id': payment_id,
+                    'order_id': order_id,
+                    'amount': amount,
+                    'success': True,
+                    'status': 'completed',
+                    'qr_link': api_data.get('qr_link'),
+                    'payment_time': round(generation_time, 2),
+                    'timestamp': datetime.now().isoformat(),
+                    'card': card,
+                    'owner': owner
+                }
+                
+                # Сохраняем в БД
+                db.add_payment(payment_data)
+                db.add_log('success', f'Платёж {order_id} создан успешно: {amount}₽ за {generation_time:.2f}с')
+                
+                return jsonify({
+                    'success': True,
+                    'order_id': order_id,
+                    'amount': amount,
+                    'status': 'completed',
+                    'qr_link': api_data.get('qr_link'),
+                    'payment_time': round(generation_time, 2),
+                    'generation_time': round(generation_time, 2),
+                    'total_time': round(generation_time, 2),
+                    'message': 'Payment created successfully'
+                }), 201
+            else:
+                # Ошибка от API
+                error_msg = response.json().get('error', 'Unknown error') if response.text else 'API error'
+                
+                payment_data = {
+                    'id': payment_id,
+                    'order_id': order_id,
+                    'amount': amount,
+                    'success': False,
+                    'status': 'failed',
+                    'qr_link': None,
+                    'payment_time': round(generation_time, 2),
+                    'timestamp': datetime.now().isoformat(),
+                    'card': card,
+                    'owner': owner
+                }
+                
+                db.add_payment(payment_data)
+                db.add_log('error', f'Платёж {order_id} не удался: {error_msg}')
+                
+                return jsonify({
+                    'success': False,
+                    'order_id': order_id,
+                    'error': error_msg,
+                    'payment_time': round(generation_time, 2),
+                    'generation_time': round(generation_time, 2),
+                    'total_time': round(generation_time, 2)
+                }), 500
+        
+        finally:
+            # Снимаем блокировку
+            with payment_lock:
+                current_generation['in_progress'] = False
+                current_generation['order_id'] = None
+                current_generation['started_at'] = None
+        
+    except Exception as e:
+        # Снимаем блокировку при ошибке
+        with payment_lock:
+            current_generation['in_progress'] = False
+            current_generation['order_id'] = None
+            current_generation['started_at'] = None
+        
+        db.add_log('error', f'Ошибка создания платежа: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    """Проверка статуса API"""
+    return jsonify({
+        'status': 'ok',
+        'service': 'LinkFlow Admin Panel with Database',
+        'version': '3.0.0',
+        'database': 'SQLite',
+        'browser_ready': True,
+        'generation_in_progress': current_generation['in_progress'],
+        'current_order': current_generation['order_id'] if current_generation['in_progress'] else None
+    })
+
+
+@app.route('/api/generation-status', methods=['GET'])
+def generation_status():
+    """Проверка статуса текущей генерации"""
+    if current_generation['in_progress']:
+        elapsed = (datetime.now() - current_generation['started_at']).total_seconds()
+        return jsonify({
+            'in_progress': True,
+            'order_id': current_generation['order_id'],
+            'elapsed_time': round(elapsed, 1),
+            'started_at': current_generation['started_at'].isoformat()
+        })
+    else:
+        return jsonify({
+            'in_progress': False
+        })
+
+
+@app.route('/api/analytics', methods=['GET'])
+def analytics():
+    """Получение аналитики"""
+    period = request.args.get('period', '30')
+    
+    try:
+        days = int(period)
+    except:
+        days = 30
+    
+    now = datetime.now()
+    cutoff = now - timedelta(days=days)
+    
+    # Получаем платежи из БД
+    filtered = db.get_payments_by_period(cutoff)
+    
+    # Группируем по дням
+    daily_stats = {}
+    for payment in filtered:
+        date = datetime.fromisoformat(payment['timestamp']).date().isoformat()
+        if date not in daily_stats:
+            daily_stats[date] = {'total': 0, 'success': 0, 'failed': 0, 'amount': 0}
+        
+        daily_stats[date]['total'] += 1
+        if payment['success']:
+            daily_stats[date]['success'] += 1
+            daily_stats[date]['amount'] += payment['amount']
+        else:
+            daily_stats[date]['failed'] += 1
+    
+    # Конвертируем в массив для графиков
+    chart_data = []
+    for date in sorted(daily_stats.keys()):
+        stats = daily_stats[date]
+        chart_data.append({
+            'date': date,
+            'total': stats['total'],
+            'success': stats['success'],
+            'failed': stats['failed'],
+            'amount': stats['amount'],
+            'success_rate': round((stats['success'] / stats['total'] * 100) if stats['total'] > 0 else 0, 1)
+        })
+    
+    return jsonify({
+        'success': True,
+        'period_days': days,
+        'chart_data': chart_data,
+        'total_payments': len(filtered),
+        'total_success': sum(1 for p in filtered if p['success']),
+        'total_failed': sum(1 for p in filtered if not p['success']),
+        'total_amount': sum(p['amount'] for p in filtered if p['success']),
+        'avg_payment_time': round(sum(p['payment_time'] for p in filtered if p['payment_time']) / len(filtered), 2) if filtered else 0
+    })
+
+
+@app.route('/api/payments', methods=['GET'])
+def get_payments():
+    """Получение списка платежей с фильтрацией"""
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    status = request.args.get('status', 'all')
+    search = request.args.get('search', '')
+    
+    result = db.get_payments(status=status, search=search, page=page, per_page=per_page)
+    
+    return jsonify({
+        'success': True,
+        **result
+    })
+
+
+@app.route('/api/payments/<payment_id>', methods=['GET'])
+def get_payment_detail(payment_id):
+    """Получение детальной информации о платеже"""
+    payment = db.get_payment_by_id(payment_id)
+    
+    if not payment:
+        return jsonify({'success': False, 'error': 'Платёж не найден'}), 404
+    
+    return jsonify({
+        'success': True,
+        'payment': payment
+    })
+
+
+@app.route('/api/export', methods=['GET'])
+def export_data():
+    """Экспорт данных"""
+    format_type = request.args.get('format', 'json')
+    status = request.args.get('status', 'all')
+    
+    # Получаем все платежи
+    all_payments = db.get_all_payments()
+    
+    # Фильтрация
+    if status == 'success':
+        filtered = [p for p in all_payments if p['success']]
+    elif status == 'failed':
+        filtered = [p for p in all_payments if not p['success']]
+    else:
+        filtered = all_payments
+    
+    if format_type == 'csv':
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=['id', 'order_id', 'amount', 'status', 'timestamp', 'payment_time'])
+        writer.writeheader()
+        for payment in filtered:
+            writer.writerow({
+                'id': payment['id'],
+                'order_id': payment['order_id'],
+                'amount': payment['amount'],
+                'status': payment['status'],
+                'timestamp': payment['timestamp'],
+                'payment_time': payment['payment_time']
+            })
+        
+        return output.getvalue(), 200, {
+            'Content-Type': 'text/csv',
+            'Content-Disposition': f'attachment; filename=payments_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        }
+    else:
+        return jsonify({
+            'success': True,
+            'data': filtered,
+            'exported_at': datetime.now().isoformat()
+        })
+
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def settings():
+    """Управление настройками"""
+    if request.method == 'GET':
+        settings = db.get_all_settings()
+        return jsonify({
+            'success': True,
+            'settings': settings
+        })
+    else:
+        data = request.get_json()
+        db.update_settings(data)
+        db.add_log('settings', f'Настройки обновлены: {", ".join(data.keys())}')
+        
+        return jsonify({
+            'success': True,
+            'settings': db.get_all_settings()
+        })
+
+
+@app.route('/api/logs', methods=['GET'])
+def get_logs():
+    """Получение логов системы"""
+    limit = int(request.args.get('limit', 50))
+    logs = db.get_logs(limit=limit)
+    
+    return jsonify({
+        'success': True,
+        'logs': logs
+    })
+
+
+@app.route('/api/stats/summary', methods=['GET'])
+def stats_summary():
+    """Сводная статистика"""
+    stats = db.get_stats_summary()
+    
+    return jsonify({
+        'success': True,
+        **stats
+    })
+
+
+if __name__ == '__main__':
+    print("\n" + "="*60)
+    print("🎨 LinkFlow Admin Panel with Database")
+    print("="*60)
+    print(f"📍 URL: http://localhost:5000")
+    print(f"💾 Database: SQLite (linkflow.db)")
+    print("="*60 + "\n")
+    
+    # Создаём папки
+    os.makedirs('templates', exist_ok=True)
+    os.makedirs('static', exist_ok=True)
+    
+    # Инициализируем БД
+    print("🔧 Инициализация базы данных...")
+    db.init_database()
+    
+    # Инициализируем настройки
+    init_default_settings()
+    
+    # Демо-данные больше не генерируются
+    # generate_demo_data()
+    
+    db.add_log('info', 'Сервер запущен')
+    
+    print("\n✅ Сервер готов к работе!")
+    print("💡 Демо-данные отключены - используйте реальные платежи")
+    print("🔒 Защита от одновременной генерации активна\n")
+    
+    app.run(debug=True, host='0.0.0.0', port=5000)

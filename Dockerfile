@@ -1,43 +1,54 @@
 FROM python:3.11-slim
 
-# Установка системных зависимостей
+# Установка системных зависимостей для Playwright
 RUN apt-get update && apt-get install -y \
     wget \
-    unzip \
     gnupg \
-    curl \
-    xvfb \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libatspi2.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libwayland-client0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Установка Google Chrome
-RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome.deb \
-    && apt-get update \
-    && apt-get install -y /tmp/google-chrome.deb \
-    && rm /tmp/google-chrome.deb \
-    && rm -rf /var/lib/apt/lists/*
-
-# Установка ChromeDriver
-RUN wget -q https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json -O /tmp/versions.json \
-    && CHROMEDRIVER_URL=$(python3 -c "import json; data=json.load(open('/tmp/versions.json')); print(data['channels']['Stable']['downloads']['chromedriver'][0]['url'])") \
-    && wget -q "$CHROMEDRIVER_URL" -O /tmp/chromedriver.zip \
-    && unzip -q /tmp/chromedriver.zip -d /tmp/ \
-    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/ \
-    && chmod +x /usr/local/bin/chromedriver \
-    && rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64 /tmp/versions.json
-
+# Рабочая директория
 WORKDIR /app
 
-# Копирование requirements.txt и установка зависимостей
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Копируем requirements
+COPY admin/requirements.txt /app/admin/requirements.txt
+COPY requirements_playwright.txt /app/requirements_playwright.txt
 
-# Копирование кода
-COPY src/ ./src/
-COPY admin/ ./admin/
+# Устанавливаем Python зависимости
+RUN pip install --no-cache-dir -r /app/admin/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements_playwright.txt
 
-# Создание директории для скриншотов
+# Устанавливаем Playwright браузеры
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
+# Копируем весь проект
+COPY . /app/
+
+# Создаем директорию для скриншотов
 RUN mkdir -p /app/screenshots
 
-EXPOSE 5001
+# Открываем порты
+EXPOSE 5000 5001
 
-CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 & python admin/api.py"]
+# Запуск
+CMD ["python", "start_admin.py"]

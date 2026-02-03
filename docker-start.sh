@@ -1,0 +1,55 @@
+#!/bin/bash
+# Скрипт для запуска LinkFlow Admin в Docker
+
+echo "=========================================="
+echo "  ЗАПУСК LINKFLOW ADMIN В DOCKER"
+echo "=========================================="
+echo ""
+
+# Проверка Docker
+if ! command -v docker &> /dev/null; then
+    echo "❌ Docker не установлен!"
+    echo "Установите Docker: https://docs.docker.com/get-docker/"
+    exit 1
+fi
+
+if ! command -v docker-compose &> /dev/null; then
+    echo "❌ Docker Compose не установлен!"
+    echo "Установите Docker Compose: https://docs.docker.com/compose/install/"
+    exit 1
+fi
+
+echo "✅ Docker установлен"
+echo ""
+
+# Сборка и запуск
+echo "🔨 Сборка Docker образа..."
+docker-compose build
+
+if [ $? -ne 0 ]; then
+    echo "❌ Ошибка сборки Docker образа"
+    exit 1
+fi
+
+echo ""
+echo "🚀 Запуск контейнера..."
+docker-compose up -d
+
+if [ $? -ne 0 ]; then
+    echo "❌ Ошибка запуска контейнера"
+    exit 1
+fi
+
+echo ""
+echo "✅ LinkFlow Admin запущен!"
+echo ""
+echo "Доступ:"
+echo "  📊 Admin Panel: http://localhost:5000"
+echo "  🔌 API Server:  http://localhost:5001"
+echo ""
+echo "Логи:"
+echo "  docker-compose logs -f"
+echo ""
+echo "Остановка:"
+echo "  docker-compose down"
+echo ""

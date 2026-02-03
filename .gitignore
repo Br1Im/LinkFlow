@@ -49,3 +49,8 @@ Thumbs.db
 # Temporary files
 *.tmp
 /tmp/
+
+# Database (keep linkflow.db for local testing)
+*.db-journal
+*.db-wal
+*.db-shm

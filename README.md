@@ -1,142 +1,287 @@
-# 🎯 Multitransfer API - Полное API решение
+# LinkFlow Admin Panel
 
-Чистый API для создания QR-платежей через multitransfer.ru
+Локальная версия админки LinkFlow для тестирования с реальной генерацией платежей через Playwright.
 
-## 📁 Структура
+## 📋 Что это?
 
-- **`multitransfer_api.py`** - базовый API класс (100% рабочий)
-- **`auto_captcha_api.py`** - интеграция с solver'ом капчи
-- **`get_fresh_token.py`** - получение токена вручную для теста
-- **`captcha_solver_lib/`** - Docker solver для Yandex SmartCaptcha
-- **`requirements.txt`** - зависимости (только requests)
+Админ-панель для управления платежами LinkFlow с базой данных SQLite.
+Скопировано с продакшн-сервера для локального тестирования.
 
-## ✅ Что работает
+**Два режима работы:**
+1. **Playwright режим** - реальная генерация платежей через браузер (требует установки Playwright)
+2. **Proxy режим** - простое перенаправление запросов (без Playwright)
 
-### 1. API для создания платежей (100% рабочий)
+## 🚀 Быстрый старт
 
-```python
-from multitransfer_api import MultitransferAPI
+### 🐳 Вариант 1: Docker (рекомендуется)
 
-# Нужен свежий токен (получить вручную или через сервис)
-token = "твой_fhptokenid"
-
-api = MultitransferAPI(token)
-qr_link = api.create_qr_payment(
-    card_number="9860080323894719",
-    recipient_name="Nodir Asadullayev",
-    amount=110
-)
-
-print(qr_link)  # https://qr.nspk.ru/...
+**Windows:**
+```bash
+docker-start.bat
 ```
 
-### 2. Методы API
+**Linux/Mac:**
+```bash
+chmod +x docker-start.sh
+./docker-start.sh
+```
 
-- `get_commissions(amount)` - получает commission_id (БЕЗ токена)
-- `create_payment(commission_id, card, name)` - создает платеж (нужен токен)
-- `get_qr_link(transaction_id)` - получает QR-ссылку (БЕЗ токена)
-- `create_qr_payment(card, name, amount)` - полный процесс (нужен токен)
+**Или вручную:**
+```bash
+docker-compose up -d
+```
 
-## ⚠️ Проблема с автоматическим решением капчи
+✅ Всё включено: Python, Playwright, Chromium, все зависимости!
 
-**yandex-captcha-puzzle-solver НЕ МОЖЕТ решить эту капчу:**
-- Делает 200+ попыток за 5 минут
-- Капча слишком сложная для автоматического решения
-- Timeout даже с maxTimeout=300000 (5 минут)
-
-## 🔑 Получение токена
-
-### Вариант 1: Вручную (для тестирования)
+### 💻 Вариант 2: Локально - Простой режим (без Playwright)
 
 ```bash
-python3 get_fresh_token.py
+# 1. Установите базовые зависимости
+pip install -r admin/requirements.txt
+
+# 2. Запустите админку
+python start_admin.py
 ```
 
-Следуй инструкциям:
-1. Открой https://multitransfer.ru/transfer/uzbekistan
-2. F12 → Network
-3. Заполни форму и реши капчу
-4. Найди запрос к `transfers/create`
-5. Скопируй `fhptokenid` из Headers
+### 💻 Вариант 3: Локально - Полный режим (с Playwright)
 
-### Вариант 2: Через платные сервисы (для продакшена)
+```bash
+# 1. Установите все зависимости
+pip install -r admin/requirements.txt
+pip install -r requirements_playwright.txt
 
-Эти сервисы поддерживают Yandex SmartCaptcha:
+# 2. Установите браузер Chromium для Playwright
+playwright install chromium
 
-1. **anticaptcha.com** (~$0.003-0.01 за капчу)
-2. **capmonster.cloud** (~$0.003-0.01 за капчу)
-3. **rucaptcha.com** (~$0.003-0.01 за капчу)
+# 3. Запустите админку
+python start_admin.py
+```
 
-Параметры для сервисов:
-```python
+### Откройте в браузере:
+- **Admin Panel**: http://localhost:5000
+- **API Server**: http://localhost:5001
+
+## 📁 Структура проекта
+
+```
+LinkFlow/
+├── admin/
+│   ├── admin_panel_db.py    # Админ-панель (порт 5000)
+│   ├── api_server.py        # API сервер (порт 5001)
+│   ├── database.py          # Работа с БД
+│   ├── linkflow.db          # База данных SQLite
+│   ├── requirements.txt     # Зависимости (Flask, requests)
+│   ├── templates/           # HTML шаблоны
+│   │   ├── admin.html       # Версия 1
+│   │   ├── admin_v2.html    # Версия 2
+│   │   └── admin_v3.html    # Версия 3 (основная)
+│   └── static/              # Статические файлы
+│       └── demo.js
+├── src/
+│   └── sender_data.py       # Данные отправителя для Playwright
+├── payment_service.py       # Сервис генерации платежей (Playwright)
+├── requirements_playwright.txt  # Зависимости Playwright
+├── start_admin.py           # Запуск обоих серверов
+├── test_api.py              # Тестирование API
+└── README.md
+```
+
+## 🔌 API Endpoints
+
+### Создание платежа
+```bash
+POST http://localhost:5001/api/payment
+Authorization: Bearer -3uVLlbWyy90eapOGkv70C2ZltaYTxq-HtDbq-DtlLo
+Content-Type: application/json
+
 {
-    "type": "YandexSmartCaptcha",
-    "websiteURL": "https://multitransfer.ru/transfer/uzbekistan/sender-details",
-    "websiteKey": "ysc1_DAo8nFPdNCMHkAwYxIUJFxW5IIJd3ITGArZehXxO9a0ea6f8"
+  "amount": 1000,
+  "orderId": "ORDER-123"
 }
 ```
 
-Результат - это и есть `fhptokenid` для API.
-
-### Вариант 3: Интеграция с anticaptcha
-
-```python
-from anticaptchaofficial.yandexsmartcaptchaproxyless import *
-from multitransfer_api import MultitransferAPI
-
-# Решаем капчу через anticaptcha
-solver = yandexSmartCaptchaProxyless()
-solver.set_key("твой_api_key")
-solver.set_website_url("https://multitransfer.ru/transfer/uzbekistan/sender-details")
-solver.set_website_key("ysc1_DAo8nFPdNCMHkAwYxIUJFxW5IIJd3ITGArZehXxO9a0ea6f8")
-
-token = solver.solve_and_return_solution()
-
-# Используем токен для создания платежа
-api = MultitransferAPI(token)
-qr_link = api.create_qr_payment("9860080323894719", "Nodir Asadullayev", 110)
+### Health Check
+```bash
+GET http://localhost:5001/health
 ```
 
-## 💡 Важно
+Ответ покажет режим работы:
+- `"mode": "playwright"` - реальная генерация через браузер
+- `"mode": "proxy"` - перенаправление на админ-панель
 
-- **Минимальная сумма**: 110 RUB
-- **Токен живет**: ~25 минут
-- **API работает**: 100% протестирован
-- **Автоматический solver**: НЕ работает (капча слишком сложная)
-- **Решение для продакшена**: использовать платные сервисы
+## 🌐 Продакшн-сервер
 
-## 🎯 Рекомендация для продакшена
+**Хост**: `85.192.56.74`  
+**Порты**: 5000 (Admin), 5001 (API)  
+**Путь**: `/root/linkflow-admin/` и `/root/LinkFlow_playwright/`
 
-```python
-from anticaptchaofficial.yandexsmartcaptchaproxyless import *
-from multitransfer_api import MultitransferAPI
+### Синхронизация с сервером:
+```bash
+# Скачать обновленную БД
+scp root@85.192.56.74:/root/linkflow-admin/linkflow.db admin/
 
-def create_payment(card: str, name: str, amount: float):
-    """Создание платежа с решением капчи через anticaptcha"""
-    
-    # 1. Решаем капчу
-    solver = yandexSmartCaptchaProxyless()
-    solver.set_key("твой_api_key")
-    solver.set_website_url("https://multitransfer.ru/transfer/uzbekistan/sender-details")
-    solver.set_website_key("ysc1_DAo8nFPdNCMHkAwYxIUJFxW5IIJd3ITGArZehXxO9a0ea6f8")
-    
-    token = solver.solve_and_return_solution()
-    
-    if not token:
-        return None
-    
-    # 2. Создаем платеж
-    api = MultitransferAPI(token)
-    qr_link = api.create_qr_payment(card, name, amount)
-    
-    return qr_link
+# Загрузить локальную БД на сервер
+scp admin/linkflow.db root@85.192.56.74:/root/linkflow-admin/
+
+# Скачать обновленный payment_service
+scp root@85.192.56.74:/root/LinkFlow_playwright/payment_service.py ./
 ```
 
-## 📊 Итог
+## 🧪 Тестирование
 
-✅ **API работает** - протестирован и готов к использованию  
-❌ **Бесплатный solver** - не может решить эту капчу  
-💰 **Платные сервисы** - единственное рабочее решение для автоматизации  
-💵 **Стоимость** - ~$0.003-0.01 за одну капчу  
+### Полный тест генерации платежей
 
-**API готов к продакшену с интеграцией anticaptcha/capmonster!** 🎉
+```bash
+python test_payment_full.py
+```
+
+Этот скрипт проверяет:
+- ✅ Доступность API
+- ✅ Режим работы (Proxy/Playwright)
+- ✅ Создание платежа
+- ✅ Получение QR-ссылки
+- ✅ Время генерации
+
+**Типы тестов:**
+1. **Полный тест** - один платеж с детальной информацией
+2. **Стресс-тест** - 3 платежа подряд для проверки стабильности
+3. **Проверка API** - только health check
+
+### 🔍 Отладка валидации формы
+
+**Быстрая проверка всех полей:**
+```bash
+python check_form_validation.py
+```
+
+Показывает:
+- Какие поля заполнены ✅
+- Какие поля пустые ❌
+- Ошибки валидации
+- Сохраняет скриншот
+
+**Детальная отладка каждого поля:**
+```bash
+python debug_field_filling.py
+```
+
+Показывает для каждого поля:
+- Найдено ли поле
+- Атрибуты (placeholder, type, required)
+- Текущее и новое значение
+- Ошибки валидации
+- Цвет границы
+
+Подробнее: `VALIDATION_DEBUG.md`
+
+### Простой тест API
+
+```bash
+python test_api.py
+```
+
+### Проверка health endpoint
+
+```bash
+curl http://localhost:5001/health
+```
+
+## 🐳 Docker
+
+### Запуск в Docker
+
+**Windows:**
+```bash
+docker-start.bat
+```
+
+**Linux/Mac:**
+```bash
+./docker-start.sh
+```
+
+### Команды Docker
+
+```bash
+# Запуск
+docker-compose up -d
+
+# Остановка
+docker-compose down
+
+# Логи
+docker-compose logs -f
+
+# Перезапуск
+docker-compose restart
+```
+
+Подробнее: `DOCKER_GUIDE.md`
+
+## 💡 Возможности
+
+- ✅ Создание платежей через веб-интерфейс
+- ✅ API для внешних запросов
+- ✅ Реальная генерация платежей через Playwright (опционально)
+- ✅ База данных SQLite с историей
+- ✅ Аналитика и статистика
+- ✅ Экспорт данных (JSON, CSV)
+- ✅ Логи системы
+- ✅ Настройки приложения
+
+## 🛠️ Настройка данных отправителя
+
+Отредактируйте файл `src/sender_data.py` для изменения данных отправителя:
+
+```python
+SENDER_DATA = {
+    "passport_series": "1820",
+    "passport_number": "657875",
+    "first_name": "Дмитрий",
+    "last_name": "Непокрытый",
+    # ... другие поля
+}
+```
+
+## 🧪 Тестирование
+
+```bash
+# Проверка API
+python test_api.py
+
+# Проверка health endpoint
+curl http://localhost:5001/health
+```
+
+## ⚠️ Требования
+
+**Минимальные (Proxy режим):**
+- Python 3.8+
+- Flask
+- requests
+
+**Полные (Playwright режим):**
+- Python 3.8+
+- Flask
+- requests
+- Playwright
+- Chromium browser (устанавливается через Playwright)
+
+## 🔧 Troubleshooting
+
+### Playwright не работает
+```bash
+# Переустановите Playwright
+pip uninstall playwright
+pip install playwright
+playwright install chromium
+```
+
+### Порт занят
+Измените порт в файлах `admin/admin_panel_db.py` и `admin/api_server.py`
+
+### Браузер не запускается
+Убедитесь, что установлен Chromium:
+```bash
+playwright install chromium
+```

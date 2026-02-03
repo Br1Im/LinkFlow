@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkFlow Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #000000;
+            --bg-secondary: #0a0a0a;
+            --bg-card: #111111;
+            --accent: #ffffff;
+            --accent-hover: #e5e5e5;
+            --success: #ffffff;
+            --error: #ffffff;
+            --text-primary: #ffffff;
+            --text-secondary: #888888;
+            --border: #222222;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem 0;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .status-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 0;
+            background: var(--text-primary);
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 968px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            padding: 2rem;
+            transition: border-color 0.2s;
+        }
+
+        .card:hover {
+            border-color: var(--text-primary);
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--text-primary);
+        }
+
+        input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border: 1px solid var(--text-primary);
+            border-radius: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .btn span {
+            position: relative;
+        }
+
+        .btn-loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin-left: -10px;
+            margin-top: -10px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .result {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 0;
+            display: none;
+        }
+
+        .result.success {
+            background: var(--bg-secondary);
+            border: 1px solid var(--text-primary);
+            display: block;
+        }
+
+        .result.error {
+            background: var(--bg-secondary);
+            border: 1px solid var(--text-primary);
+            display: block;
+        }
+
+        .qr-link {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .copy-btn {
+            margin-top: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border: 1px solid var(--text-primary);
+            border-radius: 0;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .history-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .history-item:hover {
+            border-color: var(--text-primary);
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .history-amount {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .history-time {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .history-details {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+        }
+
+        .badge-error {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--text-primary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            padding: 1.5rem;
+            text-align: center;
+            transition: border-color 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: var(--text-primary);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .info-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .info-box strong {
+            color: var(--text-primary);
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Toast уведомления */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--bg-card);
+            border: 1px solid var(--text-primary);
+            border-radius: 0;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            min-width: 300px;
+            animation: slideInRight 0.2s ease-out;
+            z-index: 1000;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast-icon {
+            font-size: 1.5rem;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .toast-message {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ LinkFlow</h1>
+            <p class="subtitle">Админ-панель для создания платёжных ссылок</p>
+        </header>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Проверка соединения...</span>
+            </div>
+            <span id="apiVersion" style="color: var(--text-secondary); font-size: 0.9rem;">v2.2.0</span>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalPayments">0</div>
+                <div class="stat-label">Всего платежей</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="successRate">0%</div>
+                <div class="stat-label">Успешность</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalAmount">0₽</div>
+                <div class="stat-label">Общая сумма</div>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="card">
+                <h2 class="card-title">💳 Создать платёж</h2>
+                
+                <div class="info-box">
+                    💡 <strong>Демо-режим:</strong> Используются мок-данные для демонстрации дизайна
+                </div>
+                
+                <form id="paymentForm">
+                    <div class="form-group">
+                        <label for="amount">Сумма (RUB)</label>
+                        <input 
+                            type="number" 
+                            id="amount" 
+                            name="amount" 
+                            placeholder="1000"
+                            min="100"
+                            max="120000"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="orderId">ID заказа</label>
+                        <input 
+                            type="text" 
+                            id="orderId" 
+                            name="orderId" 
+                            placeholder="ORDER-12345"
+                            required
+                        >
+                    </div>
+
+                    <button type="submit" class="btn" id="submitBtn">
+                        <span>🚀 Создать платёж</span>
+                    </button>
+                </form>
+
+                <div id="result" class="result"></div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">📊 История платежей</h2>
+                <div id="history">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>Пока нет созданных платежей</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Toast уведомления
+        function showToast(title, message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="toast-icon">${type === 'success' ? '✅' : '❌'}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideInRight 0.3s ease-out reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Проверка статуса API
+        async function checkApiStatus() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                
+                if (data.status === 'ok') {
+                    statusDot.style.background = 'var(--success)';
+                    statusText.textContent = 'API готов к работе';
+                } else {
+                    statusDot.style.background = '#f59e0b';
+                    statusText.textContent = 'API прогревается...';
+                }
+            } catch (error) {
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                statusDot.style.background = 'var(--error)';
+                statusText.textContent = 'API недоступен';
+            }
+        }
+
+        // Обновление статистики
+        function updateStats() {
+            const history = JSON.parse(localStorage.getItem('paymentHistory') || '[]');
+            
+            const totalPayments = history.length;
+            const successfulPayments = history.filter(p => p.success).length;
+            const successRate = totalPayments > 0 ? Math.round((successfulPayments / totalPayments) * 100) : 0;
+            const totalAmount = history.filter(p => p.success).reduce((sum, p) => sum + parseInt(p.amount), 0);
+            
+            document.getElementById('totalPayments').textContent = totalPayments;
+            document.getElementById('successRate').textContent = successRate + '%';
+            document.getElementById('totalAmount').textContent = totalAmount.toLocaleString('ru-RU') + '₽';
+        }
+
+        // Загрузка истории из localStorage
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem('paymentHistory') || '[]');
+            const historyContainer = document.getElementById('history');
+            
+            updateStats();
+            
+            if (history.length === 0) {
+                historyContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>Пока нет созданных платежей</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            historyContainer.innerHTML = history.map(item => `
+                <div class="history-item">
+                    <div class="history-header">
+                        <div class="history-amount">${item.amount} RUB</div>
+                        <span class="badge ${item.success ? 'badge-success' : 'badge-error'}">
+                            ${item.success ? '✓ Успешно' : '✗ Ошибка'}
+                        </span>
+                    </div>
+                    <div class="history-details">
+                        <div>ID: ${item.orderId}</div>
+                        <div class="history-time">${item.time}</div>
+                        ${item.qr_link ? `
+                            <div style="margin-top: 0.5rem;">
+                                <button class="copy-btn" onclick="copyToClipboard('${item.qr_link}')">
+                                    📋 Копировать ссылку
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Сохранение в историю
+        function saveToHistory(data) {
+            const history = JSON.parse(localStorage.getItem('paymentHistory') || '[]');
+            history.unshift({
+                ...data,
+                time: new Date().toLocaleString('ru-RU')
+            });
+            
+            // Храним только последние 10
+            if (history.length > 10) {
+                history.pop();
+            }
+            
+            localStorage.setItem('paymentHistory', JSON.stringify(history));
+            loadHistory();
+        }
+
+        // Копирование в буфер обмена
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Скопировано!', 'Ссылка скопирована в буфер обмена', 'success');
+            }).catch(() => {
+                showToast('Ошибка', 'Не удалось скопировать', 'error');
+            });
+        }
+
+        // Обработка формы
+        document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const resultDiv = document.getElementById('result');
+            const amount = document.getElementById('amount').value;
+            const orderId = document.getElementById('orderId').value;
+            
+            // Блокируем кнопку
+            submitBtn.disabled = true;
+            submitBtn.classList.add('btn-loading');
+            resultDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/create-payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ amount, orderId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">✅ Платёж создан успешно!</div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                            Время создания: ${data.payment_time?.toFixed(2)}s
+                        </div>
+                        ${data.qr_link ? `
+                            <div class="qr-link">${data.qr_link}</div>
+                            <button class="copy-btn" onclick="copyToClipboard('${data.qr_link}')">
+                                📋 Копировать ссылку
+                            </button>
+                        ` : ''}
+                    `;
+                    
+                    // Toast уведомление
+                    showToast('Успех!', `Платёж на ${amount}₽ создан`, 'success');
+                    
+                    // Сохраняем в историю
+                    saveToHistory({
+                        success: true,
+                        amount,
+                        orderId,
+                        qr_link: data.qr_link
+                    });
+                    
+                    // Очищаем форму
+                    document.getElementById('paymentForm').reset();
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">❌ Ошибка создания платежа</div>
+                        <div style="font-size: 0.9rem;">${data.error || 'Неизвестная ошибка'}</div>
+                    `;
+                    
+                    showToast('Ошибка', data.error || 'Не удалось создать платёж', 'error');
+                    
+                    saveToHistory({
+                        success: false,
+                        amount,
+                        orderId,
+                        error: data.error
+                    });
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <div style="font-weight: 600; margin-bottom: 0.5rem;">❌ Ошибка соединения</div>
+                    <div style="font-size: 0.9rem;">${error.message}</div>
+                `;
+                showToast('Ошибка', 'Не удалось подключиться к серверу', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('btn-loading');
+            }
+        });
+
+        // Инициализация
+        checkApiStatus();
+        loadHistory();
+        setInterval(checkApiStatus, 10000); // Проверяем статус каждые 10 секунд
+    </script>
+    
+    <!-- Демо-скрипт для тестирования -->
+    <script src="/static/demo.js"></script>
+</body>
+</html>

@@ -1,21 +1,24 @@
-version: '3.3'
+version: '3.8'
 
 services:
-  linkflow-api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: linkflow-api
+  linkflow-admin:
+    build: .
+    container_name: linkflow-admin
     ports:
-      - "5001:5001"
-    environment:
-      - DISPLAY=:99
-      - PYTHONUNBUFFERED=1
-    command: sh -c "Xvfb :99 -screen 0 1920x1080x24 & python admin/api.py"
-    restart: always
+      - "5000:5000"  # Admin Panel
+      - "5001:5001"  # API Server
     volumes:
+      - ./admin/linkflow.db:/app/admin/linkflow.db
       - ./screenshots:/app/screenshots
-      - shared-storage:/tmp
+      - ./src:/app/src
+    environment:
+      - PYTHONUNBUFFERED=1
+      - API_URL=http://localhost:5001
+      - API_TOKEN=-3uVLlbWyy90eapOGkv70C2ZltaYTxq-HtDbq-DtlLo
+    restart: unless-stopped
+    networks:
+      - linkflow-network
 
-volumes:
-  shared-storage:
+networks:
+  linkflow-network:
+    driver: bridge

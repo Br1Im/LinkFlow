@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkFlow Admin</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Press+Start+2P&display=swap" rel="stylesheet">
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) lucide.createIcons();
+        });
+        
+        document.addEventListener('alpine:initialized', () => {
+            setTimeout(() => {
+                if (window.lucide) lucide.createIcons();
+            }, 100);
+        });
+    </script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        pixel: ['Press Start 2P', 'cursive'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        .glass {
+            background: rgba(17, 17, 17, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .pixel-corners {
+            clip-path: polygon(
+                0 4px, 4px 4px, 4px 0,
+                calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px,
+                100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%,
+                4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px)
+            );
+        }
+        
+        .pixel-border {
+            position: relative;
+            background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+        }
+        
+        .pixel-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            padding: 2px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            clip-path: polygon(
+                0 4px, 4px 4px, 4px 0,
+                calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px,
+                100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%,
+                4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px)
+            );
+        }
+        
+        .scanlines {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .scanlines::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15) 0px,
+                transparent 1px,
+                transparent 2px,
+                rgba(0, 0, 0, 0.15) 3px
+            );
+            pointer-events: none;
+            animation: scan 8s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(4px); }
+        }
+        
+        .pixel-shadow {
+            box-shadow: 
+                4px 0 0 rgba(255,255,255,0.1),
+                0 4px 0 rgba(0,0,0,0.5),
+                4px 4px 0 rgba(0,0,0,0.3);
+        }
+        
+        .retro-glow {
+            text-shadow: 
+                0 0 10px rgba(255,255,255,0.5),
+                0 0 20px rgba(255,255,255,0.3),
+                0 0 30px rgba(255,255,255,0.1);
+        }
+        
+        .hover-lift {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.1);
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: #111;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-black text-white font-sans antialiased" x-data="adminApp()" x-cloak>
+
+    <!-- Sidebar -->
+    <aside class="fixed left-0 top-0 h-screen w-64 glass border-r border-white/10 z-50 flex flex-col">
+        <!-- Logo -->
+        <div class="p-6 border-b border-white/10">
+            <div class="flex items-center gap-3 mb-1">
+                <div class="w-8 h-8 bg-gradient-to-br from-white to-gray-400 pixel-corners pixel-shadow flex items-center justify-center">
+                    <i data-lucide="zap" class="w-4 h-4 text-black"></i>
+                </div>
+                <h1 class="text-xl font-bold text-white retro-glow font-pixel">LinkFlow</h1>
+            </div>
+            <p class="text-xs text-gray-500 mt-2 ml-11 font-mono">ADMIN PANEL</p>
+        </div>
+        
+        <!-- Navigation -->
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto scrollbar-thin">
+            <button 
+                @click="currentView = 'dashboard'"
+                :class="currentView === 'dashboard' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200"
+            >
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span class="font-medium">Панель</span>
+            </button>
+            
+            <button 
+                @click="currentView = 'analytics'"
+                :class="currentView === 'analytics' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200"
+            >
+                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                <span class="font-medium">Аналитика</span>
+            </button>
+            
+            <button 
+                @click="currentView = 'create'"
+                :class="currentView === 'create' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200"
+            >
+                <i data-lucide="credit-card" class="w-5 h-5"></i>
+                <span class="font-medium">Создать</span>
+            </button>
+            
+            <button 
+                @click="currentView = 'payments'"
+                :class="currentView === 'payments' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200"
+            >
+                <i data-lucide="list" class="w-5 h-5"></i>
+                <span class="font-medium">Платежи</span>
+                <span x-show="payments.length > 0" class="ml-auto px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded font-mono" x-text="payments.length"></span>
+            </button>
+            
+            <button 
+                @click="currentView = 'logs'"
+                :class="currentView === 'logs' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200"
+            >
+                <i data-lucide="terminal" class="w-5 h-5"></i>
+                <span class="font-medium">Логи</span>
+            </button>
+            
+            <button 
+                @click="currentView = 'settings'"
+                :class="currentView === 'settings' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200"
+            >
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                <span class="font-medium">Настройки</span>
+            </button>
+        </nav>
+        
+        <!-- Status -->
+        <div class="p-4 border-t border-white/10">
+            <div class="flex items-center gap-3 px-4 py-3 pixel-corners bg-white/5">
+                <div class="relative">
+                    <div class="w-3 h-3 pixel-corners" :class="apiStatus === 'ok' ? 'bg-green-500' : 'bg-red-500'"></div>
+                    <div class="absolute inset-0 w-3 h-3 pixel-corners animate-ping" :class="apiStatus === 'ok' ? 'bg-green-500' : 'bg-red-500'" style="opacity: 0.5;"></div>
+                </div>
+                <div class="flex-1">
+                    <div class="text-xs text-gray-400 font-mono">API</div>
+                    <div class="text-sm font-medium font-mono" x-text="apiStatus === 'ok' ? 'В СЕТИ' : 'НЕ В СЕТИ'"></div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="ml-64 min-h-screen p-8">
+        
+        <!-- Dashboard View -->
+        <div x-show="currentView === 'dashboard'" x-transition class="space-y-6">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Панель управления</h2>
+                <p class="text-gray-400 font-mono">[ ОБЗОР СИСТЕМЫ ]</p>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="pixel-border pixel-corners p-6 hover-lift scanlines">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-blue-500/20 pixel-corners flex items-center justify-center">
+                            <i data-lucide="wallet" class="w-6 h-6 text-blue-400"></i>
+                        </div>
+                        <div class="text-xs text-gray-400 font-mono">СЕГОДНЯ</div>
+                    </div>
+                    <div class="text-3xl font-bold mb-2 font-pixel retro-glow" x-text="(summary.today && summary.today.total) || 0"></div>
+                    <div class="text-sm text-gray-400 font-mono">платежей</div>
+                </div>
+                
+                <div class="pixel-border pixel-corners p-6 hover-lift scanlines">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-green-500/20 pixel-corners flex items-center justify-center">
+                            <i data-lucide="trending-up" class="w-6 h-6 text-green-400"></i>
+                        </div>
+                        <div class="text-xs text-gray-400 font-mono">УСПЕХ</div>
+                    </div>
+                    <div class="text-3xl font-bold mb-2 font-pixel retro-glow" x-text="summary.today ? Math.round((summary.today.success / summary.today.total * 100) || 0) + '%' : '0%'"></div>
+                    <div class="text-sm text-gray-400 font-mono">успешных</div>
+                </div>
+                
+                <div class="pixel-border pixel-corners p-6 hover-lift scanlines">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-purple-500/20 pixel-corners flex items-center justify-center">
+                            <i data-lucide="banknote" class="w-6 h-6 text-purple-400"></i>
+                        </div>
+                        <div class="text-xs text-gray-400 font-mono">СУММА</div>
+                    </div>
+                    <div class="text-3xl font-bold mb-2 font-pixel retro-glow" x-text="(summary.today && summary.today.amount) ? summary.today.amount.toLocaleString('ru-RU') + '₽' : '0₽'"></div>
+                    <div class="text-sm text-gray-400 font-mono">сегодня</div>
+                </div>
+                
+                <div class="pixel-border pixel-corners p-6 hover-lift scanlines">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-orange-500/20 pixel-corners flex items-center justify-center">
+                            <i data-lucide="clock" class="w-6 h-6 text-orange-400"></i>
+                        </div>
+                        <div class="text-xs text-gray-400 font-mono">ВСЕГО</div>
+                    </div>
+                    <div class="text-3xl font-bold mb-2 font-pixel retro-glow" x-text="(summary.all_time && summary.all_time.total) || 0"></div>
+                    <div class="text-sm text-gray-400 font-mono">платежей</div>
+                </div>
+            </div>
+            
+            <!-- Period Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="pixel-border pixel-corners p-6 scanlines">
+                    <h3 class="text-lg font-bold mb-4 font-pixel retro-glow">Неделя</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400 font-mono">Платежей:</span>
+                            <span class="font-bold font-mono" x-text="(summary.week && summary.week.total) || 0"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400 font-mono">Успешных:</span>
+                            <span class="font-bold text-green-400 font-mono" x-text="(summary.week && summary.week.success) || 0"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400 font-mono">Сумма:</span>
+                            <span class="font-bold font-mono" x-text="((summary.week && summary.week.amount) || 0).toLocaleString('ru-RU') + '₽'"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="pixel-border pixel-corners p-6 scanlines">
+                    <h3 class="text-lg font-bold mb-4 font-pixel retro-glow">Месяц</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400 font-mono">Платежей:</span>
+                            <span class="font-bold font-mono" x-text="(summary.month && summary.month.total) || 0"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400 font-mono">Успешных:</span>
+                            <span class="font-bold text-green-400 font-mono" x-text="(summary.month && summary.month.success) || 0"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400 font-mono">Сумма:</span>
+                            <span class="font-bold font-mono" x-text="((summary.month && summary.month.amount) || 0).toLocaleString('ru-RU') + '₽'"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="pixel-border pixel-corners p-6 scanlines">
+                    <h3 class="text-lg font-bold mb-4 font-pixel retro-glow">Всё время</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400 font-mono">Платежей:</span>
+                            <span class="font-bold font-mono" x-text="(summary.all_time && summary.all_time.total) || 0"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400 font-mono">Успешных:</span>
+                            <span class="font-bold text-green-400 font-mono" x-text="(summary.all_time && summary.all_time.success) || 0"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400 font-mono">Сумма:</span>
+                            <span class="font-bold font-mono" x-text="((summary.all_time && summary.all_time.amount) || 0).toLocaleString('ru-RU') + '₽'"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Payments -->
+            <div class="pixel-border pixel-corners p-6 scanlines">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold font-pixel retro-glow">Последние платежи</h3>
+                    <button @click="currentView = 'payments'" class="text-sm text-blue-400 hover:text-blue-300 font-mono">Все →</button>
+                </div>
+                <div class="space-y-3">
+                    <template x-for="(payment, index) in payments.slice(0, 5)" :key="index">
+                        <div class="flex items-center justify-between p-4 bg-white/5 pixel-corners hover:bg-white/10 transition-colors">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 pixel-corners flex items-center justify-center" :class="payment.success ? 'bg-green-500/20' : 'bg-red-500/20'">
+                                    <i :data-lucide="payment.success ? 'check-circle' : 'x-circle'" class="w-5 h-5" :class="payment.success ? 'text-green-400' : 'text-red-400'"></i>
+                                </div>
+                                <div>
+                                    <div class="font-medium font-mono" x-text="payment.amount + ' ₽'"></div>
+                                    <div class="text-sm text-gray-400 font-mono" x-text="payment.order_id"></div>
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-400 font-mono" x-text="formatDate(payment.timestamp)"></div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="payments.length === 0" class="text-center py-8 text-gray-400 font-mono">
+                        [ НЕТ ДАННЫХ ]
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div x-show="currentView === 'analytics'" x-transition class="space-y-6">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Аналитика</h2>
+                <p class="text-gray-400 font-mono">[ ГРАФИКИ И СТАТИСТИКА ]</p>
+            </div>
+            
+            <!-- Period Selector -->
+            <div class="flex gap-2">
+                <button @click="loadAnalytics(7)" :class="analyticsPeriod === 7 ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/20'" class="px-4 py-2 pixel-corners font-mono transition-colors">7 дней</button>
+                <button @click="loadAnalytics(14)" :class="analyticsPeriod === 14 ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/20'" class="px-4 py-2 pixel-corners font-mono transition-colors">14 дней</button>
+                <button @click="loadAnalytics(30)" :class="analyticsPeriod === 30 ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/20'" class="px-4 py-2 pixel-corners font-mono transition-colors">30 дней</button>
+            </div>
+            
+            <!-- Charts -->
+            <div class="space-y-6">
+                <div class="pixel-border pixel-corners p-6 scanlines">
+                    <h3 class="text-lg font-bold mb-4 font-pixel retro-glow">Платежи по дням</h3>
+                    <div style="height: 400px;">
+                        <canvas id="paymentsChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="pixel-border pixel-corners p-6 scanlines">
+                    <h3 class="text-lg font-bold mb-4 font-pixel retro-glow">Успешность</h3>
+                    <div style="height: 400px;">
+                        <canvas id="successChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analytics Stats -->
+            <div class="pixel-border pixel-corners p-6 scanlines">
+                <h3 class="text-lg font-bold mb-4 font-pixel retro-glow">Статистика за период</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <div class="text-2xl font-bold font-pixel retro-glow" x-text="analytics.total_payments || 0"></div>
+                        <div class="text-sm text-gray-400 font-mono">Всего платежей</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-green-400 font-pixel retro-glow" x-text="analytics.total_success || 0"></div>
+                        <div class="text-sm text-gray-400 font-mono">Успешных</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-red-400 font-pixel retro-glow" x-text="analytics.total_failed || 0"></div>
+                        <div class="text-sm text-gray-400 font-mono">Неудачных</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold font-pixel retro-glow" x-text="(analytics.total_amount || 0).toLocaleString('ru-RU') + '₽'"></div>
+                        <div class="text-sm text-gray-400 font-mono">Общая сумма</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Payment View -->
+        <div x-show="currentView === 'create'" x-transition class="max-w-2xl space-y-6">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Создать платёж</h2>
+                <p class="text-gray-400 font-mono">[ НОВЫЙ ПЛАТЁЖ ]</p>
+            </div>
+            
+            <div class="pixel-border pixel-corners p-8 scanlines">
+                <div class="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 pixel-corners">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-500/20 pixel-corners flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="info" class="w-5 h-5 text-blue-400"></i>
+                        </div>
+                        <div>
+                            <div class="font-medium font-mono">ДЕМО РЕЖИМ</div>
+                            <div class="text-sm text-gray-400 font-mono">Тестовые данные для демонстрации</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <form @submit.prevent="createPayment" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 font-mono">СУММА (РУБ)</label>
+                        <input 
+                            type="number" 
+                            x-model="form.amount"
+                            min="100"
+                            max="120000"
+                            required
+                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                            placeholder="1000"
+                        >
+                        <p class="mt-2 text-xs text-gray-400 font-mono">ID заказа генерируется автоматически</p>
+                    </div>
+                    
+                    <button 
+                        type="submit"
+                        :disabled="loading"
+                        class="w-full px-6 py-4 bg-white text-black pixel-corners font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-mono pixel-shadow"
+                    >
+                        <template x-if="!loading">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="send" class="w-5 h-5"></i>
+                                <span>СОЗДАТЬ</span>
+                            </div>
+                        </template>
+                        <template x-if="loading">
+                            <div class="flex items-center gap-2">
+                                <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>ЗАГРУЗКА...</span>
+                            </div>
+                        </template>
+                    </button>
+                </form>
+                
+                <div x-show="result" x-transition class="mt-6 p-6 pixel-corners" :class="result?.success ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 pixel-corners flex items-center justify-center flex-shrink-0" :class="result?.success ? 'bg-green-500/20' : 'bg-red-500/20'">
+                            <i :data-lucide="result?.success ? 'check-circle' : 'alert-circle'" class="w-5 h-5" :class="result?.success ? 'text-green-400' : 'text-red-400'"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-medium mb-2 font-mono" x-text="result?.success ? 'УСПЕХ!' : 'ОШИБКА!'"></div>
+                            
+                            <template x-if="result?.success && result?.qr_link">
+                                <div>
+                                    <div class="p-3 bg-black/50 pixel-corners font-mono text-sm break-all mb-3" x-text="result.qr_link"></div>
+                                    <button 
+                                        @click="copyToClipboard(result.qr_link)"
+                                        class="w-full px-4 py-2 bg-white/10 hover:bg-white/20 pixel-corners text-sm transition-colors flex items-center justify-center gap-2 font-mono"
+                                    >
+                                        <i data-lucide="copy" class="w-4 h-4"></i>
+                                        <span>КОПИРОВАТЬ</span>
+                                    </button>
+                                </div>
+                            </template>
+                            
+                            <template x-if="!result?.success">
+                                <div class="text-sm text-gray-400 font-mono" x-text="result?.error"></div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payments List View -->
+        <div x-show="currentView === 'payments'" x-transition class="space-y-6">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Платежи</h2>
+                <p class="text-gray-400 font-mono">[ СПИСОК ВСЕХ ПЛАТЕЖЕЙ ]</p>
+            </div>
+            
+            <!-- Filters -->
+            <div class="flex flex-wrap gap-4">
+                <input 
+                    type="text" 
+                    x-model="searchQuery"
+                    @input="searchPayments"
+                    placeholder="Поиск по ID..."
+                    class="flex-1 min-w-[200px] px-4 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                >
+                <select x-model="filterStatus" @change="loadPayments" class="px-4 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono">
+                    <option value="all">Все</option>
+                    <option value="success">Успешные</option>
+                    <option value="failed">Неудачные</option>
+                </select>
+                <button @click="exportData('json')" class="px-4 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 pixel-corners transition-colors font-mono flex items-center gap-2">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    JSON
+                </button>
+                <button @click="exportData('csv')" class="px-4 py-2 bg-green-500/20 text-green-400 hover:bg-green-500/30 pixel-corners transition-colors font-mono flex items-center gap-2">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    CSV
+                </button>
+            </div>
+            
+            <!-- Payments Table -->
+            <div class="pixel-border pixel-corners p-6 scanlines">
+                <div class="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin">
+                    <template x-for="(payment, index) in payments" :key="index">
+                        <div class="p-6 bg-white/5 pixel-corners hover:bg-white/10 transition-all duration-200">
+                            <div class="flex items-start justify-between mb-4">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 pixel-corners flex items-center justify-center" :class="payment.success ? 'bg-green-500/20' : 'bg-red-500/20'">
+                                        <i :data-lucide="payment.success ? 'check-circle' : 'x-circle'" class="w-6 h-6" :class="payment.success ? 'text-green-400' : 'text-red-400'"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-2xl font-bold font-pixel retro-glow" x-text="payment.amount + ' ₽'"></div>
+                                        <div class="text-sm text-gray-400 font-mono" x-text="'ID: ' + payment.order_id"></div>
+                                        <div class="text-xs text-gray-500 font-mono" x-text="'Payment ID: ' + payment.id"></div>
+                                    </div>
+                                </div>
+                                <div class="px-3 py-1 pixel-corners text-xs font-medium flex items-center gap-1 font-mono" :class="payment.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
+                                    <i :data-lucide="payment.success ? 'check' : 'x'" class="w-3 h-3"></i>
+                                    <span x-text="payment.success ? 'ОК' : 'ОШИБКА'"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-4 text-sm text-gray-400 mb-3 font-mono">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="clock" class="w-4 h-4"></i>
+                                    <span x-text="formatDate(payment.timestamp)"></span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="zap" class="w-4 h-4"></i>
+                                    <span x-text="payment.payment_time + 's'"></span>
+                                </div>
+                            </div>
+                            
+                            <template x-if="payment.qr_link">
+                                <button 
+                                    @click="copyToClipboard(payment.qr_link)"
+                                    class="px-4 py-2 bg-white/10 hover:bg-white/20 pixel-corners text-sm transition-colors flex items-center gap-2 font-mono"
+                                >
+                                    <i data-lucide="copy" class="w-4 h-4"></i>
+                                    <span>КОПИРОВАТЬ ССЫЛКУ</span>
+                                </button>
+                            </template>
+                        </div>
+                    </template>
+                    
+                    <div x-show="payments.length === 0" class="text-center py-16">
+                        <div class="w-20 h-20 mx-auto mb-4 bg-white/5 pixel-corners flex items-center justify-center">
+                            <i data-lucide="inbox" class="w-10 h-10 text-gray-600"></i>
+                        </div>
+                        <div class="text-xl text-gray-400 font-mono">[ НЕТ ПЛАТЕЖЕЙ ]</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs View -->
+        <div x-show="currentView === 'logs'" x-transition class="space-y-6">
+            <div class="mb-8 flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Логи системы</h2>
+                    <p class="text-gray-400 font-mono">[ РЕАЛЬНОЕ ВРЕМЯ ]</p>
+                </div>
+                <button @click="loadLogs" class="px-4 py-2 bg-white/10 hover:bg-white/20 pixel-corners transition-colors font-mono flex items-center gap-2">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    ОБНОВИТЬ
+                </button>
+            </div>
+            
+            <div class="pixel-border pixel-corners p-6 scanlines">
+                <div class="space-y-2 max-h-[600px] overflow-y-auto scrollbar-thin font-mono text-sm">
+                    <template x-for="(log, index) in logs" :key="index">
+                        <div class="p-3 bg-white/5 pixel-corners hover:bg-white/10 transition-colors flex items-start gap-3">
+                            <div class="px-2 py-1 pixel-corners text-xs font-bold" :class="{
+                                'bg-green-500/20 text-green-400': log.level === 'success',
+                                'bg-red-500/20 text-red-400': log.level === 'error',
+                                'bg-blue-500/20 text-blue-400': log.level === 'info',
+                                'bg-yellow-500/20 text-yellow-400': log.level === 'warning',
+                                'bg-gray-500/20 text-gray-400': log.level === 'settings'
+                            }" x-text="log.level.toUpperCase()"></div>
+                            <div class="flex-1">
+                                <div class="text-gray-300" x-text="log.message"></div>
+                                <div class="text-xs text-gray-500 mt-1" x-text="formatDate(log.timestamp)"></div>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="logs.length === 0" class="text-center py-16 text-gray-400">
+                        [ НЕТ ЛОГОВ ]
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings View -->
+        <div x-show="currentView === 'settings'" x-transition class="max-w-3xl space-y-6">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Настройки</h2>
+                <p class="text-gray-400 font-mono">[ КОНФИГУРАЦИЯ СИСТЕМЫ ]</p>
+            </div>
+            
+            <div class="pixel-border pixel-corners p-8 scanlines">
+                <form @submit.prevent="saveSettings" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 font-mono">API URL</label>
+                        <input 
+                            type="text" 
+                            x-model="settings.api_url"
+                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                        >
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-2 font-mono">API TOKEN</label>
+                        <input 
+                            type="password" 
+                            x-model="settings.api_token"
+                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                        >
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 font-mono">МИН. СУММА (₽)</label>
+                            <input 
+                                type="number" 
+                                x-model="settings.min_amount"
+                                class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2 font-mono">МАКС. СУММА (₽)</label>
+                            <input 
+                                type="number" 
+                                x-model="settings.max_amount"
+                                class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-2 font-mono">КАРТА ПО УМОЛЧАНИЮ</label>
+                        <input 
+                            type="text" 
+                            x-model="settings.default_card"
+                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                        >
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-2 font-mono">ВЛАДЕЛЕЦ КАРТЫ</label>
+                        <input 
+                            type="text" 
+                            x-model="settings.default_owner"
+                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                        >
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" x-model="settings.auto_retry" class="w-5 h-5">
+                            <span class="font-mono">Автоматический повтор при ошибке</span>
+                        </label>
+                        
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" x-model="settings.notifications_enabled" class="w-5 h-5">
+                            <span class="font-mono">Включить уведомления</span>
+                        </label>
+                    </div>
+                    
+                    <button 
+                        type="submit"
+                        class="w-full px-6 py-4 bg-white text-black pixel-corners font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 font-mono pixel-shadow"
+                    >
+                        <i data-lucide="save" class="w-5 h-5"></i>
+                        <span>СОХРАНИТЬ</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+    </main>
+
+    <!-- Toast Notifications -->
+    <div class="fixed bottom-6 right-6 z-50 space-y-3">
+        <template x-for="(toast, index) in toasts" :key="index">
+            <div 
+                x-show="toast.show"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 transform translate-x-full"
+                x-transition:enter-end="opacity-100 transform translate-x-0"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 transform translate-x-0"
+                x-transition:leave-end="opacity-0 transform translate-x-full"
+                class="glass rounded-xl p-4 min-w-[300px] border border-white/20"
+            >
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center" :class="toast.type === 'success' ? 'bg-green-500/20' : 'bg-red-500/20'">
+                        <i :data-lucide="toast.type === 'success' ? 'check-circle' : 'alert-circle'" class="w-5 h-5" :class="toast.type === 'success' ? 'text-green-400' : 'text-red-400'"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium" x-text="toast.title"></div>
+                        <div class="text-sm text-gray-400" x-text="toast.message"></div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+    
+    <script>
+        function adminApp() {
+            return {
+                currentView: 'dashboard',
+                apiStatus: 'checking',
+                loading: false,
+                result: null,
+                form: {
+                    amount: ''
+                },
+                payments: [],
+                logs: [],
+                summary: {},
+                analytics: {},
+                analyticsPeriod: 30,
+                settings: {},
+                toasts: [],
+                searchQuery: '',
+                filterStatus: 'all',
+                paymentsChart: null,
+                successChart: null,
+                
+                init() {
+                    this.checkApiStatus();
+                    this.loadSummary();
+                    this.loadPayments();
+                    this.loadSettings();
+                    this.loadLogs();
+                    this.loadAnalytics(30);
+                    
+                    setInterval(() => this.checkApiStatus(), 10000);
+                    setInterval(() => this.loadLogs(), 5000);
+                    
+                    // Watch for view changes to update icons
+                    this.$watch('currentView', () => {
+                        this.$nextTick(() => {
+                            if (window.lucide) lucide.createIcons();
+                            if (this.currentView === 'analytics') {
+                                setTimeout(() => this.renderCharts(), 100);
+                            }
+                        });
+                    });
+                },
+                
+                async checkApiStatus() {
+                    try {
+                        const response = await fetch('/api/health');
+                        const data = await response.json();
+                        this.apiStatus = data.status === 'ok' ? 'ok' : 'error';
+                    } catch {
+                        this.apiStatus = 'error';
+                    }
+                },
+                
+                async loadSummary() {
+                    try {
+                        const response = await fetch('/api/stats/summary');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.summary = data;
+                        }
+                    } catch (error) {
+                        console.error('Failed to load summary:', error);
+                    }
+                },
+                
+                async loadPayments() {
+                    try {
+                        const response = await fetch(`/api/payments?status=${this.filterStatus}&per_page=50`);
+                        const data = await response.json();
+                        if (data.success) {
+                            this.payments = data.payments;
+                        }
+                    } catch (error) {
+                        console.error('Failed to load payments:', error);
+                    }
+                },
+                
+                async loadLogs() {
+                    try {
+                        const response = await fetch('/api/logs?limit=50');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.logs = data.logs;
+                        }
+                    } catch (error) {
+                        console.error('Failed to load logs:', error);
+                    }
+                },
+                
+                async loadSettings() {
+                    try {
+                        const response = await fetch('/api/settings');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.settings = data.settings;
+                        }
+                    } catch (error) {
+                        console.error('Failed to load settings:', error);
+                    }
+                },
+                
+                async saveSettings() {
+                    try {
+                        const response = await fetch('/api/settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.settings)
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            this.showToast('success', 'Сохранено!', 'Настройки успешно обновлены');
+                        }
+                    } catch (error) {
+                        this.showToast('error', 'Ошибка', 'Не удалось сохранить настройки');
+                    }
+                },
+                
+                async loadAnalytics(days) {
+                    this.analyticsPeriod = days;
+                    try {
+                        const response = await fetch(`/api/analytics?period=${days}`);
+                        const data = await response.json();
+                        if (data.success) {
+                            this.analytics = data;
+                            this.$nextTick(() => this.renderCharts());
+                        }
+                    } catch (error) {
+                        console.error('Failed to load analytics:', error);
+                    }
+                },
+                
+                renderCharts() {
+                    // Всегда показываем графики, даже если нет данных
+                    const chartData = this.analytics.chart_data || [];
+                    const labels = chartData.length > 0 ? chartData.map(d => d.date) : ['Нет данных'];
+                    const totals = chartData.length > 0 ? chartData.map(d => d.total) : [0];
+                    const successes = chartData.length > 0 ? chartData.map(d => d.success) : [0];
+                    const successRates = chartData.length > 0 ? chartData.map(d => d.success_rate) : [0];
+                    
+                    // Общие настройки для тёмной темы
+                    const darkThemeOptions = {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { 
+                                    color: '#fff',
+                                    font: {
+                                        family: 'JetBrains Mono, monospace',
+                                        size: 12
+                                    },
+                                    padding: 15
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                                titleColor: '#fff',
+                                bodyColor: '#fff',
+                                borderColor: 'rgba(255, 255, 255, 0.2)',
+                                borderWidth: 1,
+                                padding: 12,
+                                titleFont: {
+                                    family: 'JetBrains Mono, monospace',
+                                    size: 13
+                                },
+                                bodyFont: {
+                                    family: 'JetBrains Mono, monospace',
+                                    size: 12
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { 
+                                    color: '#888',
+                                    font: {
+                                        family: 'JetBrains Mono, monospace',
+                                        size: 11
+                                    }
+                                },
+                                grid: { 
+                                    color: 'rgba(255,255,255,0.05)',
+                                    lineWidth: 1
+                                },
+                                border: {
+                                    color: 'rgba(255,255,255,0.1)'
+                                }
+                            },
+                            x: {
+                                ticks: { 
+                                    color: '#888',
+                                    font: {
+                                        family: 'JetBrains Mono, monospace',
+                                        size: 11
+                                    },
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                },
+                                grid: { 
+                                    color: 'rgba(255,255,255,0.05)',
+                                    lineWidth: 1
+                                },
+                                border: {
+                                    color: 'rgba(255,255,255,0.1)'
+                                }
+                            }
+                        }
+                    };
+                    
+                    // Payments Chart
+                    const paymentsCtx = document.getElementById('paymentsChart');
+                    if (paymentsCtx) {
+                        if (this.paymentsChart) this.paymentsChart.destroy();
+                        this.paymentsChart = new Chart(paymentsCtx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Всего',
+                                    data: totals,
+                                    borderColor: 'rgb(59, 130, 246)',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                                    borderWidth: 3,
+                                    tension: 0.4,
+                                    fill: true,
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6,
+                                    pointBackgroundColor: 'rgb(59, 130, 246)',
+                                    pointBorderColor: '#000',
+                                    pointBorderWidth: 2
+                                }, {
+                                    label: 'Успешных',
+                                    data: successes,
+                                    borderColor: 'rgb(34, 197, 94)',
+                                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                                    borderWidth: 3,
+                                    tension: 0.4,
+                                    fill: true,
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6,
+                                    pointBackgroundColor: 'rgb(34, 197, 94)',
+                                    pointBorderColor: '#000',
+                                    pointBorderWidth: 2
+                                }]
+                            },
+                            options: darkThemeOptions
+                        });
+                    }
+                    
+                    // Success Rate Chart
+                    const successCtx = document.getElementById('successChart');
+                    if (successCtx) {
+                        if (this.successChart) this.successChart.destroy();
+                        this.successChart = new Chart(successCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Успешность %',
+                                    data: successRates,
+                                    backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                                    borderColor: 'rgb(34, 197, 94)',
+                                    borderWidth: 2,
+                                    borderRadius: 0,
+                                    hoverBackgroundColor: 'rgba(34, 197, 94, 0.9)',
+                                    hoverBorderColor: 'rgb(34, 197, 94)',
+                                    hoverBorderWidth: 3
+                                }]
+                            },
+                            options: {
+                                ...darkThemeOptions,
+                                scales: {
+                                    ...darkThemeOptions.scales,
+                                    y: {
+                                        ...darkThemeOptions.scales.y,
+                                        max: 100
+                                    }
+                                }
+                            }
+                        });
+                    }
+                },
+                
+                async createPayment() {
+                    this.loading = true;
+                    this.result = null;
+                    
+                    try {
+                        const response = await fetch('/api/create-payment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                amount: parseInt(this.form.amount)
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        this.result = data;
+                        
+                        this.showToast(
+                            data.success ? 'success' : 'error',
+                            data.success ? 'Успех!' : 'Ошибка',
+                            data.success ? `Платёж на ${this.form.amount}₽ создан` : data.error
+                        );
+                        
+                        if (data.success) {
+                            this.form.amount = '';
+                            this.loadPayments();
+                            this.loadSummary();
+                        }
+                    } catch (error) {
+                        this.result = { success: false, error: error.message };
+                        this.showToast('error', 'Ошибка', 'Не удалось подключиться к серверу');
+                    } finally {
+                        this.loading = false;
+                        this.$nextTick(() => {
+                            if (window.lucide) lucide.createIcons();
+                        });
+                    }
+                },
+                
+                searchPayments() {
+                    // Простой поиск на клиенте
+                    // В реальном приложении делать запрос к серверу
+                },
+                
+                async exportData(format) {
+                    try {
+                        const response = await fetch(`/api/export?format=${format}&status=${this.filterStatus}`);
+                        
+                        if (format === 'csv') {
+                            const blob = await response.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `payments_${new Date().toISOString().split('T')[0]}.csv`;
+                            a.click();
+                        } else {
+                            const data = await response.json();
+                            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `payments_${new Date().toISOString().split('T')[0]}.json`;
+                            a.click();
+                        }
+                        
+                        this.showToast('success', 'Экспорт', 'Данные успешно экспортированы');
+                    } catch (error) {
+                        this.showToast('error', 'Ошибка', 'Не удалось экспортировать данные');
+                    }
+                },
+                
+                copyToClipboard(text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.showToast('success', 'Скопировано!', 'Ссылка скопирована в буфер обмена');
+                    });
+                },
+                
+                formatDate(timestamp) {
+                    return new Date(timestamp).toLocaleString('ru-RU', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                },
+                
+                showToast(type, title, message) {
+                    const toast = { show: true, type, title, message };
+                    this.toasts.push(toast);
+                    
+                    setTimeout(() => {
+                        toast.show = false;
+                        setTimeout(() => {
+                            const index = this.toasts.indexOf(toast);
+                            if (index > -1) this.toasts.splice(index, 1);
+                        }, 300);
+                    }, 3000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
