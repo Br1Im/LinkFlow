@@ -69,11 +69,33 @@ def init_database():
             )
         ''')
         
+        # Sender data table (данные отправителей из Excel)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sender_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                passport_series TEXT NOT NULL,
+                passport_number TEXT NOT NULL,
+                passport_issue_date TEXT NOT NULL,
+                birth_country TEXT NOT NULL,
+                birth_place TEXT NOT NULL,
+                first_name TEXT NOT NULL,
+                last_name TEXT NOT NULL,
+                middle_name TEXT NOT NULL,
+                birth_date TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                registration_country TEXT NOT NULL,
+                registration_place TEXT NOT NULL,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # Indexes for better performance
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_payments_timestamp ON payments(timestamp DESC)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_payments_success ON payments(success)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp DESC)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_sender_data_active ON sender_data(is_active)')
         
         print("✅ Database initialized successfully")
 
@@ -407,3 +429,207 @@ if __name__ == '__main__':
     # Initialize database when run directly
     init_database()
     print("Database module ready!")
+
+
+# ============= SENDER DATA =============
+
+def add_sender_data(sender_data):
+    """Add sender data to database"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO sender_data (
+                passport_series, passport_number, passport_issue_date,
+                birth_country, birth_place, first_name, last_name, middle_name,
+                birth_date, phone, registration_country, registration_place
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            sender_data['passport_series'],
+            sender_data['passport_number'],
+            sender_data['passport_issue_date'],
+            sender_data['birth_country'],
+            sender_data['birth_place'],
+            sender_data['first_name'],
+            sender_data['last_name'],
+            sender_data['middle_name'],
+            sender_data['birth_date'],
+            sender_data['phone'],
+            sender_data['registration_country'],
+            sender_data['registration_place']
+        ))
+        return cursor.lastrowid
+
+
+def get_random_sender_data():
+    """Get random active sender data"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM sender_data 
+            WHERE is_active = 1 
+            ORDER BY RANDOM() 
+            LIMIT 1
+        ''')
+        row = cursor.fetchone()
+        
+        if not row:
+            return None
+        
+        return {
+            'id': row['id'],
+            'passport_series': row['passport_series'],
+            'passport_number': row['passport_number'],
+            'passport_issue_date': row['passport_issue_date'],
+            'birth_country': row['birth_country'],
+            'birth_place': row['birth_place'],
+            'first_name': row['first_name'],
+            'last_name': row['last_name'],
+            'middle_name': row['middle_name'],
+            'birth_date': row['birth_date'],
+            'phone': row['phone'],
+            'registration_country': row['registration_country'],
+            'registration_place': row['registration_place']
+        }
+
+
+def get_all_sender_data():
+    """Get all sender data"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM sender_data ORDER BY id DESC')
+        rows = cursor.fetchall()
+        
+        senders = []
+        for row in rows:
+            senders.append({
+                'id': row['id'],
+                'passport_series': row['passport_series'],
+                'passport_number': row['passport_number'],
+                'passport_issue_date': row['passport_issue_date'],
+                'birth_country': row['birth_country'],
+                'birth_place': row['birth_place'],
+                'first_name': row['first_name'],
+                'last_name': row['last_name'],
+                'middle_name': row['middle_name'],
+                'birth_date': row['birth_date'],
+                'phone': row['phone'],
+                'registration_country': row['registration_country'],
+                'registration_place': row['registration_place'],
+                'is_active': bool(row['is_active'])
+            })
+        
+        return senders
+
+
+def update_sender_data(sender_id, sender_data):
+    """Update sender data"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE sender_data SET
+                passport_series = ?,
+                passport_number = ?,
+                passport_issue_date = ?,
+                birth_country = ?,
+                birth_place = ?,
+                first_name = ?,
+                last_name = ?,
+                middle_name = ?,
+                birth_date = ?,
+                phone = ?,
+                registration_country = ?,
+                registration_place = ?,
+                is_active = ?
+            WHERE id = ?
+        ''', (
+            sender_data['passport_series'],
+            sender_data['passport_number'],
+            sender_data['passport_issue_date'],
+            sender_data['birth_country'],
+            sender_data['birth_place'],
+            sender_data['first_name'],
+            sender_data['last_name'],
+            sender_data['middle_name'],
+            sender_data['birth_date'],
+            sender_data['phone'],
+            sender_data['registration_country'],
+            sender_data['registration_place'],
+            sender_data.get('is_active', True),
+            sender_id
+        ))
+
+
+def delete_sender_data(sender_id):
+    """Delete sender data"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM sender_data WHERE id = ?', (sender_id,))
+
+
+def import_sender_data_from_excel(excel_path):
+    """Import sender data from Excel file"""
+    import pandas as pd
+    
+    df = pd.read_excel(excel_path, header=None)
+    
+    imported_count = 0
+    for _, row in df.iterrows():
+        # Форматируем даты
+        birth_date = row[6]
+        if hasattr(birth_date, 'strftime'):
+            birth_date = birth_date.strftime('%d.%m.%Y')
+        else:
+            birth_date = str(birth_date)
+        
+        issue_date = row[10]
+        if hasattr(issue_date, 'strftime'):
+            issue_date = issue_date.strftime('%d.%m.%Y')
+        else:
+            issue_date = str(issue_date)
+        
+        # Форматируем телефон
+        phone = str(row[4])
+        if not phone.startswith('+'):
+            phone = f'+{phone}'
+        
+        # Очищаем адреса
+        def clean_address(addr):
+            addr = str(addr)
+            while ',,' in addr:
+                addr = addr.replace(',,', ',')
+            addr = addr.strip(',').strip()
+            addr = addr.replace(',', ', ')
+            while '  ' in addr:
+                addr = addr.replace('  ', ' ')
+            import re
+            addr = re.sub(r'([а-я])([А-Я])', r'\1 \2', addr)
+            addr = re.sub(r'\.([А-Яа-я])', r'. \1', addr)
+            addr = ' '.join(addr.split())
+            return addr
+        
+        birth_place = clean_address(row[7])
+        registration_place = clean_address(row[5])
+        
+        # Форматируем паспортные данные
+        passport_series = str(int(row[8])).zfill(4)
+        passport_number = str(int(row[9])).zfill(6)
+        
+        sender_data = {
+            'passport_series': passport_series,
+            'passport_number': passport_number,
+            'passport_issue_date': issue_date,
+            'birth_country': 'Россия',
+            'birth_place': birth_place,
+            'first_name': str(row[2]),
+            'last_name': str(row[1]),
+            'middle_name': str(row[3]),
+            'birth_date': birth_date,
+            'phone': phone,
+            'registration_country': 'Россия',
+            'registration_place': registration_place
+        }
+        
+        add_sender_data(sender_data)
+        imported_count += 1
+    
+    return imported_count

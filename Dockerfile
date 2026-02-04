@@ -47,6 +47,10 @@ COPY . /app/
 # Создаем директорию для скриншотов
 RUN mkdir -p /app/screenshots
 
+# Инициализируем БД и импортируем данные из Excel
+RUN python admin/database.py && \
+    python import_excel_to_db.py || echo "Excel import skipped"
+
 # Открываем порты
 EXPOSE 5000 5001
 

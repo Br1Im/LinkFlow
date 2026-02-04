@@ -31,10 +31,10 @@ def get_random_sender_data():
     # Читаем Excel без заголовков
     df = pd.read_excel(excel_path, header=None)
     
-    # Выбираем случайную строку
-    row = df.sample(n=1).iloc[0]
+    # Берем первую строку
+    row = df.iloc[0]
     
-    # Форматируем даты в DD.MM.YYYY (формат для формы)
+    # Форматируем даты в DD.MM.YYYY (формат для отображения в форме)
     birth_date = row[6]
     if hasattr(birth_date, 'strftime'):
         birth_date = birth_date.strftime('%d.%m.%Y')
@@ -52,7 +52,7 @@ def get_random_sender_data():
     if not phone.startswith('+'):
         phone = f'+{phone}'
     
-    # Очищаем адреса от двойных запятых и лишних пробелов
+    # Очищаем адреса от двойных запятых и добавляем пробелы
     def clean_address(addr):
         addr = str(addr)
         # Убираем двойные запятые
@@ -60,17 +60,31 @@ def get_random_sender_data():
             addr = addr.replace(',,', ',')
         # Убираем запятые в начале и конце
         addr = addr.strip(',').strip()
+        # Добавляем пробел после каждой запятой если его нет
+        addr = addr.replace(',', ', ')
+        # Убираем двойные пробелы
+        while '  ' in addr:
+            addr = addr.replace('  ', ' ')
+        # Добавляем пробелы в слитном тексте
+        import re
+        # Добавляем пробел перед заглавной буквой если перед ней строчная
+        addr = re.sub(r'([а-я])([А-Я])', r'\1 \2', addr)
+        # Добавляем пробел после точки если его нет
+        addr = re.sub(r'\.([А-Яа-я])', r'. \1', addr)
         # Убираем лишние пробелы
         addr = ' '.join(addr.split())
         return addr
     
     birth_place = clean_address(row[7])
     registration_place = clean_address(row[5])
+    # Форматируем паспортные данные с ведущими нулями
+    passport_series = str(int(row[8])).zfill(4)  # 4 цифры
+    passport_number = str(int(row[9])).zfill(6)  # 6 цифр
     
     return {
         # Паспортные данные
-        "passport_series": str(row[8]),
-        "passport_number": str(row[9]),
+        "passport_series": passport_series,
+        "passport_number": passport_number,
         "passport_issue_date": issue_date,
         
         # Место рождения

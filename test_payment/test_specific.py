@@ -1,38 +1,34 @@
 #!/usr/bin/env python3
 """
-Простой тест генерации платежа
+Тест конкретного платежа
 """
 import asyncio
-import sys
 from payment_service import PaymentService
 
 async def main():
     print("="*60)
-    print("ТЕСТ ГЕНЕРАЦИИ ПЛАТЕЖА")
+    print("ТЕСТ КОНКРЕТНОГО ПЛАТЕЖА")
     print("="*60)
     print()
     
     # Данные
     card_number = '9860606753188378'
     owner_name = 'ASIYA ESEMURATOVA'
-    amount = 1000
+    amount = 110
     
     print(f"Карта: {card_number}")
     print(f"Получатель: {owner_name}")
     print(f"Сумма: {amount} RUB")
     print()
     
-    # Создаем сервис
     service = PaymentService()
     
     try:
-        # Запускаем браузер (headless=True для фонового режима)
         print("Запуск браузера...")
-        await service.start(headless=True)
+        await service.start(headless=False)  # НЕ headless режим для отладки
         print("Браузер запущен!")
         print()
         
-        # Создаем платеж
         print("Создание платежа...")
         result = await service.create_payment_link(
             amount=amount,
