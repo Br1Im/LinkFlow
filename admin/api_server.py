@@ -110,13 +110,29 @@ def create_payment():
                 'error': 'Amount must be between 100 and 120000 RUB'
             }), 400
         
-        # Данные получателя (фиксированные)
-        card_number = '9860080323894719'
-        owner_name = 'Nodir Asadullayev'
+        # Получаем данные получателя из запроса или из БД
+        card_number = data.get('card_number')
+        owner_name = data.get('card_owner')
+        custom_sender = data.get('custom_sender')  # dict с кастомными данными отправителя
+        
+        # Если не указаны в запросе, берем случайный из БД
+        if not card_number or not owner_name:
+            from admin.database import get_random_beneficiary
+            beneficiary = get_random_beneficiary()
+            
+            if not beneficiary:
+                return jsonify({
+                    'success': False,
+                    'error': 'No active beneficiaries found in database'
+                }), 400
+            
+            card_number = beneficiary['card_number']
+            owner_name = beneficiary['card_owner']
+            log(f"Используется случайный реквизит: {owner_name} ({card_number})", "INFO")
         
         # Режим работы зависит от наличия Playwright
         if PLAYWRIGHT_AVAILABLE:
-            return create_payment_playwright(amount, order_id, card_number, owner_name)
+            return create_payment_playwright(amount, order_id, card_number, owner_name, custom_sender)
         else:
             return create_payment_proxy(amount, order_id)
         
@@ -128,11 +144,13 @@ def create_payment():
         }), 500
 
 
-def create_payment_playwright(amount, order_id, card_number, owner_name):
+def create_payment_playwright(amount, order_id, card_number, owner_name, custom_sender=None):
     """Создание платежа через Playwright"""
     import time
     
     log(f"Создаю платеж через Playwright: amount={amount}, orderId={order_id}", "INFO")
+    if custom_sender:
+        log(f"Используются кастомные данные отправителя: {custom_sender}", "INFO")
     
     total_start_time = time.time()
     
@@ -156,7 +174,8 @@ def create_payment_playwright(amount, order_id, card_number, owner_name):
         payment_service.create_payment_link(
             amount=amount,
             card_number=card_number,
-            owner_name=owner_name
+            owner_name=owner_name,
+            custom_sender=custom_sender
         )
     )
     
@@ -263,6 +282,227 @@ def restart_service():
         'success': True,
         'message': 'Browser restarts automatically for each payment'
     })
+
+
+@app.route('/api/beneficiaries', methods=['GET'])
+def get_beneficiaries():
+    """Получить все реквизиты"""
+    if not check_auth():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    try:
+        from admin.database import get_all_beneficiaries
+        beneficiaries = get_all_beneficiaries()
+        return jsonify({'success': True, 'beneficiaries': beneficiaries})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/beneficiaries', methods=['POST'])
+def add_beneficiary_endpoint():
+    """Добавить новый реквизит с автоматической проверкой"""
+    if not check_auth():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    try:
+        data = request.get_json()
+        card_number = data.get('card_number')
+        card_owner = data.get('card_owner')
+        is_retest = data.get('retest', False)
+        existing_id = data.get('beneficiary_id')
+        
+        if not card_number or not card_owner:
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        from admin.database import add_beneficiary, update_beneficiary_verification
+        
+        # Если это повторная проверка, используем существующий ID
+        if is_retest and existing_id:
+            beneficiary_id = existing_id
+        else:
+            # Добавляем новый реквизит
+            beneficiary_id = add_beneficiary(card_number, card_owner)
+        
+        # Создаем тестовый платеж
+        if PLAYWRIGHT_AVAILABLE and payment_service:
+            test_amount = 110
+            test_order_id = f"TEST_{beneficiary_id}_{int(datetime.now().timestamp())}"
+            
+            try:
+                log(f"Запуск тестового платежа для реквизита ID {beneficiary_id}: {card_owner}", "INFO")
+                
+                # Перезапускаем браузер для чистого состояния
+                try:
+                    log("Перезапуск браузера для теста...", "DEBUG")
+                    run_async(payment_service.stop())
+                    import time
+                    time.sleep(1)
+                    run_async(payment_service.start(headless=True))
+                    log("Браузер перезапущен", "SUCCESS")
+                except Exception as e:
+                    log(f"Ошибка перезапуска браузера: {e}", "WARNING")
+                
+                # Запускаем тестовый платеж
+                result = run_async(payment_service.create_payment_link(
+                    amount=test_amount,
+                    card_number=card_number,
+                    owner_name=card_owner
+                ))
+                
+                log(f"Результат теста: success={result.get('success')}, qr_link={result.get('qr_link')[:50] if result.get('qr_link') else 'None'}", "INFO")
+                
+                # Обновляем статус верификации
+                update_beneficiary_verification(
+                    beneficiary_id, 
+                    result.get('success', False),
+                    test_order_id if result.get('success') else None
+                )
+                
+                return jsonify({
+                    'success': True,
+                    'beneficiary_id': beneficiary_id,
+                    'verified': result.get('success', False),
+                    'test_result': result
+                })
+            except Exception as e:
+                # Если тест не прошел
+                update_beneficiary_verification(beneficiary_id, False)
+                return jsonify({
+                    'success': True,
+                    'beneficiary_id': beneficiary_id,
+                    'verified': False,
+                    'error': str(e)
+                })
+        else:
+            # Без проверки (режим прокси)
+            return jsonify({
+                'success': True,
+                'beneficiary_id': beneficiary_id,
+                'verified': False,
+                'message': 'Verification skipped (Playwright not available)'
+            })
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/beneficiaries/retest', methods=['POST'])
+def retest_beneficiary_endpoint():
+    """Повторная проверка существующего реквизита"""
+    if not check_auth():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    try:
+        data = request.get_json()
+        beneficiary_id = data.get('beneficiary_id')
+        card_number = data.get('card_number')
+        card_owner = data.get('card_owner')
+        
+        if not beneficiary_id or not card_number or not card_owner:
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        from admin.database import update_beneficiary_verification
+        
+        # Создаем тестовый платеж
+        if PLAYWRIGHT_AVAILABLE and payment_service:
+            test_amount = 110
+            test_order_id = f"TEST_{beneficiary_id}_{int(datetime.now().timestamp())}"
+            
+            try:
+                log(f"Повторная проверка реквизита ID {beneficiary_id}: {card_owner}", "INFO")
+                
+                # Перезапускаем браузер для чистого состояния
+                try:
+                    log("Перезапуск браузера для теста...", "DEBUG")
+                    run_async(payment_service.stop())
+                    import time
+                    time.sleep(1)
+                    run_async(payment_service.start(headless=True))
+                    log("Браузер перезапущен", "SUCCESS")
+                except Exception as e:
+                    log(f"Ошибка перезапуска браузера: {e}", "WARNING")
+                
+                # Запускаем тестовый платеж
+                result = run_async(payment_service.create_payment_link(
+                    amount=test_amount,
+                    card_number=card_number,
+                    owner_name=card_owner
+                ))
+                
+                log(f"Результат повторного теста: success={result.get('success')}", "INFO")
+                
+                # Обновляем статус верификации
+                is_verified = result.get('success', False)
+                update_beneficiary_verification(
+                    beneficiary_id, 
+                    is_verified,
+                    test_order_id if is_verified else None
+                )
+                
+                # Если не прошел проверку - отключаем реквизит
+                if not is_verified:
+                    from admin.database import update_beneficiary_status
+                    update_beneficiary_status(beneficiary_id, False)
+                    log(f"Реквизит ID {beneficiary_id} отключен (не прошел проверку)", "WARNING")
+                
+                return jsonify({
+                    'success': True,
+                    'beneficiary_id': beneficiary_id,
+                    'verified': is_verified,
+                    'test_result': result
+                })
+            except Exception as e:
+                # Если тест не прошел - отключаем реквизит
+                update_beneficiary_verification(beneficiary_id, False)
+                from admin.database import update_beneficiary_status
+                update_beneficiary_status(beneficiary_id, False)
+                log(f"Реквизит ID {beneficiary_id} отключен (ошибка проверки)", "ERROR")
+                
+                return jsonify({
+                    'success': True,
+                    'beneficiary_id': beneficiary_id,
+                    'verified': False,
+                    'error': str(e)
+                })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Playwright not available'
+            })
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/beneficiaries/<int:beneficiary_id>', methods=['DELETE'])
+def delete_beneficiary_endpoint(beneficiary_id):
+    """Удалить реквизит"""
+    if not check_auth():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    try:
+        from admin.database import delete_beneficiary
+        delete_beneficiary(beneficiary_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/beneficiaries/<int:beneficiary_id>/toggle', methods=['POST'])
+def toggle_beneficiary_endpoint(beneficiary_id):
+    """Включить/выключить реквизит"""
+    if not check_auth():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    try:
+        data = request.get_json()
+        is_active = data.get('is_active', True)
+        
+        from admin.database import update_beneficiary_status
+        update_beneficiary_status(beneficiary_id, is_active)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 if __name__ == '__main__':

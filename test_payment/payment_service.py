@@ -329,7 +329,7 @@ class PaymentService:
         
         # Предзагружаем страницу
         log("Предзагрузка страницы...", "INFO")
-        await self.page.goto("https://multitransfer.ru/transfer/uzbekistan", wait_until='domcontentloaded')
+        await self.page.goto("https://multitransfer.ru/transfer/uzbekistan", wait_until='load', timeout=60000)
         await self.page.wait_for_selector('input[placeholder="0 RUB"]', state='visible', timeout=10000)
         
         self.is_ready = True
@@ -344,9 +344,15 @@ class PaymentService:
         self.is_ready = False
         print("🛑 Сервис остановлен")
         
-    async def create_payment_link(self, amount: int, card_number: str, owner_name: str) -> dict:
+    async def create_payment_link(self, amount: int, card_number: str, owner_name: str, custom_sender: dict = None) -> dict:
         """
         Создает платежную ссылку
+        
+        Args:
+            amount: Сумма платежа
+            card_number: Номер карты получателя
+            owner_name: Имя владельца карты
+            custom_sender: Кастомные данные отправителя (опционально)
         
         Returns:
             dict: {
@@ -361,9 +367,29 @@ class PaymentService:
         if not self.is_ready:
             return {'success': False, 'error': 'Сервис не запущен', 'time': 0}
         
-        # Получаем случайные данные отправителя из БД
-        SENDER_DATA = get_sender_data_from_db()
-        log(f"Используются данные: {SENDER_DATA['last_name']} {SENDER_DATA['first_name']} {SENDER_DATA['middle_name']}", "INFO")
+        # Получаем данные отправителя: кастомные или из БД
+        if custom_sender:
+            # Используем кастомные данные
+            SENDER_DATA = {
+                "first_name": custom_sender.get('first_name', ''),
+                "last_name": custom_sender.get('last_name', ''),
+                "middle_name": custom_sender.get('middle_name', ''),
+                "birth_date": custom_sender.get('birth_date', ''),
+                "phone": custom_sender.get('phone', ''),
+                # Остальные поля берем из БД (если не указаны)
+                "passport_series": custom_sender.get('passport_series', '9217'),
+                "passport_number": custom_sender.get('passport_number', '224758'),
+                "passport_issue_date": custom_sender.get('passport_issue_date', '14.07.2017'),
+                "birth_country": custom_sender.get('birth_country', 'Россия'),
+                "birth_place": custom_sender.get('birth_place', 'ГОР. НАБЕРЕЖНЫЕЧЕЛНЫРЕСПУБЛИКИТАТАРСТАН'),
+                "registration_country": custom_sender.get('registration_country', 'Россия'),
+                "registration_place": custom_sender.get('registration_place', '423831, РОССИЯ, Татарстан Респ, Набережные Челныг, Сююмбикепр-кт, 27, 154')
+            }
+            log(f"Используются КАСТОМНЫЕ данные: {SENDER_DATA['last_name']} {SENDER_DATA['first_name']} {SENDER_DATA['middle_name']}", "INFO")
+        else:
+            # Получаем случайные данные отправителя из БД
+            SENDER_DATA = get_sender_data_from_db()
+            log(f"Используются данные из БД: {SENDER_DATA['last_name']} {SENDER_DATA['first_name']} {SENDER_DATA['middle_name']}", "INFO")
         
         start_time = time.time()
         qr_link = None
@@ -384,7 +410,7 @@ class PaymentService:
         try:
             # Полная перезагрузка страницы с очисткой состояния
             log("Перезагружаю страницу...", "DEBUG")
-            await self.page.goto("https://multitransfer.ru/transfer/uzbekistan", wait_until='domcontentloaded')
+            await self.page.goto("https://multitransfer.ru/transfer/uzbekistan", wait_until='load', timeout=60000)
             # Ждем появления поля суммы вместо фиксированной задержки
             await self.page.wait_for_selector('input[placeholder="0 RUB"]', state='visible', timeout=10000)
             
@@ -564,7 +590,7 @@ class PaymentService:
             # Ждем активации кнопки "Продолжить" с retry
             log("Жду активации кнопки Продолжить...", "DEBUG")
             button_active = False
-            for btn_attempt in range(10):
+            for btn_attempt in range(15):  # Увеличено с 10 до 15 попыток
                 try:
                     is_active = await self.page.evaluate("""
                         () => {
@@ -627,8 +653,30 @@ class PaymentService:
                         """)
                         await self.page.wait_for_timeout(300)
                     
+                    # Если кнопка не активна после 7 попыток, пробуем кликнуть по способу перевода снова
+                    if btn_attempt == 7:
+                        log("Повторный клик по 'Способ перевода'...", "WARNING")
+                        try:
+                            transfer_block = self.page.locator('div:has-text("Способ перевода")').first
+                            if await transfer_block.is_visible(timeout=500):
+                                await transfer_block.click()
+                                await self.page.wait_for_timeout(200)
+                        except:
+                            pass
+                        
+                        # И снова Uzcard
+                        await self.page.evaluate("""
+                            () => {
+                                const uzcardBtn = Array.from(document.querySelectorAll('[role="button"]')).find(
+                                    el => el.textContent.includes('Uzcard')
+                                );
+                                if (uzcardBtn) uzcardBtn.click();
+                            }
+                        """)
+                        await self.page.wait_for_timeout(300)
+                    
                     # Если кнопка не активна, пробуем кликнуть Uzcard еще раз
-                    if btn_attempt > 4:
+                    if btn_attempt > 4 and btn_attempt % 2 == 0:
                         await self.page.evaluate("""
                             () => {
                                 const uzcardBtn = Array.from(document.querySelectorAll('[role="button"]')).find(

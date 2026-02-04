@@ -182,40 +182,22 @@
             </button>
             
             <button 
-                @click="currentView = 'analytics'"
-                :class="currentView === 'analytics' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
-                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200"
-            >
-                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
-                <span class="font-medium">Аналитика</span>
-            </button>
-            
-            <button 
                 @click="currentView = 'create'"
                 :class="currentView === 'create' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
                 class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200"
             >
                 <i data-lucide="credit-card" class="w-5 h-5"></i>
                 <span class="font-medium">Создать</span>
-            </button>
-            
-            <button 
-                @click="currentView = 'payments'"
-                :class="currentView === 'payments' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
-                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200"
-            >
-                <i data-lucide="list" class="w-5 h-5"></i>
-                <span class="font-medium">Платежи</span>
                 <span x-show="payments.length > 0" class="ml-auto px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded font-mono" x-text="payments.length"></span>
             </button>
             
             <button 
-                @click="currentView = 'logs'"
-                :class="currentView === 'logs' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
+                @click="currentView = 'beneficiaries'"
+                :class="currentView === 'beneficiaries' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'"
                 class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200"
             >
-                <i data-lucide="terminal" class="w-5 h-5"></i>
-                <span class="font-medium">Логи</span>
+                <i data-lucide="user-check" class="w-5 h-5"></i>
+                <span class="font-medium">Реквизиты</span>
             </button>
             
             <button 
@@ -386,272 +368,279 @@
             </div>
         </div>
 
-        <!-- Analytics View -->
-        <div x-show="currentView === 'analytics'" x-transition class="space-y-6">
-            <div class="mb-8">
-                <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Аналитика</h2>
-                <p class="text-gray-400 font-mono">[ ГРАФИКИ И СТАТИСТИКА ]</p>
-            </div>
-            
-            <!-- Period Selector -->
-            <div class="flex gap-2">
-                <button @click="loadAnalytics(7)" :class="analyticsPeriod === 7 ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/20'" class="px-4 py-2 pixel-corners font-mono transition-colors">7 дней</button>
-                <button @click="loadAnalytics(14)" :class="analyticsPeriod === 14 ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/20'" class="px-4 py-2 pixel-corners font-mono transition-colors">14 дней</button>
-                <button @click="loadAnalytics(30)" :class="analyticsPeriod === 30 ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/20'" class="px-4 py-2 pixel-corners font-mono transition-colors">30 дней</button>
-            </div>
-            
-            <!-- Charts -->
-            <div class="space-y-6">
-                <div class="pixel-border pixel-corners p-6 scanlines">
-                    <h3 class="text-lg font-bold mb-4 font-pixel retro-glow">Платежи по дням</h3>
-                    <div style="height: 400px;">
-                        <canvas id="paymentsChart"></canvas>
-                    </div>
-                </div>
-                
-                <div class="pixel-border pixel-corners p-6 scanlines">
-                    <h3 class="text-lg font-bold mb-4 font-pixel retro-glow">Успешность</h3>
-                    <div style="height: 400px;">
-                        <canvas id="successChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Analytics Stats -->
-            <div class="pixel-border pixel-corners p-6 scanlines">
-                <h3 class="text-lg font-bold mb-4 font-pixel retro-glow">Статистика за период</h3>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                        <div class="text-2xl font-bold font-pixel retro-glow" x-text="analytics.total_payments || 0"></div>
-                        <div class="text-sm text-gray-400 font-mono">Всего платежей</div>
-                    </div>
-                    <div>
-                        <div class="text-2xl font-bold text-green-400 font-pixel retro-glow" x-text="analytics.total_success || 0"></div>
-                        <div class="text-sm text-gray-400 font-mono">Успешных</div>
-                    </div>
-                    <div>
-                        <div class="text-2xl font-bold text-red-400 font-pixel retro-glow" x-text="analytics.total_failed || 0"></div>
-                        <div class="text-sm text-gray-400 font-mono">Неудачных</div>
-                    </div>
-                    <div>
-                        <div class="text-2xl font-bold font-pixel retro-glow" x-text="(analytics.total_amount || 0).toLocaleString('ru-RU') + '₽'"></div>
-                        <div class="text-sm text-gray-400 font-mono">Общая сумма</div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Create Payment View -->
-        <div x-show="currentView === 'create'" x-transition class="max-w-2xl space-y-6">
+        <div x-show="currentView === 'create'" x-transition class="space-y-6">
             <div class="mb-8">
                 <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Создать платёж</h2>
                 <p class="text-gray-400 font-mono">[ НОВЫЙ ПЛАТЁЖ ]</p>
             </div>
             
-            <div class="pixel-border pixel-corners p-8 scanlines">
-                <div class="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 pixel-corners">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-blue-500/20 pixel-corners flex items-center justify-center flex-shrink-0">
-                            <i data-lucide="info" class="w-5 h-5 text-blue-400"></i>
+            <div class="max-w-2xl">
+                <div class="pixel-border pixel-corners p-8 scanlines">
+                    <div class="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 pixel-corners">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-blue-500/20 pixel-corners flex items-center justify-center flex-shrink-0">
+                                <i data-lucide="info" class="w-5 h-5 text-blue-400"></i>
+                            </div>
+                            <div>
+                                <div class="font-medium font-mono">ДЕМО РЕЖИМ</div>
+                                <div class="text-sm text-gray-400 font-mono">Тестовые данные для демонстрации</div>
+                            </div>
                         </div>
-                        <div>
-                            <div class="font-medium font-mono">ДЕМО РЕЖИМ</div>
-                            <div class="text-sm text-gray-400 font-mono">Тестовые данные для демонстрации</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <form @submit.prevent="createPayment" class="space-y-6">
-                    <div>
-                        <label class="block text-sm font-medium mb-2 font-mono">СУММА (РУБ)</label>
-                        <input 
-                            type="number" 
-                            x-model="form.amount"
-                            min="100"
-                            max="120000"
-                            required
-                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
-                            placeholder="1000"
-                        >
-                        <p class="mt-2 text-xs text-gray-400 font-mono">ID заказа генерируется автоматически</p>
                     </div>
                     
-                    <button 
-                        type="submit"
-                        :disabled="loading"
-                        class="w-full px-6 py-4 bg-white text-black pixel-corners font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-mono pixel-shadow"
-                    >
-                        <template x-if="!loading">
-                            <div class="flex items-center gap-2">
-                                <i data-lucide="send" class="w-5 h-5"></i>
-                                <span>СОЗДАТЬ</span>
-                            </div>
-                        </template>
-                        <template x-if="loading">
-                            <div class="flex items-center gap-2">
-                                <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span>ЗАГРУЗКА...</span>
-                            </div>
-                        </template>
-                    </button>
-                </form>
-                
-                <div x-show="result" x-transition class="mt-6 p-6 pixel-corners" :class="result?.success ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'">
-                    <div class="flex items-start gap-3">
-                        <div class="w-10 h-10 pixel-corners flex items-center justify-center flex-shrink-0" :class="result?.success ? 'bg-green-500/20' : 'bg-red-500/20'">
-                            <i :data-lucide="result?.success ? 'check-circle' : 'alert-circle'" class="w-5 h-5" :class="result?.success ? 'text-green-400' : 'text-red-400'"></i>
+                    <form @submit.prevent="createPayment" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 font-mono">СУММА (РУБ)</label>
+                            <input 
+                                type="number" 
+                                x-model="form.amount"
+                                min="100"
+                                max="120000"
+                                required
+                                class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                                placeholder="1000"
+                            >
+                            <p class="mt-2 text-xs text-gray-400 font-mono">ID заказа генерируется автоматически</p>
                         </div>
-                        <div class="flex-1">
-                            <div class="font-medium mb-2 font-mono" x-text="result?.success ? 'УСПЕХ!' : 'ОШИБКА!'"></div>
+                        
+                        <!-- Advanced Options Toggle -->
+                        <div class="border-t border-white/10 pt-4">
+                            <button 
+                                type="button"
+                                @click="showAdvanced = !showAdvanced"
+                                class="w-full px-4 py-2 bg-white/5 hover:bg-white/10 pixel-corners transition-colors font-mono flex items-center justify-between"
+                            >
+                                <span>ДОПОЛНИТЕЛЬНЫЕ ОПЦИИ</span>
+                                <i :data-lucide="showAdvanced ? 'chevron-up' : 'chevron-down'" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Advanced Options Content -->
+                        <div x-show="showAdvanced" x-transition class="space-y-4 p-4 bg-white/5 pixel-corners">
+                            <!-- Custom Beneficiary Data -->
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input type="checkbox" x-model="form.useCustomBeneficiary" class="w-5 h-5">
+                                <span class="font-mono">Использовать свои реквизиты получателя</span>
+                            </label>
                             
-                            <template x-if="result?.success && result?.qr_link">
+                            <div x-show="form.useCustomBeneficiary" x-transition class="space-y-3 pl-8">
                                 <div>
-                                    <div class="p-3 bg-black/50 pixel-corners font-mono text-sm break-all mb-3" x-text="result.qr_link"></div>
-                                    <button 
-                                        @click="copyToClipboard(result.qr_link)"
-                                        class="w-full px-4 py-2 bg-white/10 hover:bg-white/20 pixel-corners text-sm transition-colors flex items-center justify-center gap-2 font-mono"
+                                    <label class="block text-xs font-medium mb-1 font-mono">НОМЕР КАРТЫ</label>
+                                    <input 
+                                        type="text" 
+                                        x-model="form.customCard"
+                                        placeholder="9860606753188378"
+                                        class="w-full px-3 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono text-sm"
                                     >
-                                        <i data-lucide="copy" class="w-4 h-4"></i>
-                                        <span>КОПИРОВАТЬ</span>
-                                    </button>
                                 </div>
-                            </template>
+                                <div>
+                                    <label class="block text-xs font-medium mb-1 font-mono">ВЛАДЕЛЕЦ КАРТЫ</label>
+                                    <input 
+                                        type="text" 
+                                        x-model="form.customOwner"
+                                        placeholder="ASIYA ESEMURATOVA"
+                                        class="w-full px-3 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono text-sm"
+                                    >
+                                </div>
+                            </div>
                             
-                            <template x-if="!result?.success">
-                                <div class="text-sm text-gray-400 font-mono" x-text="result?.error"></div>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Payments List View -->
-        <div x-show="currentView === 'payments'" x-transition class="space-y-6">
-            <div class="mb-8">
-                <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Платежи</h2>
-                <p class="text-gray-400 font-mono">[ СПИСОК ВСЕХ ПЛАТЕЖЕЙ ]</p>
-            </div>
-            
-            <!-- Filters -->
-            <div class="flex flex-wrap gap-4">
-                <input 
-                    type="text" 
-                    x-model="searchQuery"
-                    @input="searchPayments"
-                    placeholder="Поиск по ID..."
-                    class="flex-1 min-w-[200px] px-4 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
-                >
-                <select x-model="filterStatus" @change="loadPayments" class="px-4 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono">
-                    <option value="all">Все</option>
-                    <option value="success">Успешные</option>
-                    <option value="failed">Неудачные</option>
-                </select>
-                <button @click="exportData('json')" class="px-4 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 pixel-corners transition-colors font-mono flex items-center gap-2">
-                    <i data-lucide="download" class="w-4 h-4"></i>
-                    JSON
-                </button>
-                <button @click="exportData('csv')" class="px-4 py-2 bg-green-500/20 text-green-400 hover:bg-green-500/30 pixel-corners transition-colors font-mono flex items-center gap-2">
-                    <i data-lucide="file-text" class="w-4 h-4"></i>
-                    CSV
-                </button>
-            </div>
-            
-            <!-- Payments Table -->
-            <div class="pixel-border pixel-corners p-6 scanlines">
-                <div class="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin">
-                    <template x-for="(payment, index) in payments" :key="index">
-                        <div class="p-6 bg-white/5 pixel-corners hover:bg-white/10 transition-all duration-200">
-                            <div class="flex items-start justify-between mb-4">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-12 h-12 pixel-corners flex items-center justify-center" :class="payment.success ? 'bg-green-500/20' : 'bg-red-500/20'">
-                                        <i :data-lucide="payment.success ? 'check-circle' : 'x-circle'" class="w-6 h-6" :class="payment.success ? 'text-green-400' : 'text-red-400'"></i>
+                            <!-- Custom Sender Data -->
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input type="checkbox" x-model="form.useCustomSender" class="w-5 h-5">
+                                <span class="font-mono">Использовать свои паспортные данные</span>
+                            </label>
+                            
+                            <div x-show="form.useCustomSender" x-transition class="space-y-3 pl-8">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium mb-1 font-mono">ИМЯ</label>
+                                        <input 
+                                            type="text" 
+                                            x-model="form.senderFirstName"
+                                            class="w-full px-3 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono text-sm"
+                                        >
                                     </div>
                                     <div>
-                                        <div class="text-2xl font-bold font-pixel retro-glow" x-text="payment.amount + ' ₽'"></div>
-                                        <div class="text-sm text-gray-400 font-mono" x-text="'ID: ' + payment.order_id"></div>
-                                        <div class="text-xs text-gray-500 font-mono" x-text="'Payment ID: ' + payment.id"></div>
+                                        <label class="block text-xs font-medium mb-1 font-mono">ФАМИЛИЯ</label>
+                                        <input 
+                                            type="text" 
+                                            x-model="form.senderLastName"
+                                            class="w-full px-3 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono text-sm"
+                                        >
                                     </div>
                                 </div>
-                                <div class="px-3 py-1 pixel-corners text-xs font-medium flex items-center gap-1 font-mono" :class="payment.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
-                                    <i :data-lucide="payment.success ? 'check' : 'x'" class="w-3 h-3"></i>
-                                    <span x-text="payment.success ? 'ОК' : 'ОШИБКА'"></span>
+                                <div>
+                                    <label class="block text-xs font-medium mb-1 font-mono">ОТЧЕСТВО</label>
+                                    <input 
+                                        type="text" 
+                                        x-model="form.senderMiddleName"
+                                        class="w-full px-3 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono text-sm"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium mb-1 font-mono">ДАТА РОЖДЕНИЯ (ДД.ММ.ГГГГ)</label>
+                                    <input 
+                                        type="text" 
+                                        x-model="form.senderBirthDate"
+                                        placeholder="14.07.2017"
+                                        class="w-full px-3 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono text-sm"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium mb-1 font-mono">ТЕЛЕФОН</label>
+                                    <input 
+                                        type="text" 
+                                        x-model="form.senderPhone"
+                                        placeholder="+79001234567"
+                                        class="w-full px-3 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono text-sm"
+                                    >
                                 </div>
                             </div>
-                            
-                            <div class="flex items-center gap-4 text-sm text-gray-400 mb-3 font-mono">
+                        </div>
+                        
+                        <button 
+                            type="submit"
+                            :disabled="loading"
+                            class="w-full px-6 py-4 bg-white text-black pixel-corners font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-mono pixel-shadow"
+                        >
+                            <template x-if="!loading">
                                 <div class="flex items-center gap-2">
-                                    <i data-lucide="clock" class="w-4 h-4"></i>
-                                    <span x-text="formatDate(payment.timestamp)"></span>
+                                    <i data-lucide="send" class="w-5 h-5"></i>
+                                    <span>СОЗДАТЬ</span>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <i data-lucide="zap" class="w-4 h-4"></i>
-                                    <span x-text="payment.payment_time + 's'"></span>
-                                </div>
-                            </div>
-                            
-                            <template x-if="payment.qr_link">
-                                <button 
-                                    @click="copyToClipboard(payment.qr_link)"
-                                    class="px-4 py-2 bg-white/10 hover:bg-white/20 pixel-corners text-sm transition-colors flex items-center gap-2 font-mono"
-                                >
-                                    <i data-lucide="copy" class="w-4 h-4"></i>
-                                    <span>КОПИРОВАТЬ ССЫЛКУ</span>
-                                </button>
                             </template>
-                        </div>
-                    </template>
+                            <template x-if="loading">
+                                <div class="flex items-center gap-2">
+                                    <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>ЗАГРУЗКА...</span>
+                                </div>
+                            </template>
+                        </button>
+                    </form>
                     
-                    <div x-show="payments.length === 0" class="text-center py-16">
-                        <div class="w-20 h-20 mx-auto mb-4 bg-white/5 pixel-corners flex items-center justify-center">
-                            <i data-lucide="inbox" class="w-10 h-10 text-gray-600"></i>
+                    <div x-show="result" x-transition class="mt-6 p-6 pixel-corners" :class="result?.success ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'">
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 pixel-corners flex items-center justify-center flex-shrink-0" :class="result?.success ? 'bg-green-500/20' : 'bg-red-500/20'">
+                                <i :data-lucide="result?.success ? 'check-circle' : 'alert-circle'" class="w-5 h-5" :class="result?.success ? 'text-green-400' : 'text-red-400'"></i>
+                            </div>
+                            <div class="flex-1">
+                                <div class="font-medium mb-2 font-mono" x-text="result?.success ? 'УСПЕХ!' : 'ОШИБКА!'"></div>
+                                
+                                <template x-if="result?.success && result?.qr_link">
+                                    <div>
+                                        <div class="p-3 bg-black/50 pixel-corners font-mono text-sm break-all mb-3" x-text="result.qr_link"></div>
+                                        <button 
+                                            @click="copyToClipboard(result.qr_link)"
+                                            class="w-full px-4 py-2 bg-white/10 hover:bg-white/20 pixel-corners text-sm transition-colors flex items-center justify-center gap-2 font-mono"
+                                        >
+                                            <i data-lucide="copy" class="w-4 h-4"></i>
+                                            <span>КОПИРОВАТЬ</span>
+                                        </button>
+                                    </div>
+                                </template>
+                                
+                                <template x-if="!result?.success">
+                                    <div class="text-sm text-gray-400 font-mono" x-text="result?.error"></div>
+                                </template>
+                            </div>
                         </div>
-                        <div class="text-xl text-gray-400 font-mono">[ НЕТ ПЛАТЕЖЕЙ ]</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Payments List -->
+            <div class="mt-8">
+                <div class="mb-6 flex items-center justify-between">
+                    <h3 class="text-2xl font-bold font-pixel retro-glow">Список платежей</h3>
+                    <div class="flex gap-2">
+                        <button @click="exportData('json')" class="px-3 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 pixel-corners transition-colors font-mono flex items-center gap-2 text-sm">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            JSON
+                        </button>
+                        <button @click="exportData('csv')" class="px-3 py-2 bg-green-500/20 text-green-400 hover:bg-green-500/30 pixel-corners transition-colors font-mono flex items-center gap-2 text-sm">
+                            <i data-lucide="file-text" class="w-4 h-4"></i>
+                            CSV
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Filters -->
+                <div class="flex flex-wrap gap-4 mb-6">
+                    <input 
+                        type="text" 
+                        x-model="searchQuery"
+                        @input="searchPayments"
+                        placeholder="Поиск по ID..."
+                        class="flex-1 min-w-[200px] px-4 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                    >
+                    <select x-model="filterStatus" @change="loadPayments" class="px-4 py-2 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono">
+                        <option value="all">Все</option>
+                        <option value="success">Успешные</option>
+                        <option value="failed">Неудачные</option>
+                    </select>
+                </div>
+                
+                <!-- Payments Table -->
+                <div class="pixel-border pixel-corners p-6 scanlines">
+                    <div class="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin">
+                        <template x-for="(payment, index) in payments" :key="index">
+                            <div class="p-6 bg-white/5 pixel-corners hover:bg-white/10 transition-all duration-200">
+                                <div class="flex items-start justify-between mb-4">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 pixel-corners flex items-center justify-center" :class="payment.success ? 'bg-green-500/20' : 'bg-red-500/20'">
+                                            <i :data-lucide="payment.success ? 'check-circle' : 'x-circle'" class="w-6 h-6" :class="payment.success ? 'text-green-400' : 'text-red-400'"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-2xl font-bold font-pixel retro-glow" x-text="payment.amount + ' ₽'"></div>
+                                            <div class="text-sm text-gray-400 font-mono" x-text="'ID: ' + payment.order_id"></div>
+                                            <div class="text-xs text-gray-500 font-mono" x-text="'Payment ID: ' + payment.id"></div>
+                                        </div>
+                                    </div>
+                                    <div class="px-3 py-1 pixel-corners text-xs font-medium flex items-center gap-1 font-mono" :class="payment.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
+                                        <i :data-lucide="payment.success ? 'check' : 'x'" class="w-3 h-3"></i>
+                                        <span x-text="payment.success ? 'ОК' : 'ОШИБКА'"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center gap-4 text-sm text-gray-400 mb-3 font-mono">
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="clock" class="w-4 h-4"></i>
+                                        <span x-text="formatDate(payment.timestamp)"></span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="zap" class="w-4 h-4"></i>
+                                        <span x-text="payment.payment_time + 's'"></span>
+                                    </div>
+                                </div>
+                                
+                                <template x-if="payment.qr_link">
+                                    <button 
+                                        @click="copyToClipboard(payment.qr_link)"
+                                        class="px-4 py-2 bg-white/10 hover:bg-white/20 pixel-corners text-sm transition-colors flex items-center gap-2 font-mono"
+                                    >
+                                        <i data-lucide="copy" class="w-4 h-4"></i>
+                                        <span>КОПИРОВАТЬ ССЫЛКУ</span>
+                                    </button>
+                                </template>
+                            </div>
+                        </template>
+                        
+                        <div x-show="payments.length === 0" class="text-center py-16">
+                            <div class="w-20 h-20 mx-auto mb-4 bg-white/5 pixel-corners flex items-center justify-center">
+                                <i data-lucide="inbox" class="w-10 h-10 text-gray-600"></i>
+                            </div>
+                            <div class="text-xl text-gray-400 font-mono">[ НЕТ ПЛАТЕЖЕЙ ]</div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Logs View -->
-        <div x-show="currentView === 'logs'" x-transition class="space-y-6">
-            <div class="mb-8 flex items-center justify-between">
-                <div>
-                    <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Логи системы</h2>
-                    <p class="text-gray-400 font-mono">[ РЕАЛЬНОЕ ВРЕМЯ ]</p>
-                </div>
-                <button @click="loadLogs" class="px-4 py-2 bg-white/10 hover:bg-white/20 pixel-corners transition-colors font-mono flex items-center gap-2">
-                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                    ОБНОВИТЬ
-                </button>
-            </div>
-            
-            <div class="pixel-border pixel-corners p-6 scanlines">
-                <div class="space-y-2 max-h-[600px] overflow-y-auto scrollbar-thin font-mono text-sm">
-                    <template x-for="(log, index) in logs" :key="index">
-                        <div class="p-3 bg-white/5 pixel-corners hover:bg-white/10 transition-colors flex items-start gap-3">
-                            <div class="px-2 py-1 pixel-corners text-xs font-bold" :class="{
-                                'bg-green-500/20 text-green-400': log.level === 'success',
-                                'bg-red-500/20 text-red-400': log.level === 'error',
-                                'bg-blue-500/20 text-blue-400': log.level === 'info',
-                                'bg-yellow-500/20 text-yellow-400': log.level === 'warning',
-                                'bg-gray-500/20 text-gray-400': log.level === 'settings'
-                            }" x-text="log.level.toUpperCase()"></div>
-                            <div class="flex-1">
-                                <div class="text-gray-300" x-text="log.message"></div>
-                                <div class="text-xs text-gray-500 mt-1" x-text="formatDate(log.timestamp)"></div>
-                            </div>
-                        </div>
-                    </template>
-                    
-                    <div x-show="logs.length === 0" class="text-center py-16 text-gray-400">
-                        [ НЕТ ЛОГОВ ]
-                    </div>
-                </div>
-            </div>
-        </div>
         
         <!-- Settings View -->
         <div x-show="currentView === 'settings'" x-transition class="max-w-3xl space-y-6">
@@ -700,21 +689,14 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium mb-2 font-mono">КАРТА ПО УМОЛЧАНИЮ</label>
+                        <label class="block text-sm font-medium mb-2 font-mono">ПРОКСИ (опционально)</label>
                         <input 
                             type="text" 
-                            x-model="settings.default_card"
+                            x-model="settings.proxy"
+                            placeholder="http://user:pass@host:port"
                             class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
                         >
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium mb-2 font-mono">ВЛАДЕЛЕЦ КАРТЫ</label>
-                        <input 
-                            type="text" 
-                            x-model="settings.default_owner"
-                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
-                        >
+                        <p class="mt-2 text-xs text-gray-400 font-mono">Формат: http://user:pass@host:port или socks5://host:port</p>
                     </div>
                     
                     <div class="space-y-3">
@@ -737,6 +719,182 @@
                         <span>СОХРАНИТЬ</span>
                     </button>
                 </form>
+            </div>
+            
+            <!-- Logs Section -->
+            <div class="mt-8">
+                <div class="mb-6 flex items-center justify-between">
+                    <h3 class="text-2xl font-bold font-pixel retro-glow">Логи системы</h3>
+                    <button @click="loadLogs" class="px-4 py-2 bg-white/10 hover:bg-white/20 pixel-corners transition-colors font-mono flex items-center gap-2">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        ОБНОВИТЬ
+                    </button>
+                </div>
+                
+                <div class="pixel-border pixel-corners p-6 scanlines">
+                    <div class="space-y-2 max-h-[600px] overflow-y-auto scrollbar-thin font-mono text-sm">
+                        <template x-for="(log, index) in logs" :key="index">
+                            <div class="p-3 bg-white/5 pixel-corners hover:bg-white/10 transition-colors flex items-start gap-3">
+                                <div class="px-2 py-1 pixel-corners text-xs font-bold" :class="{
+                                    'bg-green-500/20 text-green-400': log.level === 'success',
+                                    'bg-red-500/20 text-red-400': log.level === 'error',
+                                    'bg-blue-500/20 text-blue-400': log.level === 'info',
+                                    'bg-yellow-500/20 text-yellow-400': log.level === 'warning',
+                                    'bg-gray-500/20 text-gray-400': log.level === 'settings'
+                                }" x-text="log.level.toUpperCase()"></div>
+                                <div class="flex-1">
+                                    <div class="text-gray-300" x-text="log.message"></div>
+                                    <div class="text-xs text-gray-500 mt-1" x-text="formatDate(log.timestamp)"></div>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <div x-show="logs.length === 0" class="text-center py-16 text-gray-400">
+                            [ НЕТ ЛОГОВ ]
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Beneficiaries View -->
+        <div x-show="currentView === 'beneficiaries'" x-transition class="space-y-6">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold mb-2 font-pixel retro-glow">Реквизиты получателей</h2>
+                <p class="text-gray-400 font-mono">[ УПРАВЛЕНИЕ РЕКВИЗИТАМИ ]</p>
+            </div>
+            
+            <!-- Add New Beneficiary Form -->
+            <div class="pixel-border pixel-corners p-8 scanlines">
+                <h3 class="text-xl font-bold mb-6 font-mono">ДОБАВИТЬ РЕКВИЗИТ</h3>
+                
+                <form @submit.prevent="addBeneficiary" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 font-mono">НОМЕР КАРТЫ</label>
+                            <input 
+                                type="text" 
+                                x-model="newBeneficiary.card_number"
+                                placeholder="9860606753188378"
+                                required
+                                maxlength="16"
+                                class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2 font-mono">ВЛАДЕЛЕЦ КАРТЫ</label>
+                            <input 
+                                type="text" 
+                                x-model="newBeneficiary.card_owner"
+                                placeholder="ASIYA ESEMURATOVA"
+                                required
+                                class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                            >
+                        </div>
+                    </div>
+                    
+                    <button 
+                        type="submit"
+                        :disabled="loadingBeneficiary"
+                        class="w-full px-6 py-4 bg-white text-black pixel-corners font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-mono pixel-shadow"
+                    >
+                        <template x-if="!loadingBeneficiary">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                                <span>ДОБАВИТЬ И ПРОВЕРИТЬ</span>
+                            </div>
+                        </template>
+                        <template x-if="loadingBeneficiary">
+                            <div class="flex items-center gap-2">
+                                <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>ПРОВЕРКА...</span>
+                            </div>
+                        </template>
+                    </button>
+                </form>
+                
+                <div class="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 pixel-corners">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-blue-500/20 pixel-corners flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="info" class="w-4 h-4 text-blue-400"></i>
+                        </div>
+                        <div class="text-sm text-gray-300 font-mono">
+                            При добавлении реквизита автоматически создается тестовый платеж на 110₽. 
+                            Проверка занимает около 20-30 секунд. Дождитесь завершения процесса.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Beneficiaries List -->
+            <div class="pixel-border pixel-corners p-6 scanlines">
+                <h3 class="text-xl font-bold mb-6 font-mono">СПИСОК РЕКВИЗИТОВ</h3>
+                
+                <div class="space-y-3">
+                    <template x-for="(beneficiary, index) in beneficiaries" :key="beneficiary.id">
+                        <div class="p-6 bg-white/5 pixel-corners hover:bg-white/10 transition-all duration-200">
+                            <div class="flex items-start justify-between">
+                                <div class="flex items-start gap-4 flex-1">
+                                    <!-- Verification Status Icon -->
+                                    <div class="w-12 h-12 pixel-corners flex items-center justify-center flex-shrink-0" :class="beneficiary.is_verified ? 'bg-green-500/20' : 'bg-red-500/20'">
+                                        <i :data-lucide="beneficiary.is_verified ? 'check-circle' : 'x-circle'" class="w-6 h-6" :class="beneficiary.is_verified ? 'text-green-400' : 'text-red-400'"></i>
+                                    </div>
+                                    
+                                    <!-- Beneficiary Info -->
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-3 mb-2">
+                                            <div class="text-lg font-bold font-mono" x-text="beneficiary.card_owner"></div>
+                                            <div class="px-2 py-1 pixel-corners text-xs font-medium" :class="beneficiary.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'">
+                                                <span x-text="beneficiary.is_active ? 'АКТИВЕН' : 'ОТКЛЮЧЕН'"></span>
+                                            </div>
+                                        </div>
+                                        <div class="text-sm text-gray-400 font-mono mb-1" x-text="'Карта: ' + beneficiary.card_number"></div>
+                                        <div class="text-xs text-gray-500 font-mono" x-text="'Добавлен: ' + formatDate(beneficiary.created_at)"></div>
+                                        <template x-if="beneficiary.last_test_date">
+                                            <div class="text-xs text-gray-500 font-mono" x-text="'Последняя проверка: ' + formatDate(beneficiary.last_test_date)"></div>
+                                        </template>
+                                    </div>
+                                </div>
+                                
+                                <!-- Actions -->
+                                <div class="flex items-center gap-2">
+                                    <button 
+                                        @click="retestBeneficiary(beneficiary.id, beneficiary.card_number, beneficiary.card_owner)"
+                                        :disabled="retestingId === beneficiary.id"
+                                        class="px-3 py-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 pixel-corners text-sm transition-colors font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <span x-show="retestingId !== beneficiary.id">ПРОВЕРИТЬ</span>
+                                        <span x-show="retestingId === beneficiary.id">...</span>
+                                    </button>
+                                    <button 
+                                        @click="toggleBeneficiary(beneficiary.id, !beneficiary.is_active)"
+                                        class="px-3 py-2 pixel-corners text-sm transition-colors font-mono"
+                                        :class="beneficiary.is_active ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'"
+                                    >
+                                        <span x-text="beneficiary.is_active ? 'ОТКЛЮЧИТЬ' : 'ВКЛЮЧИТЬ'"></span>
+                                    </button>
+                                    <button 
+                                        @click="deleteBeneficiary(beneficiary.id)"
+                                        class="px-3 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 pixel-corners text-sm transition-colors font-mono"
+                                    >
+                                        УДАЛИТЬ
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="beneficiaries.length === 0" class="text-center py-16">
+                        <div class="w-20 h-20 mx-auto mb-4 bg-white/5 pixel-corners flex items-center justify-center">
+                            <i data-lucide="credit-card" class="w-10 h-10 text-gray-600"></i>
+                        </div>
+                        <div class="text-xl text-gray-400 font-mono">[ НЕТ РЕКВИЗИТОВ ]</div>
+                        <div class="text-sm text-gray-500 font-mono mt-2">Добавьте первый реквизит выше</div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -775,8 +933,18 @@
                 apiStatus: 'checking',
                 loading: false,
                 result: null,
+                showAdvanced: false,
                 form: {
-                    amount: ''
+                    amount: '',
+                    useCustomBeneficiary: false,
+                    customCard: '',
+                    customOwner: '',
+                    useCustomSender: false,
+                    senderFirstName: '',
+                    senderLastName: '',
+                    senderMiddleName: '',
+                    senderBirthDate: '',
+                    senderPhone: ''
                 },
                 payments: [],
                 logs: [],
@@ -784,6 +952,13 @@
                 analytics: {},
                 analyticsPeriod: 30,
                 settings: {},
+                beneficiaries: [],
+                newBeneficiary: {
+                    card_number: '',
+                    card_owner: ''
+                },
+                loadingBeneficiary: false,
+                retestingId: null,
                 toasts: [],
                 searchQuery: '',
                 filterStatus: 'all',
@@ -797,6 +972,7 @@
                     this.loadSettings();
                     this.loadLogs();
                     this.loadAnalytics(30);
+                    this.loadBeneficiaries();
                     
                     setInterval(() => this.checkApiStatus(), 10000);
                     setInterval(() => this.loadLogs(), 5000);
@@ -1058,12 +1234,31 @@
                     this.result = null;
                     
                     try {
+                        const payload = {
+                            amount: parseInt(this.form.amount)
+                        };
+                        
+                        // Добавляем кастомные данные получателя если указаны
+                        if (this.form.useCustomBeneficiary && this.form.customCard && this.form.customOwner) {
+                            payload.card_number = this.form.customCard;
+                            payload.card_owner = this.form.customOwner;
+                        }
+                        
+                        // Добавляем кастомные данные отправителя если указаны
+                        if (this.form.useCustomSender) {
+                            payload.custom_sender = {
+                                first_name: this.form.senderFirstName,
+                                last_name: this.form.senderLastName,
+                                middle_name: this.form.senderMiddleName,
+                                birth_date: this.form.senderBirthDate,
+                                phone: this.form.senderPhone
+                            };
+                        }
+                        
                         const response = await fetch('/api/create-payment', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                amount: parseInt(this.form.amount)
-                            })
+                            body: JSON.stringify(payload)
                         });
                         
                         const data = await response.json();
@@ -1077,6 +1272,17 @@
                         
                         if (data.success) {
                             this.form.amount = '';
+                            // Сбрасываем кастомные поля
+                            this.form.useCustomBeneficiary = false;
+                            this.form.customCard = '';
+                            this.form.customOwner = '';
+                            this.form.useCustomSender = false;
+                            this.form.senderFirstName = '';
+                            this.form.senderLastName = '';
+                            this.form.senderMiddleName = '';
+                            this.form.senderBirthDate = '';
+                            this.form.senderPhone = '';
+                            this.showAdvanced = false;
                             this.loadPayments();
                             this.loadSummary();
                         }
@@ -1120,6 +1326,161 @@
                         this.showToast('success', 'Экспорт', 'Данные успешно экспортированы');
                     } catch (error) {
                         this.showToast('error', 'Ошибка', 'Не удалось экспортировать данные');
+                    }
+                },
+                
+                async loadBeneficiaries() {
+                    try {
+                        const response = await fetch('/api/beneficiaries');
+                        const data = await response.json();
+                        if (data.success) {
+                            this.beneficiaries = data.beneficiaries;
+                            // Обновляем иконки после загрузки данных
+                            this.$nextTick(() => {
+                                if (window.lucide) lucide.createIcons();
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Failed to load beneficiaries:', error);
+                    }
+                },
+                
+                async addBeneficiary() {
+                    if (!this.newBeneficiary.card_number || !this.newBeneficiary.card_owner) {
+                        this.showToast('error', 'Ошибка', 'Заполните все поля');
+                        return;
+                    }
+                    
+                    this.loadingBeneficiary = true;
+                    
+                    try {
+                        const response = await fetch('/api/beneficiaries', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.newBeneficiary)
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            if (data.verified) {
+                                this.showToast('success', 'Успех!', 'Реквизит добавлен и проверен ✓');
+                            } else {
+                                this.showToast('warning', 'Добавлено', 'Реквизит добавлен, но не прошел проверку ✗');
+                            }
+                            
+                            // Очищаем форму
+                            this.newBeneficiary = { card_number: '', card_owner: '' };
+                            
+                            // Обновляем список
+                            await this.loadBeneficiaries();
+                            await this.loadPayments();
+                        } else {
+                            this.showToast('error', 'Ошибка', data.error || 'Не удалось добавить реквизит');
+                        }
+                    } catch (error) {
+                        this.showToast('error', 'Ошибка', 'Не удалось добавить реквизит');
+                        console.error('Failed to add beneficiary:', error);
+                    } finally {
+                        this.loadingBeneficiary = false;
+                    }
+                },
+                
+                async toggleBeneficiary(id, isActive) {
+                    try {
+                        const response = await fetch(`/api/beneficiaries/${id}/toggle`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ is_active: isActive })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.showToast('success', 'Успех', isActive ? 'Реквизит активирован' : 'Реквизит отключен');
+                            await this.loadBeneficiaries();
+                        } else {
+                            this.showToast('error', 'Ошибка', data.error || 'Не удалось изменить статус');
+                        }
+                    } catch (error) {
+                        this.showToast('error', 'Ошибка', 'Не удалось изменить статус');
+                        console.error('Failed to toggle beneficiary:', error);
+                    }
+                },
+                
+                async deleteBeneficiary(id) {
+                    if (!confirm('Вы уверены, что хотите удалить этот реквизит?')) {
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`/api/beneficiaries/${id}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.showToast('success', 'Удалено', 'Реквизит успешно удален');
+                            await this.loadBeneficiaries();
+                        } else {
+                            this.showToast('error', 'Ошибка', data.error || 'Не удалось удалить реквизит');
+                        }
+                    } catch (error) {
+                        this.showToast('error', 'Ошибка', 'Не удалось удалить реквизит');
+                        console.error('Failed to delete beneficiary:', error);
+                    }
+                },
+                
+                async retestBeneficiary(id, cardNumber, cardOwner) {
+                    // Защита от двойного клика
+                    if (this.retestingId !== null) {
+                        return;
+                    }
+                    
+                    if (!confirm('Запустить тестовый платеж на 110₽ для проверки реквизита?')) {
+                        return;
+                    }
+                    
+                    this.retestingId = id;
+                    this.showToast('info', 'Проверка', 'Создаю тестовый платеж... Это займет ~30 секунд');
+                    
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 минуты таймаут
+                        
+                        const response = await fetch('/api/beneficiaries/retest', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                beneficiary_id: id,
+                                card_number: cardNumber,
+                                card_owner: cardOwner
+                            }),
+                            signal: controller.signal
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            if (data.verified) {
+                                this.showToast('success', 'Успех!', 'Реквизит проверен успешно ✓');
+                            } else {
+                                this.showToast('error', 'Ошибка', 'Реквизит не прошел проверку ✗');
+                            }
+                            
+                            // Обновляем список
+                            await this.loadBeneficiaries();
+                            await this.loadPayments();
+                        } else {
+                            this.showToast('error', 'Ошибка', data.error || 'Не удалось проверить реквизит');
+                        }
+                    } catch (error) {
+                        this.showToast('error', 'Ошибка', 'Не удалось проверить реквизит');
+                        console.error('Failed to retest beneficiary:', error);
+                    } finally {
+                        this.retestingId = null;
                     }
                 },
                 

@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import random
 import time
 import threading
+import requests
 
 # Import database module
 import database as db
@@ -101,6 +102,11 @@ def create_payment():
         # ID заказа генерируется автоматически
         order_id = data.get('orderId') or f'ORD-{int(time.time())}-{random.randint(1000, 9999)}'
         
+        # Получаем кастомные данные если указаны
+        custom_card = data.get('card_number')
+        custom_owner = data.get('card_owner')
+        custom_sender = data.get('custom_sender')  # dict с данными отправителя
+        
         if not amount:
             return jsonify({
                 'success': False,
@@ -148,8 +154,16 @@ def create_payment():
             
             # Получаем настройки
             settings = db.get_all_settings()
-            card = settings.get('default_card', DEFAULT_CARD)
-            owner = settings.get('default_owner', DEFAULT_OWNER)
+            
+            # Используем кастомные данные получателя если указаны, иначе из настроек
+            if custom_card and custom_owner:
+                card = custom_card
+                owner = custom_owner
+                db.add_log('info', f'Используются кастомные реквизиты: {owner} ({card})')
+            else:
+                card = settings.get('default_card', DEFAULT_CARD)
+                owner = settings.get('default_owner', DEFAULT_OWNER)
+            
             api_url = settings.get('api_url', API_URL)
             api_token = settings.get('api_token', API_TOKEN)
             
@@ -158,8 +172,15 @@ def create_payment():
             
             api_payload = {
                 'amount': amount,
-                'orderId': order_id
+                'orderId': order_id,
+                'card_number': card,
+                'card_owner': owner
             }
+            
+            # Добавляем кастомные данные отправителя если указаны
+            if custom_sender:
+                api_payload['custom_sender'] = custom_sender
+                db.add_log('info', f'Используются кастомные данные отправителя: {custom_sender.get("last_name")} {custom_sender.get("first_name")}')
             
             headers = {
                 'Authorization': f'Bearer {api_token}',
@@ -464,6 +485,126 @@ def stats_summary():
         'success': True,
         **stats
     })
+
+
+@app.route('/api/beneficiaries', methods=['GET'])
+def get_beneficiaries():
+    """Получение всех реквизитов"""
+    beneficiaries = db.get_all_beneficiaries()
+    return jsonify({
+        'success': True,
+        'beneficiaries': beneficiaries
+    })
+
+
+@app.route('/api/beneficiaries', methods=['POST'])
+def add_beneficiary():
+    """Добавление нового реквизита с проверкой"""
+    data = request.get_json()
+    card_number = data.get('card_number')
+    card_owner = data.get('card_owner')
+    
+    if not card_number or not card_owner:
+        return jsonify({
+            'success': False,
+            'error': 'Необходимо указать номер карты и владельца'
+        }), 400
+    
+    # Отправляем запрос на API сервер для создания и проверки
+    try:
+        response = requests.post(
+            f'{API_URL}/api/beneficiaries',
+            json={'card_number': card_number, 'card_owner': card_owner},
+            headers={'Authorization': f'Bearer {API_TOKEN}'},
+            timeout=60
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            db.add_log('success' if result.get('verified') else 'warning', 
+                      f"Реквизит добавлен: {card_owner} - {'✓ Проверен' if result.get('verified') else '✗ Не прошел проверку'}")
+            return jsonify(result)
+        else:
+            return jsonify(response.json()), response.status_code
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/beneficiaries/<int:beneficiary_id>', methods=['DELETE'])
+def delete_beneficiary(beneficiary_id):
+    """Удаление реквизита"""
+    try:
+        db.delete_beneficiary(beneficiary_id)
+        db.add_log('info', f"Реквизит удален: ID {beneficiary_id}")
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/beneficiaries/<int:beneficiary_id>/toggle', methods=['POST'])
+def toggle_beneficiary(beneficiary_id):
+    """Включение/выключение реквизита"""
+    data = request.get_json()
+    is_active = data.get('is_active', True)
+    
+    try:
+        db.update_beneficiary_status(beneficiary_id, is_active)
+        db.add_log('info', f"Реквизит {'активирован' if is_active else 'деактивирован'}: ID {beneficiary_id}")
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/beneficiaries/retest', methods=['POST'])
+def retest_beneficiary():
+    """Повторная проверка реквизита"""
+    data = request.get_json()
+    beneficiary_id = data.get('beneficiary_id')
+    card_number = data.get('card_number')
+    card_owner = data.get('card_owner')
+    
+    if not beneficiary_id or not card_number or not card_owner:
+        return jsonify({
+            'success': False,
+            'error': 'Необходимо указать все параметры'
+        }), 400
+    
+    # Отправляем запрос на API сервер для проверки
+    try:
+        response = requests.post(
+            f'{API_URL}/api/beneficiaries/retest',
+            json={
+                'beneficiary_id': beneficiary_id,
+                'card_number': card_number,
+                'card_owner': card_owner
+            },
+            headers={'Authorization': f'Bearer {API_TOKEN}'},
+            timeout=120
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            db.add_log('success' if result.get('verified') else 'warning', 
+                      f"Повторная проверка реквизита ID {beneficiary_id}: {'✓ Успешно' if result.get('verified') else '✗ Не прошел'}")
+            return jsonify(result)
+        else:
+            return jsonify(response.json()), response.status_code
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 if __name__ == '__main__':
