@@ -90,12 +90,28 @@ def init_database():
             )
         ''')
         
+        # Beneficiaries table (реквизиты получателей)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS beneficiaries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                card_number TEXT NOT NULL,
+                card_owner TEXT NOT NULL,
+                is_verified BOOLEAN DEFAULT 0,
+                is_active BOOLEAN DEFAULT 1,
+                last_test_date TEXT,
+                test_payment_id TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # Indexes for better performance
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_payments_timestamp ON payments(timestamp DESC)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_payments_success ON payments(success)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp DESC)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_sender_data_active ON sender_data(is_active)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_beneficiaries_active ON beneficiaries(is_active)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_beneficiaries_verified ON beneficiaries(is_verified)')
         
         print("✅ Database initialized successfully")
 
@@ -633,3 +649,92 @@ def import_sender_data_from_excel(excel_path):
         imported_count += 1
     
     return imported_count
+
+
+# ============= BENEFICIARIES =============
+
+def add_beneficiary(card_number, card_owner):
+    """Add new beneficiary"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO beneficiaries (card_number, card_owner)
+            VALUES (?, ?)
+        ''', (card_number, card_owner))
+        return cursor.lastrowid
+
+
+def get_all_beneficiaries():
+    """Get all beneficiaries"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM beneficiaries ORDER BY created_at DESC')
+        rows = cursor.fetchall()
+        
+        beneficiaries = []
+        for row in rows:
+            beneficiaries.append({
+                'id': row['id'],
+                'card_number': row['card_number'],
+                'card_owner': row['card_owner'],
+                'is_verified': bool(row['is_verified']),
+                'is_active': bool(row['is_active']),
+                'last_test_date': row['last_test_date'],
+                'test_payment_id': row['test_payment_id'],
+                'created_at': row['created_at']
+            })
+        
+        return beneficiaries
+
+
+def get_random_beneficiary():
+    """Get random active and verified beneficiary"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM beneficiaries 
+            WHERE is_active = 1 AND is_verified = 1
+            ORDER BY RANDOM() 
+            LIMIT 1
+        ''')
+        row = cursor.fetchone()
+        
+        if not row:
+            return None
+        
+        return {
+            'id': row['id'],
+            'card_number': row['card_number'],
+            'card_owner': row['card_owner'],
+            'is_verified': bool(row['is_verified']),
+            'is_active': bool(row['is_active'])
+        }
+
+
+def update_beneficiary_verification(beneficiary_id, is_verified, test_payment_id=None):
+    """Update beneficiary verification status"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE beneficiaries 
+            SET is_verified = ?, last_test_date = ?, test_payment_id = ?
+            WHERE id = ?
+        ''', (is_verified, datetime.now().isoformat(), test_payment_id, beneficiary_id))
+
+
+def update_beneficiary_status(beneficiary_id, is_active):
+    """Update beneficiary active status"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE beneficiaries 
+            SET is_active = ?
+            WHERE id = ?
+        ''', (is_active, beneficiary_id))
+
+
+def delete_beneficiary(beneficiary_id):
+    """Delete beneficiary"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM beneficiaries WHERE id = ?', (beneficiary_id,))
