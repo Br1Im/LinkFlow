@@ -1150,10 +1150,14 @@ class PaymentService:
             
             # Кнопка "Продолжить" - пробуем разные способы клика
             log("Нажимаю кнопку Продолжить (этап 2)...", "DEBUG")
-            button_clicked = False
             
-            # Проверяем что кнопка активна
-            for attempt in range(5):
+            # Сохраняем текущий URL перед кликом
+            url_before = self.page.url
+            log(f"URL перед отправкой: {url_before}", "DEBUG")
+            
+            # Проверяем что кнопка активна и кликаем
+            button_clicked = False
+            for attempt in range(25):
                 try:
                     is_enabled = await self.page.evaluate("""
                         () => {
@@ -1165,41 +1169,16 @@ class PaymentService:
                     if is_enabled:
                         log(f"Кнопка активна (попытка #{attempt + 1})", "DEBUG")
                         
-                        # Сохраняем текущий URL перед кликом
-                        url_before = self.page.url
-                        log(f"URL перед кликом: {url_before}", "DEBUG")
-                        
-                        # Способ 1: JS клик
+                        # Пробуем JS клик
                         try:
                             await self.page.locator('#pay').evaluate('el => el.click()')
                             log("Кнопка Продолжить нажата (JS клик)", "SUCCESS")
                             button_clicked = True
-                            
-                            # Ждем изменения URL или появления нового контента
-                            await self.page.wait_for_timeout(2000)
-                            url_after = self.page.url
-                            log(f"URL после клика: {url_after}", "DEBUG")
-                            
-                            if url_before != url_after:
-                                log(f"✅ URL изменился! Форма отправлена", "SUCCESS")
-                            else:
-                                log(f"⚠️ URL не изменился, форма возможно не отправилась", "WARNING")
-                            
                             break
                         except:
                             pass
                         
-                        # Способ 2: Обычный клик
-                        if not button_clicked:
-                            try:
-                                await self.page.locator('#pay').click(timeout=2000)
-                                log("Кнопка Продолжить нажата (обычный клик)", "SUCCESS")
-                                button_clicked = True
-                                break
-                            except:
-                                pass
-                        
-                        # Способ 3: Force клик
+                        # Если не сработало - пробуем force клик
                         if not button_clicked:
                             try:
                                 await self.page.locator('#pay').click(force=True, timeout=2000)
@@ -1208,18 +1187,93 @@ class PaymentService:
                                 break
                             except:
                                 pass
+                        
+                        # Дополнительная попытка на 7 и 14 итерации
+                        if attempt in [7, 14]:
+                            try:
+                                await self.page.locator('#pay').evaluate("""
+                                    el => {
+                                        el.dispatchEvent(new MouseEvent('click', {
+                                            view: window,
+                                            bubbles: true,
+                                            cancelable: true
+                                        }));
+                                    }
+                                """)
+                                log(f"Кнопка Продолжить нажата (dispatchEvent, попытка {attempt + 1})", "SUCCESS")
+                                button_clicked = True
+                                break
+                            except:
+                                pass
                     else:
                         log(f"Кнопка не активна (попытка #{attempt + 1}), жду...", "WARNING")
-                        await self.page.wait_for_timeout(500)
                         
                 except Exception as e:
                     log(f"Ошибка при проверке кнопки: {e}", "WARNING")
-                    await self.page.wait_for_timeout(500)
+                
+                await self.page.wait_for_timeout(500)
             
             if not button_clicked:
                 log("⚠️ Не удалось нажать кнопку Продолжить!", "WARNING")
             
             await self.page.wait_for_timeout(1000)
+            
+            # Проверяем изменился ли URL после клика
+            url_after = self.page.url
+            log(f"URL после отправки: {url_after}", "DEBUG")
+            
+            if url_before == url_after and 'sender-details' in url_after:
+                log("⚠️ URL не изменился, форма возможно не отправилась", "WARNING")
+                # Пробуем еще раз через Enter
+                try:
+                    await self.page.keyboard.press('Enter')
+                    log("Попытка отправки через Enter", "DEBUG")
+                    await self.page.wait_for_timeout(2000)
+                    url_after_enter = self.page.url
+                    if url_after_enter != url_before:
+                        log(f"✅ URL изменился после Enter: {url_after_enter}", "SUCCESS")
+                except:
+                    pass
+            
+            # Проверяем есть ли ошибки валидации на странице
+            try:
+                validation_errors = await self.page.evaluate("""
+                    () => {
+                        const errors = [];
+                        // Проверяем красные поля
+                        const invalidFields = document.querySelectorAll('input.is-invalid, input[aria-invalid="true"]');
+                        invalidFields.forEach(field => {
+                            errors.push({
+                                name: field.name || field.id,
+                                value: field.value
+                            });
+                        });
+                        // Проверяем сообщения об ошибках
+                        const errorMessages = document.querySelectorAll('.invalid-feedback, .error-message');
+                        errorMessages.forEach(msg => {
+                            if (msg.offsetParent !== null) {  // видимый элемент
+                                errors.push({ message: msg.textContent.trim() });
+                            }
+                        });
+                        return errors;
+                    }
+                """)
+                
+                if validation_errors and len(validation_errors) > 0:
+                    log(f"⚠️ Найдены ошибки валидации: {validation_errors}", "WARNING")
+                    # Пробуем исправить - кликаем по всем полям еще раз
+                    await self.page.evaluate("""
+                        () => {
+                            const inputs = document.querySelectorAll('input');
+                            inputs.forEach(input => {
+                                input.focus();
+                                input.blur();
+                            });
+                        }
+                    """)
+                    await self.page.wait_for_timeout(1000)
+            except Exception as e:
+                log(f"Ошибка при проверке валидации: {e}", "DEBUG")
             
             # Капча
             log("Проверяю наличие капчи...", "DEBUG")
