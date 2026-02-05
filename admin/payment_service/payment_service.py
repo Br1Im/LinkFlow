@@ -1165,11 +1165,26 @@ class PaymentService:
                     if is_enabled:
                         log(f"Кнопка активна (попытка #{attempt + 1})", "DEBUG")
                         
+                        # Сохраняем текущий URL перед кликом
+                        url_before = self.page.url
+                        log(f"URL перед кликом: {url_before}", "DEBUG")
+                        
                         # Способ 1: JS клик
                         try:
                             await self.page.locator('#pay').evaluate('el => el.click()')
                             log("Кнопка Продолжить нажата (JS клик)", "SUCCESS")
                             button_clicked = True
+                            
+                            # Ждем изменения URL или появления нового контента
+                            await self.page.wait_for_timeout(2000)
+                            url_after = self.page.url
+                            log(f"URL после клика: {url_after}", "DEBUG")
+                            
+                            if url_before != url_after:
+                                log(f"✅ URL изменился! Форма отправлена", "SUCCESS")
+                            else:
+                                log(f"⚠️ URL не изменился, форма возможно не отправилась", "WARNING")
+                            
                             break
                         except:
                             pass
@@ -1494,6 +1509,15 @@ class PaymentService:
                 if qr_link:
                     log(f"QR-ссылка получена на итерации {i+1}", "SUCCESS")
                     break
+                
+                # Проверяем URL каждые 2 секунды
+                if i % 4 == 0:
+                    current_url = self.page.url
+                    log(f"Текущий URL (итерация {i}): {current_url}", "DEBUG")
+                    
+                    # Если URL изменился - значит форма отправилась
+                    if 'sender-details' not in current_url:
+                        log(f"URL изменился! Новый URL: {current_url}", "SUCCESS")
                 
                 # Проверяем модалки с ошибками каждые 2 секунды
                 if i % 4 == 0:
