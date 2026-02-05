@@ -6,17 +6,19 @@
 
 ```
 LinkFlow/
-├── admin/              # Админ-панель (Flask)
-│   ├── admin_panel_db.py   # Основной сервер админки (порт 5000)
-│   ├── api_server.py       # API сервер (порт 5001)
-│   ├── database.py         # Работа с SQLite БД
-│   ├── templates/          # HTML шаблоны
-│   └── linkflow.db         # База данных
-├── test_payment/       # Скрипт создания платежей (Playwright)
-│   └── payment_service.py  # Основной сервис
-├── 100.xlsx            # Данные отправителей для импорта
-├── import_excel_to_db.py   # Скрипт импорта данных в БД
-└── linkflow.db         # Главная база данных
+├── admin/                      # Вся система в одной папке
+│   ├── admin_panel_db.py       # Админ-панель (порт 5000)
+│   ├── api_server.py           # API сервер (порт 5001)
+│   ├── database.py             # Работа с SQLite БД
+│   ├── linkflow.db             # База данных
+│   ├── templates/              # HTML шаблоны
+│   ├── static/                 # Статические файлы
+│   ├── test_payment/           # Скрипт создания платежей (Playwright)
+│   │   └── payment_service.py
+│   ├── 100.xlsx                # Данные отправителей
+│   ├── import_excel_to_db.py   # Импорт данных в БД
+│   └── requirements_playwright.txt
+└── README.md
 ```
 
 ## Установка
@@ -24,16 +26,15 @@ LinkFlow/
 ### 1. Установка зависимостей
 
 ```bash
-# Python зависимости
+cd admin
 pip3 install flask playwright pandas openpyxl
-
-# Playwright браузер
 playwright install chromium
 ```
 
 ### 2. Импорт данных
 
 ```bash
+cd admin
 python3 import_excel_to_db.py
 ```
 
