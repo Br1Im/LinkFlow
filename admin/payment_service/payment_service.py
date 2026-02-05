@@ -12,17 +12,25 @@ import time
 import sys
 import os
 from datetime import datetime
+import json
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'playwright_version'))
 
 # Импортируем функцию для получения данных из БД
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'admin'))
+admin_path = os.path.join(os.path.dirname(__file__), '..')
+sys.path.insert(0, admin_path)
 try:
     import database as db
     DB_AVAILABLE = True
 except ImportError:
     DB_AVAILABLE = False
     print("⚠️ База данных недоступна, используется fallback режим")
+
+
+# Глобальное хранилище логов для текущего платежа
+current_payment_logs = []
+# Файл для обмена логами между процессами
+LOGS_FILE = os.path.join(os.path.dirname(__file__), '..', 'current_payment_logs.json')
 
 
 def get_sender_data_from_db():
@@ -49,11 +57,16 @@ def get_sender_data_from_db():
     if not sender_data:
         raise Exception("Нет активных данных отправителей в БД. Импортируйте данные через import_excel_to_db.py")
     
+    # Заменяем Ё на Е во всех текстовых полях
+    for key, value in sender_data.items():
+        if isinstance(value, str):
+            sender_data[key] = value.replace('Ё', 'Е').replace('ё', 'е')
+    
     return sender_data
 
 
 def log(message: str, level: str = "INFO"):
-    """Логирование с временной меткой"""
+    """Логирование с временной меткой и сохранением в файл"""
     timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
     prefix = {
         "INFO": "ℹ️",
@@ -63,6 +76,21 @@ def log(message: str, level: str = "INFO"):
         "DEBUG": "🔍"
     }.get(level, "📝")
     print(f"[{timestamp}] {prefix} {message}")
+    
+    # Сохраняем лог в глобальный список
+    log_entry = {
+        'timestamp': datetime.now().isoformat(),
+        'level': level.lower(),
+        'message': message
+    }
+    current_payment_logs.append(log_entry)
+    
+    # Сохраняем в файл для обмена с админ-панелью
+    try:
+        with open(LOGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(current_payment_logs, f, ensure_ascii=False)
+    except:
+        pass
 
 
 async def fill_react_input(page, selector: str, value: str, field_name_for_log: str = ""):
@@ -385,11 +413,18 @@ class PaymentService:
                 'time': float,
                 'step1_time': float,
                 'step2_time': float,
-                'error': str or None
+                'error': str or None,
+                'logs': list
             }
         """
+        global current_payment_logs
+        
         if not self.is_ready:
-            return {'success': False, 'error': 'Сервис не запущен', 'time': 0}
+            return {'success': False, 'error': 'Сервис не запущен', 'time': 0, 'logs': []}
+        
+        # Очищаем логи перед началом нового платежа
+        current_payment_logs.clear()
+        log(f"Начало создания платежа: {amount}₽, карта {card_number}, владелец {owner_name}", "INFO")
         
         # Получаем данные отправителя: кастомные или из БД
         if custom_sender:
@@ -528,7 +563,7 @@ class PaymentService:
                     log(f"Скриншот сохранен: {screenshot_path}", "INFO")
                 except:
                     pass
-                return {'success': False, 'error': 'Не удалось рассчитать комиссию', 'time': time.time() - start_time}
+                return {'success': False, 'error': 'Не удалось рассчитать комиссию', 'time': time.time() - start_time, 'logs': current_payment_logs.copy()}
             
             # Выбор способа платежа и Uzcard с улучшенной логикой
             log("Выбираю способ перевода и Uzcard...", "DEBUG")
@@ -607,14 +642,14 @@ class PaymentService:
                     log(f"Скриншот сохранен: {screenshot_path}", "INFO")
                 except:
                     pass
-                return {'success': False, 'error': 'Не удалось выбрать Uzcard', 'time': time.time() - start_time}
+                return {'success': False, 'error': 'Не удалось выбрать Uzcard', 'time': time.time() - start_time, 'logs': current_payment_logs.copy()}
             
             await self.page.wait_for_timeout(200)
             
             # Ждем активации кнопки "Продолжить" с retry
             log("Жду активации кнопки Продолжить...", "DEBUG")
             button_active = False
-            for btn_attempt in range(15):  # Увеличено с 10 до 15 попыток
+            for btn_attempt in range(25):  # Увеличено с 15 до 25 попыток
                 try:
                     is_active = await self.page.evaluate("""
                         () => {
@@ -699,6 +734,28 @@ class PaymentService:
                         """)
                         await self.page.wait_for_timeout(300)
                     
+                    # Дополнительная попытка на 14-й итерации (как на 7-й)
+                    if btn_attempt == 14:
+                        log("Повторный клик по 'Способ перевода' (попытка #14)...", "WARNING")
+                        try:
+                            transfer_block = self.page.locator('div:has-text("Способ перевода")').first
+                            if await transfer_block.is_visible(timeout=500):
+                                await transfer_block.click()
+                                await self.page.wait_for_timeout(200)
+                        except:
+                            pass
+                        
+                        # И снова Uzcard
+                        await self.page.evaluate("""
+                            () => {
+                                const uzcardBtn = Array.from(document.querySelectorAll('[role="button"]')).find(
+                                    el => el.textContent.includes('Uzcard')
+                                );
+                                if (uzcardBtn) uzcardBtn.click();
+                            }
+                        """)
+                        await self.page.wait_for_timeout(300)
+                    
                     # Если кнопка не активна, пробуем кликнуть Uzcard еще раз
                     if btn_attempt > 4 and btn_attempt % 2 == 0:
                         await self.page.evaluate("""
@@ -727,7 +784,7 @@ class PaymentService:
                     log(f"Скриншот сохранен: {screenshot_path}", "INFO")
                 except Exception as e:
                     log(f"Не удалось сохранить скриншот: {e}", "WARNING")
-                return {'success': False, 'error': 'Кнопка Продолжить не активировалась', 'time': time.time() - start_time}
+                return {'success': False, 'error': 'Кнопка Продолжить не активировалась', 'time': time.time() - start_time, 'logs': current_payment_logs.copy()}
             
             # Клик по кнопке
             await self.page.locator('#pay').evaluate('el => el.click()')
@@ -852,7 +909,8 @@ class PaymentService:
                     'time': time.time() - start_time,
                     'step1_time': step1_time,
                     'step2_time': 0,
-                    'error': 'Не удалось заполнить номер карты'
+                    'error': 'Не удалось заполнить номер карты',
+                    'logs': current_payment_logs.copy()
                 }
             
             await self.page.wait_for_timeout(300)
@@ -872,7 +930,8 @@ class PaymentService:
                     'time': time.time() - start_time,
                     'step1_time': step1_time,
                     'step2_time': 0,
-                    'error': 'Не удалось заполнить имя/фамилию получателя'
+                    'error': 'Не удалось заполнить имя/фамилию получателя',
+                    'logs': current_payment_logs.copy()
                 }
             
             log("Реквизиты получателя заполнены успешно!", "SUCCESS")
@@ -1085,15 +1144,65 @@ class PaymentService:
                     'time': time.time() - start_time,
                     'step1_time': step1_time,
                     'step2_time': 0,
-                    'error': 'Поля получателя пустые перед отправкой'
+                    'error': 'Поля получателя пустые перед отправкой',
+                    'logs': current_payment_logs.copy()
                 }
             
-            # Кнопка "Продолжить"
-            try:
-                await self.page.locator('#pay').evaluate('el => el.click()')
-                log("Кнопка Продолжить нажата (этап 2)", "SUCCESS")
-            except:
-                pass
+            # Кнопка "Продолжить" - пробуем разные способы клика
+            log("Нажимаю кнопку Продолжить (этап 2)...", "DEBUG")
+            button_clicked = False
+            
+            # Проверяем что кнопка активна
+            for attempt in range(5):
+                try:
+                    is_enabled = await self.page.evaluate("""
+                        () => {
+                            const btn = document.getElementById('pay');
+                            return btn && !btn.disabled;
+                        }
+                    """)
+                    
+                    if is_enabled:
+                        log(f"Кнопка активна (попытка #{attempt + 1})", "DEBUG")
+                        
+                        # Способ 1: JS клик
+                        try:
+                            await self.page.locator('#pay').evaluate('el => el.click()')
+                            log("Кнопка Продолжить нажата (JS клик)", "SUCCESS")
+                            button_clicked = True
+                            break
+                        except:
+                            pass
+                        
+                        # Способ 2: Обычный клик
+                        if not button_clicked:
+                            try:
+                                await self.page.locator('#pay').click(timeout=2000)
+                                log("Кнопка Продолжить нажата (обычный клик)", "SUCCESS")
+                                button_clicked = True
+                                break
+                            except:
+                                pass
+                        
+                        # Способ 3: Force клик
+                        if not button_clicked:
+                            try:
+                                await self.page.locator('#pay').click(force=True, timeout=2000)
+                                log("Кнопка Продолжить нажата (force клик)", "SUCCESS")
+                                button_clicked = True
+                                break
+                            except:
+                                pass
+                    else:
+                        log(f"Кнопка не активна (попытка #{attempt + 1}), жду...", "WARNING")
+                        await self.page.wait_for_timeout(500)
+                        
+                except Exception as e:
+                    log(f"Ошибка при проверке кнопки: {e}", "WARNING")
+                    await self.page.wait_for_timeout(500)
+            
+            if not button_clicked:
+                log("⚠️ Не удалось нажать кнопку Продолжить!", "WARNING")
             
             await self.page.wait_for_timeout(1000)
             
@@ -1237,7 +1346,8 @@ class PaymentService:
                             'time': time.time() - start_time,
                             'step1_time': step1_time,
                             'step2_time': step2_time,
-                            'error': 'Реквизиты получателя больше не актуальны (модалка с ошибкой)'
+                            'error': 'Реквизиты получателя больше не актуальны (модалка с ошибкой)',
+                            'logs': current_payment_logs.copy()
                         }
                     else:
                         # Это просто подтверждение данных - нажимаем "Продолжить"
@@ -1360,7 +1470,8 @@ class PaymentService:
                                             'time': time.time() - start_time,
                                             'step1_time': step1_time,
                                             'step2_time': step2_time,
-                                            'error': 'Реквизиты получателя больше не актуальны (модалка с ошибкой после подтверждения)'
+                                            'error': 'Реквизиты получателя больше не актуальны (модалка с ошибкой после подтверждения)',
+                                            'logs': current_payment_logs.copy()
                                         }
                                 except Exception as e:
                                     log(f"Ошибка при проверке модалки с ошибкой: {e}", "DEBUG")
@@ -1423,7 +1534,8 @@ class PaymentService:
                                     'time': time.time() - start_time,
                                     'step1_time': step1_time,
                                     'step2_time': step2_time,
-                                    'error': f'Ошибка валидации: {error_text}'
+                                    'error': f'Ошибка валидации: {error_text}',
+                                    'logs': current_payment_logs.copy()
                                 }
                     except:
                         pass
@@ -1472,7 +1584,8 @@ class PaymentService:
                 'time': elapsed,
                 'step1_time': step1_time,
                 'step2_time': step2_time,
-                'error': None if success else 'QR-ссылка не получена'
+                'error': None if success else 'QR-ссылка не получена',
+                'logs': current_payment_logs.copy()  # Добавляем логи в результат
             }
             
         except Exception as e:
@@ -1490,7 +1603,8 @@ class PaymentService:
                 'time': time.time() - start_time,
                 'step1_time': 0,
                 'step2_time': 0,
-                'error': str(e)
+                'error': str(e),
+                'logs': current_payment_logs.copy()
             }
         finally:
             self.page.remove_listener('response', handle_response)

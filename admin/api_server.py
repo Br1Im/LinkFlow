@@ -115,10 +115,14 @@ def create_payment():
         owner_name = data.get('card_owner')
         custom_sender = data.get('custom_sender')  # dict с кастомными данными отправителя
         
+        # Преобразуем card_number в строку если это число
+        if card_number is not None:
+            card_number = str(card_number)
+        
         # Если не указаны в запросе, берем случайный из БД
         if not card_number or not owner_name:
-            from admin.database import get_random_beneficiary
-            beneficiary = get_random_beneficiary()
+            import database
+            beneficiary = database.get_random_beneficiary()
             
             if not beneficiary:
                 return jsonify({
@@ -126,7 +130,7 @@ def create_payment():
                     'error': 'No active beneficiaries found in database'
                 }), 400
             
-            card_number = beneficiary['card_number']
+            card_number = str(beneficiary['card_number'])  # Преобразуем в строку
             owner_name = beneficiary['card_owner']
             log(f"Используется случайный реквизит: {owner_name} ({card_number})", "INFO")
         
@@ -181,6 +185,10 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
     
     total_elapsed_time = time.time() - total_start_time
     
+    # Получаем логи из результата
+    logs = result.get('logs', [])
+    log(f"📊 Получено логов из payment_service: {len(logs)}", "DEBUG")
+    
     # Перезапускаем браузер для следующего платежа
     try:
         log("Перезапускаю браузер для следующего платежа...", "DEBUG")
@@ -193,6 +201,7 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
     
     # Возвращаем результат
     if result.get('success'):
+        print(f"📤 Возвращаю {len(logs)} логов в ответе (успех)")  # Отладка
         return jsonify({
             'success': True,
             'order_id': order_id,
@@ -203,15 +212,18 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
             'total_time': total_elapsed_time,
             'step1_time': result.get('step1_time'),
             'step2_time': result.get('step2_time'),
-            'message': 'Payment created successfully'
+            'message': 'Payment created successfully',
+            'logs': logs
         }), 201
     else:
+        print(f"📤 Возвращаю {len(logs)} логов в ответе (ошибка)")  # Отладка
         return jsonify({
             'success': False,
             'order_id': order_id,
             'error': result.get('error', 'Payment creation failed'),
             'payment_time': result.get('time'),
-            'total_time': total_elapsed_time
+            'total_time': total_elapsed_time,
+            'logs': logs
         }), 500
 
 
@@ -291,8 +303,8 @@ def get_beneficiaries():
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
     
     try:
-        from admin.database import get_all_beneficiaries
-        beneficiaries = get_all_beneficiaries()
+        import database
+        beneficiaries = database.get_all_beneficiaries()
         return jsonify({'success': True, 'beneficiaries': beneficiaries})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -314,14 +326,14 @@ def add_beneficiary_endpoint():
         if not card_number or not card_owner:
             return jsonify({'success': False, 'error': 'Missing required fields'}), 400
         
-        from admin.database import add_beneficiary, update_beneficiary_verification
+        import database
         
         # Если это повторная проверка, используем существующий ID
         if is_retest and existing_id:
             beneficiary_id = existing_id
         else:
             # Добавляем новый реквизит
-            beneficiary_id = add_beneficiary(card_number, card_owner)
+            beneficiary_id = database.add_beneficiary(card_number, card_owner)
         
         # Создаем тестовый платеж
         if PLAYWRIGHT_AVAILABLE and payment_service:
@@ -352,7 +364,7 @@ def add_beneficiary_endpoint():
                 log(f"Результат теста: success={result.get('success')}, qr_link={result.get('qr_link')[:50] if result.get('qr_link') else 'None'}", "INFO")
                 
                 # Обновляем статус верификации
-                update_beneficiary_verification(
+                database.update_beneficiary_verification(
                     beneficiary_id, 
                     result.get('success', False),
                     test_order_id if result.get('success') else None
@@ -366,7 +378,7 @@ def add_beneficiary_endpoint():
                 })
             except Exception as e:
                 # Если тест не прошел
-                update_beneficiary_verification(beneficiary_id, False)
+                database.update_beneficiary_verification(beneficiary_id, False)
                 return jsonify({
                     'success': True,
                     'beneficiary_id': beneficiary_id,
@@ -401,7 +413,7 @@ def retest_beneficiary_endpoint():
         if not beneficiary_id or not card_number or not card_owner:
             return jsonify({'success': False, 'error': 'Missing required fields'}), 400
         
-        from admin.database import update_beneficiary_verification
+        import database
         
         # Создаем тестовый платеж
         if PLAYWRIGHT_AVAILABLE and payment_service:
@@ -433,7 +445,7 @@ def retest_beneficiary_endpoint():
                 
                 # Обновляем статус верификации
                 is_verified = result.get('success', False)
-                update_beneficiary_verification(
+                database.update_beneficiary_verification(
                     beneficiary_id, 
                     is_verified,
                     test_order_id if is_verified else None
@@ -441,8 +453,7 @@ def retest_beneficiary_endpoint():
                 
                 # Если не прошел проверку - отключаем реквизит
                 if not is_verified:
-                    from admin.database import update_beneficiary_status
-                    update_beneficiary_status(beneficiary_id, False)
+                    database.update_beneficiary_status(beneficiary_id, False)
                     log(f"Реквизит ID {beneficiary_id} отключен (не прошел проверку)", "WARNING")
                 
                 return jsonify({
@@ -453,9 +464,8 @@ def retest_beneficiary_endpoint():
                 })
             except Exception as e:
                 # Если тест не прошел - отключаем реквизит
-                update_beneficiary_verification(beneficiary_id, False)
-                from admin.database import update_beneficiary_status
-                update_beneficiary_status(beneficiary_id, False)
+                database.update_beneficiary_verification(beneficiary_id, False)
+                database.update_beneficiary_status(beneficiary_id, False)
                 log(f"Реквизит ID {beneficiary_id} отключен (ошибка проверки)", "ERROR")
                 
                 return jsonify({
@@ -481,8 +491,8 @@ def delete_beneficiary_endpoint(beneficiary_id):
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
     
     try:
-        from admin.database import delete_beneficiary
-        delete_beneficiary(beneficiary_id)
+        import database
+        database.delete_beneficiary(beneficiary_id)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -498,34 +508,11 @@ def toggle_beneficiary_endpoint(beneficiary_id):
         data = request.get_json()
         is_active = data.get('is_active', True)
         
-        from admin.database import update_beneficiary_status
-        update_beneficiary_status(beneficiary_id, is_active)
+        import database
+        database.update_beneficiary_status(beneficiary_id, is_active)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/api/browser-screenshot', methods=['GET'])
-def get_browser_screenshot():
-    """Получить скриншот браузера в реальном времени"""
-    from flask import send_file
-    import io
-    
-    if not PLAYWRIGHT_AVAILABLE or not payment_service or not payment_service.page:
-        # Возвращаем пустое изображение
-        return jsonify({'error': 'Browser not available'}), 404
-    
-    try:
-        # Делаем скриншот
-        screenshot_bytes = run_async(payment_service.page.screenshot(type='png'))
-        
-        return send_file(
-            io.BytesIO(screenshot_bytes),
-            mimetype='image/png',
-            as_attachment=False
-        )
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

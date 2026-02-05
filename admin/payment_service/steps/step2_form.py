@@ -10,6 +10,8 @@ from .form_helpers import fill_field_simple, select_country_async
 
 async def fill_beneficiary_card(page: Page, card_number: str, log_func) -> bool:
     """Заполнение номера карты получателя"""
+    from .form_helpers import fill_react_input
+    
     log = log_func
     log(f"Заполняю номер карты: {card_number}", "DEBUG")
     
@@ -17,33 +19,16 @@ async def fill_beneficiary_card(page: Page, card_number: str, log_func) -> bool:
         if attempt > 0:
             log(f"Попытка #{attempt + 1} заполнения карты", "WARNING")
         
-        try:
-            locator = page.locator('input[name="transfer_beneficiaryAccountNumber"]')
-            await locator.wait_for(state="visible", timeout=7000)
-            await locator.click(force=True)
-            await locator.evaluate("el => { el.focus(); el.value = ''; }")
-            await page.wait_for_timeout(30)
-            
-            escaped = card_number.replace('\\', '\\\\').replace("'", "\\'")
-            await locator.evaluate(f"""
-                (el) => {{
-                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                        window.HTMLInputElement.prototype, 'value'
-                    ).set;
-                    nativeInputValueSetter.call(el, '{escaped}');
-                    el.dispatchEvent(new Event('input',  {{ bubbles: true }}));
-                    el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                    el.dispatchEvent(new Event('blur',   {{ bubbles: true }}));
-                }}
-            """)
-            await page.wait_for_timeout(120)
-            
-            current = await locator.input_value()
-            if current.strip() == card_number.strip():
-                log(f"✅ Номер карты заполнен: {card_number}", "SUCCESS")
-                return True
-        except Exception as e:
-            log(f"Ошибка заполнения карты: {e}", "WARNING")
+        success = await fill_react_input(
+            page,
+            'input[name="transfer_beneficiaryAccountNumber"]',
+            card_number,
+            "Номер карты",
+            log_func
+        )
+        
+        if success:
+            return True
         
         await page.wait_for_timeout(300)
     
@@ -53,67 +38,28 @@ async def fill_beneficiary_card(page: Page, card_number: str, log_func) -> bool:
 
 async def fill_beneficiary_name(page: Page, first_name: str, last_name: str, log_func) -> tuple:
     """Заполнение имени и фамилии получателя"""
+    from .form_helpers import fill_react_input
+    
     log = log_func
     log(f"Заполняю имя получателя: {first_name} {last_name}", "DEBUG")
     
-    fname_ok = False
-    lname_ok = False
+    fname_ok = await fill_react_input(
+        page,
+        'input[name="beneficiary_firstName"]',
+        first_name,
+        "Имя получателя",
+        log_func
+    )
     
-    try:
-        # Имя
-        fname_locator = page.locator('input[name="beneficiary_firstName"]')
-        await fname_locator.wait_for(state="visible", timeout=5000)
-        await fname_locator.click(force=True)
-        await fname_locator.evaluate("el => { el.focus(); el.value = ''; }")
-        await page.wait_for_timeout(30)
-        
-        escaped_fname = first_name.replace('\\', '\\\\').replace("'", "\\'")
-        await fname_locator.evaluate(f"""
-            (el) => {{
-                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                    window.HTMLInputElement.prototype, 'value'
-                ).set;
-                nativeInputValueSetter.call(el, '{escaped_fname}');
-                el.dispatchEvent(new Event('input',  {{ bubbles: true }}));
-                el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                el.dispatchEvent(new Event('blur',   {{ bubbles: true }}));
-            }}
-        """)
-        await page.wait_for_timeout(250)
-        
-        current_fname = await fname_locator.input_value()
-        if current_fname.strip() == first_name.strip():
-            log(f"✅ Имя получателя заполнено: {first_name}", "SUCCESS")
-            fname_ok = True
-        
-        # Фамилия
-        lname_locator = page.locator('input[name="beneficiary_lastName"]')
-        await lname_locator.wait_for(state="visible", timeout=5000)
-        await lname_locator.click(force=True)
-        await lname_locator.evaluate("el => { el.focus(); el.value = ''; }")
-        await page.wait_for_timeout(30)
-        
-        escaped_lname = last_name.replace('\\', '\\\\').replace("'", "\\'")
-        await lname_locator.evaluate(f"""
-            (el) => {{
-                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                    window.HTMLInputElement.prototype, 'value'
-                ).set;
-                nativeInputValueSetter.call(el, '{escaped_lname}');
-                el.dispatchEvent(new Event('input',  {{ bubbles: true }}));
-                el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                el.dispatchEvent(new Event('blur',   {{ bubbles: true }}));
-            }}
-        """)
-        await page.wait_for_timeout(250)
-        
-        current_lname = await lname_locator.input_value()
-        if current_lname.strip() == last_name.strip():
-            log(f"✅ Фамилия получателя заполнена: {last_name}", "SUCCESS")
-            lname_ok = True
-            
-    except Exception as e:
-        log(f"Ошибка заполнения имени/фамилии: {e}", "ERROR")
+    await page.wait_for_timeout(250)
+    
+    lname_ok = await fill_react_input(
+        page,
+        'input[name="beneficiary_lastName"]',
+        last_name,
+        "Фамилия получателя",
+        log_func
+    )
     
     return (fname_ok, lname_ok)
 
@@ -178,33 +124,43 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         # Заполняем поля отправителя
         log("⚡ Заполняю поля отправителя...", "INFO")
         
+        log("📝 Серия паспорта...", "DEBUG")
         await fill_field_simple(page, "sender_documents_series", sender_data["passport_series"], "Серия паспорта", log)
         await page.wait_for_timeout(100)
         
+        log("📝 Номер паспорта...", "DEBUG")
         await fill_field_simple(page, "sender_documents_number", sender_data["passport_number"], "Номер паспорта", log)
         await page.wait_for_timeout(100)
         
+        log("📝 Дата выдачи паспорта...", "DEBUG")
         await fill_field_simple(page, "issueDate", sender_data["passport_issue_date"], "Дата выдачи", log)
         await page.wait_for_timeout(100)
         
+        log("📝 Отчество...", "DEBUG")
         await fill_field_simple(page, "sender_middleName", sender_data["middle_name"], "Отчество", log)
         await page.wait_for_timeout(100)
         
+        log("📝 Имя отправителя...", "DEBUG")
         await fill_field_simple(page, "sender_firstName", sender_data["first_name"], "Имя отправителя", log)
         await page.wait_for_timeout(100)
         
+        log("📝 Фамилия отправителя...", "DEBUG")
         await fill_field_simple(page, "sender_lastName", sender_data["last_name"], "Фамилия отправителя", log)
         await page.wait_for_timeout(100)
         
+        log("📝 Дата рождения...", "DEBUG")
         await fill_field_simple(page, "birthDate", sender_data["birth_date"], "Дата рождения", log)
         await page.wait_for_timeout(100)
         
+        log("📝 Телефон...", "DEBUG")
         await fill_field_simple(page, "phoneNumber", sender_data["phone"], "Телефон", log)
         await page.wait_for_timeout(100)
         
+        log("📝 Место рождения...", "DEBUG")
         await fill_field_simple(page, "birthPlaceAddress_full", sender_data["birth_place"], "Место рождения", log)
         await page.wait_for_timeout(100)
         
+        log("📝 Место регистрации...", "DEBUG")
         await fill_field_simple(page, "registrationAddress_full", sender_data["registration_place"], "Место регистрации", log)
         await page.wait_for_timeout(100)
         

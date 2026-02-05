@@ -35,6 +35,10 @@ current_generation = {
     'started_at': None
 }
 
+# Хранилище логов для текущего платежа
+current_payment_logs = []
+payment_logs_lock = threading.Lock()
+
 
 def init_default_settings():
     """Initialize default settings if not exist"""
@@ -124,11 +128,28 @@ def create_payment():
                 'error': 'Неверный формат суммы'
             }), 400
         
-        # Устанавливаем блокировку
+        # Устанавливаем блокировку и очищаем логи
         with payment_lock:
             current_generation['in_progress'] = True
             current_generation['order_id'] = order_id
             current_generation['started_at'] = datetime.now()
+        
+        with payment_logs_lock:
+            current_payment_logs.clear()
+            current_payment_logs.append({
+                'timestamp': datetime.now().isoformat(),
+                'level': 'info',
+                'message': f'Начало создания платежа {order_id} на сумму {amount}₽'
+            })
+        
+        # Очищаем файл логов
+        import os
+        logs_file = os.path.join(os.path.dirname(__file__), 'current_payment_logs.json')
+        try:
+            if os.path.exists(logs_file):
+                os.remove(logs_file)
+        except:
+            pass
         
         try:
             # Засекаем время начала
@@ -141,7 +162,14 @@ def create_payment():
             if custom_card and custom_owner:
                 card = custom_card
                 owner = custom_owner
-                db.add_log('info', f'Используются кастомные реквизиты: {owner} ({card})')
+                log_msg = f'Используются кастомные реквизиты: {owner} ({card})'
+                db.add_log('info', log_msg)
+                with payment_logs_lock:
+                    current_payment_logs.append({
+                        'timestamp': datetime.now().isoformat(),
+                        'level': 'info',
+                        'message': log_msg
+                    })
             else:
                 card = settings.get('default_card', DEFAULT_CARD)
                 owner = settings.get('default_owner', DEFAULT_OWNER)
@@ -162,14 +190,28 @@ def create_payment():
             # Добавляем кастомные данные отправителя если указаны
             if custom_sender:
                 api_payload['custom_sender'] = custom_sender
-                db.add_log('info', f'Используются кастомные данные отправителя: {custom_sender.get("last_name")} {custom_sender.get("first_name")}')
+                log_msg = f'Используются кастомные данные отправителя: {custom_sender.get("last_name")} {custom_sender.get("first_name")}'
+                db.add_log('info', log_msg)
+                with payment_logs_lock:
+                    current_payment_logs.append({
+                        'timestamp': datetime.now().isoformat(),
+                        'level': 'info',
+                        'message': log_msg
+                    })
             
             headers = {
                 'Authorization': f'Bearer {api_token}',
                 'Content-Type': 'application/json'
             }
             
-            db.add_log('info', f'Отправка запроса на API: {api_url}/api/payment для заказа {order_id}')
+            log_msg = f'Отправка запроса на API для заказа {order_id}'
+            db.add_log('info', log_msg)
+            with payment_logs_lock:
+                current_payment_logs.append({
+                    'timestamp': datetime.now().isoformat(),
+                    'level': 'info',
+                    'message': log_msg
+                })
             
             response = requests.post(
                 f'{api_url}/api/payment',
@@ -189,6 +231,15 @@ def create_payment():
                 # Успешный ответ от API
                 api_data = response.json()
                 
+                # Получаем логи из ответа API
+                api_logs = api_data.get('logs', [])
+                print(f"📥 Получено {len(api_logs)} логов от API сервера")  # Отладка
+                
+                # Добавляем логи в хранилище текущего платежа
+                with payment_logs_lock:
+                    current_payment_logs.extend(api_logs)
+                    print(f"📊 Всего логов в хранилище: {len(current_payment_logs)}")  # Отладка
+                
                 payment_data = {
                     'id': payment_id,
                     'order_id': order_id,
@@ -204,7 +255,14 @@ def create_payment():
                 
                 # Сохраняем в БД
                 db.add_payment(payment_data)
-                db.add_log('success', f'Платёж {order_id} создан успешно: {amount}₽ за {generation_time:.2f}с')
+                log_msg = f'Платёж {order_id} создан успешно: {amount}₽ за {generation_time:.2f}с'
+                db.add_log('success', log_msg)
+                with payment_logs_lock:
+                    current_payment_logs.append({
+                        'timestamp': datetime.now().isoformat(),
+                        'level': 'success',
+                        'message': log_msg
+                    })
                 
                 return jsonify({
                     'success': True,
@@ -221,6 +279,16 @@ def create_payment():
                 # Ошибка от API
                 error_msg = response.json().get('error', 'Unknown error') if response.text else 'API error'
                 
+                # Получаем логи даже при ошибке
+                try:
+                    api_logs = response.json().get('logs', [])
+                    print(f"📥 Получено {len(api_logs)} логов от API сервера (ошибка)")  # Отладка
+                    with payment_logs_lock:
+                        current_payment_logs.extend(api_logs)
+                        print(f"📊 Всего логов в хранилище: {len(current_payment_logs)}")  # Отладка
+                except:
+                    pass
+                
                 payment_data = {
                     'id': payment_id,
                     'order_id': order_id,
@@ -235,7 +303,14 @@ def create_payment():
                 }
                 
                 db.add_payment(payment_data)
-                db.add_log('error', f'Платёж {order_id} не удался: {error_msg}')
+                log_msg = f'Платёж {order_id} не удался: {error_msg}'
+                db.add_log('error', log_msg)
+                with payment_logs_lock:
+                    current_payment_logs.append({
+                        'timestamp': datetime.now().isoformat(),
+                        'level': 'error',
+                        'message': log_msg
+                    })
                 
                 return jsonify({
                     'success': False,
@@ -456,6 +531,52 @@ def get_logs():
         'success': True,
         'logs': logs
     })
+
+
+@app.route('/api/payment-logs/current', methods=['GET'])
+def get_current_payment_logs():
+    """Получение логов текущего создаваемого платежа из файла"""
+    import json
+    import os
+    
+    logs_file = os.path.join(os.path.dirname(__file__), 'current_payment_logs.json')
+    
+    try:
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r', encoding='utf-8') as f:
+                logs = json.load(f)
+        else:
+            logs = []
+    except:
+        logs = []
+    
+    # Также добавляем логи из памяти
+    with payment_logs_lock:
+        memory_logs = current_payment_logs.copy()
+    
+    # Объединяем логи из файла и памяти
+    all_logs = logs + memory_logs
+    
+    return jsonify({
+        'success': True,
+        'logs': all_logs,
+        'in_progress': current_generation['in_progress'],
+        'order_id': current_generation['order_id']
+    })
+
+
+@app.route('/api/payment-logs/add', methods=['POST'])
+def add_payment_log():
+    """Добавление лога от API сервера в текущий платеж"""
+    try:
+        data = request.get_json()
+        print(f"📥 Получен лог: {data.get('level')} - {data.get('message')}")  # Отладка
+        with payment_logs_lock:
+            current_payment_logs.append(data)
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Ошибка добавления лога: {e}")
+        return jsonify({'success': False}), 500
 
 
 @app.route('/api/stats/summary', methods=['GET'])

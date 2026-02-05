@@ -378,18 +378,6 @@
             
             <div class="max-w-2xl">
                 <div class="pixel-border pixel-corners p-8 scanlines">
-                    <div class="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 pixel-corners">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-blue-500/20 pixel-corners flex items-center justify-center flex-shrink-0">
-                                <i data-lucide="info" class="w-5 h-5 text-blue-400"></i>
-                            </div>
-                            <div>
-                                <div class="font-medium font-mono">ДЕМО РЕЖИМ</div>
-                                <div class="text-sm text-gray-400 font-mono">Тестовые данные для демонстрации</div>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <form @submit.prevent="createPayment" class="space-y-6">
                         <div>
                             <label class="block text-sm font-medium mb-2 font-mono">СУММА (РУБ)</label>
@@ -553,24 +541,29 @@
                 </div>
             </div>
             
-            <!-- Browser Live View -->
-            <div class="mt-8">
+            <!-- Payment Logs (Real-time) -->
+            <div class="mt-8" x-show="loading || result">
                 <div class="pixel-border pixel-corners p-6 scanlines">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-xl font-bold font-pixel retro-glow">ПРОСМОТР БРАУЗЕРА</h3>
-                        <button 
-                            @click="toggleBrowserView()"
-                            class="px-4 py-2 pixel-corners font-mono text-sm transition-colors"
-                            :class="browserViewActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'"
-                        >
-                            <span x-text="browserViewActive ? 'ОСТАНОВИТЬ' : 'ЗАПУСТИТЬ'"></span>
-                        </button>
+                    <div class="flex items-center gap-3 mb-4">
+                        <i data-lucide="terminal" class="w-5 h-5 text-blue-400"></i>
+                        <h3 class="text-xl font-bold font-pixel retro-glow">ЛОГИ СОЗДАНИЯ</h3>
                     </div>
-                    <div id="browser-viewer-container" class="bg-black/50 pixel-corners p-4 min-h-[400px] flex items-center justify-center">
-                        <div x-show="!browserViewActive" class="text-center text-gray-500 font-mono">
-                            <i data-lucide="monitor" class="w-16 h-16 mx-auto mb-4 opacity-50"></i>
-                            <p>Нажмите "ЗАПУСТИТЬ" чтобы увидеть браузер в реальном времени</p>
+                    <div class="bg-black/50 pixel-corners p-4 max-h-[500px] overflow-y-auto scrollbar-thin font-mono text-sm">
+                        <div x-show="paymentLogs.length === 0" class="text-gray-500 text-center py-8">
+                            Ожидание логов...
                         </div>
+                        <template x-for="(log, index) in paymentLogs" :key="index">
+                            <div class="py-1" :class="{
+                                'text-green-400': log.level === 'SUCCESS',
+                                'text-blue-400': log.level === 'INFO',
+                                'text-yellow-400': log.level === 'WARNING',
+                                'text-red-400': log.level === 'ERROR',
+                                'text-gray-400': log.level === 'DEBUG'
+                            }">
+                                <span class="text-gray-600" x-text="'[' + log.time + ']'"></span>
+                                <span x-text="log.icon + ' ' + log.message"></span>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -986,8 +979,8 @@
                 filterStatus: 'all',
                 paymentsChart: null,
                 successChart: null,
-                browserViewActive: false,
-                browserViewer: null,
+                paymentLogs: [],
+                logPollingInterval: null,
                 
                 init() {
                     this.checkApiStatus();
@@ -1256,6 +1249,10 @@
                 async createPayment() {
                     this.loading = true;
                     this.result = null;
+                    this.paymentLogs = [];
+                    
+                    // Запускаем получение логов
+                    this.startLogPolling();
                     
                     try {
                         const payload = {
@@ -1315,10 +1312,55 @@
                         this.showToast('error', 'Ошибка', 'Не удалось подключиться к серверу');
                     } finally {
                         this.loading = false;
+                        this.stopLogPolling();
                         this.$nextTick(() => {
                             if (window.lucide) lucide.createIcons();
                         });
                     }
+                },
+                
+                startLogPolling() {
+                    // Получаем логи каждые 500ms
+                    this.logPollingInterval = setInterval(() => {
+                        this.fetchPaymentLogs();
+                    }, 500);
+                    this.fetchPaymentLogs(); // Первый запрос сразу
+                },
+                
+                stopLogPolling() {
+                    if (this.logPollingInterval) {
+                        clearInterval(this.logPollingInterval);
+                        this.logPollingInterval = null;
+                    }
+                },
+                
+                async fetchPaymentLogs() {
+                    try {
+                        const response = await fetch('/api/payment-logs/current');
+                        const data = await response.json();
+                        if (data.success && data.logs) {
+                            // Преобразуем логи в нужный формат
+                            this.paymentLogs = data.logs.map(log => ({
+                                time: new Date(log.timestamp).toLocaleTimeString('ru-RU'),
+                                level: log.level.toUpperCase(),
+                                message: log.message,
+                                icon: this.getLogIcon(log.level)
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Failed to fetch payment logs:', error);
+                    }
+                },
+                
+                getLogIcon(level) {
+                    const icons = {
+                        'success': '✅',
+                        'info': 'ℹ️',
+                        'warning': '⚠️',
+                        'error': '❌',
+                        'debug': '🔍'
+                    };
+                    return icons[level.toLowerCase()] || '📝';
                 },
                 
                 searchPayments() {
@@ -1512,36 +1554,6 @@
                     navigator.clipboard.writeText(text).then(() => {
                         this.showToast('success', 'Скопировано!', 'Ссылка скопирована в буфер обмена');
                     });
-                },
-                
-                toggleBrowserView() {
-                    if (!this.browserViewer) {
-                        // Загружаем скрипт если еще не загружен
-                        if (!window.BrowserViewer) {
-                            const script = document.createElement('script');
-                            script.src = '/static/browser_viewer.js';
-                            script.onload = () => {
-                                this.initBrowserViewer();
-                            };
-                            document.head.appendChild(script);
-                        } else {
-                            this.initBrowserViewer();
-                        }
-                    } else {
-                        if (this.browserViewActive) {
-                            this.browserViewer.stop();
-                            this.browserViewActive = false;
-                        } else {
-                            this.browserViewer.start();
-                            this.browserViewActive = true;
-                        }
-                    }
-                },
-                
-                initBrowserViewer() {
-                    this.browserViewer = new BrowserViewer('browser-viewer-container');
-                    this.browserViewer.start();
-                    this.browserViewActive = true;
                 },
                 
                 formatDate(timestamp) {

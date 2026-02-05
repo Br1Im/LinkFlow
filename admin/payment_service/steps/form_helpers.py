@@ -74,7 +74,7 @@ async def fill_react_input(page: Page, selector: str, value: str, field_name_for
             log(f"✅ {field_name_for_log or selector}: {current}", "SUCCESS")
             return True
         else:
-            log(f"⚠️ {field_name_for_log or selector}: value={current}, invalid={is_invalid}", "WARNING")
+            log(f"⚠️ {field_name_for_log or selector}: ожидалось '{value}', получено '{current}', invalid={is_invalid}", "WARNING")
             return False
     
     except Exception as e:
