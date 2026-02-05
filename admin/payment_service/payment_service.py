@@ -1148,14 +1148,14 @@ class PaymentService:
                     'logs': current_payment_logs.copy()
                 }
             
-            # Кнопка "Продолжить" - пробуем разные способы клика
-            log("Нажимаю кнопку Продолжить (этап 2)...", "DEBUG")
+            # Кнопка "Продолжить" - пробуем разные способы отправки формы
+            log("Отправляю форму (этап 2)...", "DEBUG")
             
-            # Сохраняем текущий URL перед кликом
+            # Сохраняем текущий URL перед отправкой
             url_before = self.page.url
             log(f"URL перед отправкой: {url_before}", "DEBUG")
             
-            # Проверяем что кнопка активна и кликаем
+            # Проверяем что кнопка активна
             button_clicked = False
             for attempt in range(25):
                 try:
@@ -1169,21 +1169,53 @@ class PaymentService:
                     if is_enabled:
                         log(f"Кнопка активна (попытка #{attempt + 1})", "DEBUG")
                         
-                        # Пробуем JS клик
-                        try:
-                            await self.page.locator('#pay').evaluate('el => el.click()')
-                            log("Кнопка Продолжить нажата (JS клик)", "SUCCESS")
-                            button_clicked = True
-                            break
-                        except:
-                            pass
+                        # СПОСОБ 1: Отправляем форму напрямую через submit()
+                        if attempt == 0:
+                            try:
+                                submitted = await self.page.evaluate("""
+                                    () => {
+                                        const form = document.querySelector('form');
+                                        if (form) {
+                                            // Находим кнопку submit
+                                            const submitBtn = form.querySelector('button[type="submit"]') || document.getElementById('pay');
+                                            if (submitBtn) {
+                                                // Убираем все обработчики preventDefault
+                                                const newBtn = submitBtn.cloneNode(true);
+                                                submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+                                                // Кликаем
+                                                newBtn.click();
+                                                return true;
+                                            }
+                                        }
+                                        return false;
+                                    }
+                                """)
+                                if submitted:
+                                    log("Форма отправлена (клонирование кнопки)", "SUCCESS")
+                                    button_clicked = True
+                                    await self.page.wait_for_timeout(2000)
+                                    break
+                            except Exception as e:
+                                log(f"Ошибка при клонировании кнопки: {e}", "DEBUG")
                         
-                        # Если не сработало - пробуем force клик
+                        # СПОСОБ 2: JS клик по кнопке
+                        if not button_clicked:
+                            try:
+                                await self.page.locator('#pay').evaluate('el => el.click()')
+                                log("Кнопка Продолжить нажата (JS клик)", "SUCCESS")
+                                button_clicked = True
+                                await self.page.wait_for_timeout(2000)
+                                break
+                            except:
+                                pass
+                        
+                        # СПОСОБ 3: Force клик
                         if not button_clicked:
                             try:
                                 await self.page.locator('#pay').click(force=True, timeout=2000)
                                 log("Кнопка Продолжить нажата (force клик)", "SUCCESS")
                                 button_clicked = True
+                                await self.page.wait_for_timeout(2000)
                                 break
                             except:
                                 pass
@@ -1202,6 +1234,7 @@ class PaymentService:
                                 """)
                                 log(f"Кнопка Продолжить нажата (dispatchEvent, попытка {attempt + 1})", "SUCCESS")
                                 button_clicked = True
+                                await self.page.wait_for_timeout(2000)
                                 break
                             except:
                                 pass
@@ -1216,24 +1249,43 @@ class PaymentService:
             if not button_clicked:
                 log("⚠️ Не удалось нажать кнопку Продолжить!", "WARNING")
             
-            await self.page.wait_for_timeout(1000)
-            
             # Проверяем изменился ли URL после клика
             url_after = self.page.url
-            log(f"URL после отправки: {url_after}", "DEBUG")
+            log(f"URL после клика: {url_after}", "DEBUG")
             
             if url_before == url_after and 'sender-details' in url_after:
-                log("⚠️ URL не изменился, форма возможно не отправилась", "WARNING")
-                # Пробуем еще раз через Enter
+                log("⚠️ URL не изменился после клика, пробую другие способы...", "WARNING")
+                
+                # Пробуем через requestSubmit
                 try:
-                    await self.page.keyboard.press('Enter')
-                    log("Попытка отправки через Enter", "DEBUG")
+                    await self.page.evaluate("""
+                        () => {
+                            const form = document.querySelector('form');
+                            if (form && form.requestSubmit) {
+                                form.requestSubmit();
+                            }
+                        }
+                    """)
+                    log("Попытка отправки через form.requestSubmit()", "DEBUG")
                     await self.page.wait_for_timeout(2000)
-                    url_after_enter = self.page.url
-                    if url_after_enter != url_before:
-                        log(f"✅ URL изменился после Enter: {url_after_enter}", "SUCCESS")
-                except:
-                    pass
+                    
+                    url_after_submit = self.page.url
+                    if url_after_submit != url_before:
+                        log(f"✅ URL изменился после requestSubmit: {url_after_submit}", "SUCCESS")
+                except Exception as e:
+                    log(f"Ошибка requestSubmit: {e}", "DEBUG")
+                
+                # Если все еще не изменился - пробуем Enter
+                if self.page.url == url_before:
+                    try:
+                        await self.page.keyboard.press('Enter')
+                        log("Попытка отправки через Enter", "DEBUG")
+                        await self.page.wait_for_timeout(2000)
+                        url_after_enter = self.page.url
+                        if url_after_enter != url_before:
+                            log(f"✅ URL изменился после Enter: {url_after_enter}", "SUCCESS")
+                    except Exception as e:
+                        log(f"Ошибка Enter: {e}", "DEBUG")
             
             # Проверяем есть ли ошибки валидации на странице
             try:
