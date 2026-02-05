@@ -77,13 +77,17 @@ def create_payment():
     
     try:
         # Получаем JSON данные
+        print(f"📥 Content-Type: {request.content_type}")
+        print(f"📥 Is JSON: {request.is_json}")
+        print(f"📥 Raw data: {request.data[:200]}")
+        
         if not request.is_json:
             return jsonify({
                 'success': False,
-                'error': 'Content-Type must be application/json'
+                'error': f'Content-Type must be application/json, got: {request.content_type}'
             }), 400
         
-        data = request.get_json()
+        data = request.get_json(force=True)  # force=True to parse even if content-type is wrong
         if data is None:
             return jsonify({
                 'success': False,
