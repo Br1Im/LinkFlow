@@ -273,9 +273,14 @@ class PaymentService:
         self.page = None
         self.is_ready = False
         
-    async def start(self, headless: bool = True):
-        """Запускает браузер и подготавливает страницу"""
-        log(f"Запуск браузера (headless={headless})...", "INFO")
+    async def start(self, headless: bool = True, compact_window: bool = False):
+        """Запускает браузер и подготавливает страницу
+        
+        Args:
+            headless: Запуск в headless режиме (без видимого окна)
+            compact_window: Маленькое окно для мониторинга (800x900)
+        """
+        log(f"Запуск браузера (headless={headless}, compact={compact_window})...", "INFO")
         
         # Удаляем старые скриншоты
         try:
@@ -293,12 +298,31 @@ class PaymentService:
             log(f"Не удалось очистить старые скриншоты: {e}", "WARNING")
         
         self.playwright = await async_playwright().start()
+        
+        # Настройки размера окна
+        if compact_window and not headless:
+            # Маленькое окно для мониторинга
+            viewport_size = {'width': 800, 'height': 900}
+            window_size = '--window-size=800,900'
+            window_position = '--window-position=50,50'  # Позиция в левом верхнем углу
+        else:
+            # Обычный размер
+            viewport_size = {'width': 1920, 'height': 1080}
+            window_size = '--window-size=1920,1080'
+            window_position = '--window-position=0,0'
+        
+        launch_args = [
+            '--disable-blink-features=AutomationControlled',
+            window_size,
+            window_position
+        ]
+        
         self.browser = await self.playwright.chromium.launch(
             headless=headless,
-            args=['--disable-blink-features=AutomationControlled']
+            args=launch_args
         )
         self.context = await self.browser.new_context(
-            viewport={'width': 1920, 'height': 1080},
+            viewport=viewport_size,
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         )
         
@@ -329,8 +353,8 @@ class PaymentService:
         
         # Предзагружаем страницу
         log("Предзагрузка страницы...", "INFO")
-        await self.page.goto("https://multitransfer.ru/transfer/uzbekistan", wait_until='load', timeout=60000)
-        await self.page.wait_for_selector('input[placeholder="0 RUB"]', state='visible', timeout=10000)
+        await self.page.goto("https://multitransfer.ru/transfer/uzbekistan", wait_until='load', timeout=90000)
+        await self.page.wait_for_selector('input[placeholder="0 RUB"]', state='visible', timeout=30000)
         
         self.is_ready = True
         log("Сервис готов к работе!", "SUCCESS")

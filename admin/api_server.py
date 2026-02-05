@@ -505,6 +505,29 @@ def toggle_beneficiary_endpoint(beneficiary_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/browser-screenshot', methods=['GET'])
+def get_browser_screenshot():
+    """Получить скриншот браузера в реальном времени"""
+    from flask import send_file
+    import io
+    
+    if not PLAYWRIGHT_AVAILABLE or not payment_service or not payment_service.page:
+        # Возвращаем пустое изображение
+        return jsonify({'error': 'Browser not available'}), 404
+    
+    try:
+        # Делаем скриншот
+        screenshot_bytes = run_async(payment_service.page.screenshot(type='png'))
+        
+        return send_file(
+            io.BytesIO(screenshot_bytes),
+            mimetype='image/png',
+            as_attachment=False
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("🔌 LinkFlow API Server")

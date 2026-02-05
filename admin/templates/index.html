@@ -553,6 +553,28 @@
                 </div>
             </div>
             
+            <!-- Browser Live View -->
+            <div class="mt-8">
+                <div class="pixel-border pixel-corners p-6 scanlines">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold font-pixel retro-glow">ПРОСМОТР БРАУЗЕРА</h3>
+                        <button 
+                            @click="toggleBrowserView()"
+                            class="px-4 py-2 pixel-corners font-mono text-sm transition-colors"
+                            :class="browserViewActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'"
+                        >
+                            <span x-text="browserViewActive ? 'ОСТАНОВИТЬ' : 'ЗАПУСТИТЬ'"></span>
+                        </button>
+                    </div>
+                    <div id="browser-viewer-container" class="bg-black/50 pixel-corners p-4 min-h-[400px] flex items-center justify-center">
+                        <div x-show="!browserViewActive" class="text-center text-gray-500 font-mono">
+                            <i data-lucide="monitor" class="w-16 h-16 mx-auto mb-4 opacity-50"></i>
+                            <p>Нажмите "ЗАПУСТИТЬ" чтобы увидеть браузер в реальном времени</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Payments List -->
             <div class="mt-8">
                 <div class="mb-6 flex items-center justify-between">
@@ -964,6 +986,8 @@
                 filterStatus: 'all',
                 paymentsChart: null,
                 successChart: null,
+                browserViewActive: false,
+                browserViewer: null,
                 
                 init() {
                     this.checkApiStatus();
@@ -1488,6 +1512,36 @@
                     navigator.clipboard.writeText(text).then(() => {
                         this.showToast('success', 'Скопировано!', 'Ссылка скопирована в буфер обмена');
                     });
+                },
+                
+                toggleBrowserView() {
+                    if (!this.browserViewer) {
+                        // Загружаем скрипт если еще не загружен
+                        if (!window.BrowserViewer) {
+                            const script = document.createElement('script');
+                            script.src = '/static/browser_viewer.js';
+                            script.onload = () => {
+                                this.initBrowserViewer();
+                            };
+                            document.head.appendChild(script);
+                        } else {
+                            this.initBrowserViewer();
+                        }
+                    } else {
+                        if (this.browserViewActive) {
+                            this.browserViewer.stop();
+                            this.browserViewActive = false;
+                        } else {
+                            this.browserViewer.start();
+                            this.browserViewActive = true;
+                        }
+                    }
+                },
+                
+                initBrowserViewer() {
+                    this.browserViewer = new BrowserViewer('browser-viewer-container');
+                    this.browserViewer.start();
+                    this.browserViewActive = true;
                 },
                 
                 formatDate(timestamp) {
