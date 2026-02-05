@@ -69,25 +69,7 @@ def static_files(filename):
 @app.route('/')
 def index():
     """Главная страница админки"""
-    return render_template('admin_v3.html')
-
-
-@app.route('/v2')
-def index_v2():
-    """Версия 2 админки"""
-    return render_template('admin_v2.html')
-
-
-@app.route('/test')
-def test():
-    """Тестовая страница"""
-    return '<h1>Server is working!</h1><p>Go to <a href="/">Admin Panel</a></p>'
-
-
-@app.route('/v1')
-def index_v1():
-    """Старая версия админки"""
-    return render_template('admin.html')
+    return render_template('index.html')
 
 
 @app.route('/api/create-payment', methods=['POST'])
