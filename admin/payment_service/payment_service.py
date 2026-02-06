@@ -316,12 +316,13 @@ class PaymentService:
             screenshots_dir = "screenshots"
             if os.path.exists(screenshots_dir):
                 old_files = glob.glob(os.path.join(screenshots_dir, "*"))
-                for f in old_files:
-                    try:
-                        os.remove(f)
-                        log(f"Удален старый файл: {f}", "DEBUG")
-                    except:
-                        pass
+                # НЕ удаляем старые файлы - оставляем для отладки
+                # for f in old_files:
+                #     try:
+                #         os.remove(f)
+                #         log(f"Удален старый файл: {f}", "DEBUG")
+                #     except:
+                #         pass
         except Exception as e:
             log(f"Не удалось очистить старые скриншоты: {e}", "WARNING")
         
