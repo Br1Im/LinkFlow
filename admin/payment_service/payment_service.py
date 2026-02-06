@@ -11,6 +11,7 @@ import asyncio
 import time
 import sys
 import os
+import random  # Для случайных задержек
 from datetime import datetime
 import json
 
@@ -839,37 +840,37 @@ class PaymentService:
             log("ЭТАП 2: ЗАПОЛНЕНИЕ ПОЛЕЙ", "INFO")
             log("=" * 50, "INFO")
             
-            print("\n⚡ Заполняю поля отправителя...")
-            # Последовательное заполнение с паузами для React
+            print("\n⚡ Заполняю поля отправителя (с человечными задержками)...")
+            # Последовательное заполнение с СЛУЧАЙНЫМИ паузами для имитации человека
             await fill_field_simple(self.page, "sender_documents_series", SENDER_DATA["passport_series"], "Серия паспорта")
-            await self.page.wait_for_timeout(100)
+            await self.page.wait_for_timeout(random.randint(200, 500))
             
             await fill_field_simple(self.page, "sender_documents_number", SENDER_DATA["passport_number"], "Номер паспорта")
-            await self.page.wait_for_timeout(100)
+            await self.page.wait_for_timeout(random.randint(200, 500))
             
             await fill_field_simple(self.page, "issueDate", SENDER_DATA["passport_issue_date"], "Дата выдачи")
-            await self.page.wait_for_timeout(100)
+            await self.page.wait_for_timeout(random.randint(300, 600))
             
             await fill_field_simple(self.page, "sender_middleName", SENDER_DATA["middle_name"], "Отчество")
-            await self.page.wait_for_timeout(100)
+            await self.page.wait_for_timeout(random.randint(200, 500))
             
             await fill_field_simple(self.page, "sender_firstName", SENDER_DATA["first_name"], "Имя отправителя")
-            await self.page.wait_for_timeout(100)
+            await self.page.wait_for_timeout(random.randint(200, 500))
             
             await fill_field_simple(self.page, "sender_lastName", SENDER_DATA["last_name"], "Фамилия отправителя")
-            await self.page.wait_for_timeout(100)
+            await self.page.wait_for_timeout(random.randint(200, 500))
             
             await fill_field_simple(self.page, "birthDate", SENDER_DATA["birth_date"], "Дата рождения")
-            await self.page.wait_for_timeout(100)
+            await self.page.wait_for_timeout(random.randint(300, 600))
             
             await fill_field_simple(self.page, "phoneNumber", SENDER_DATA["phone"], "Телефон")
-            await self.page.wait_for_timeout(100)
+            await self.page.wait_for_timeout(random.randint(200, 500))
             
             await fill_field_simple(self.page, "birthPlaceAddress_full", SENDER_DATA["birth_place"], "Место рождения")
-            await self.page.wait_for_timeout(100)
+            await self.page.wait_for_timeout(random.randint(300, 600))
             
             await fill_field_simple(self.page, "registrationAddress_full", SENDER_DATA["registration_place"], "Место регистрации")
-            await self.page.wait_for_timeout(100)
+            await self.page.wait_for_timeout(random.randint(300, 600))
             
             print("\n🌍 Заполняю страны...")
             # Страны
