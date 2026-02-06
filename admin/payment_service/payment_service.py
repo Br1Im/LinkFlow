@@ -1511,31 +1511,38 @@ class PaymentService:
                                     pass
                             
                             if clicked:
-                                log("✅ Модалка закрыта, ждем навигации...", "SUCCESS")
+                                log("✅ Модалка закрыта, кликаю основную кнопку Продолжить...", "SUCCESS")
                                 
-                                # Ждем навигации на следующую страницу (до 10 секунд)
+                                # Ждем чтобы модалка точно закрылась
+                                await self.page.wait_for_timeout(1000)
+                                
+                                # Теперь кликаем основную кнопку Продолжить (#pay)
                                 try:
-                                    await self.page.wait_for_url(lambda url: 'sender-details' not in url, timeout=10000)
-                                    log(f"✅ Навигация выполнена: {self.page.url}", "SUCCESS")
-                                except:
-                                    log("⚠️ Навигация не произошла за 10 секунд", "WARNING")
+                                    # Проверяем что кнопка активна
+                                    is_enabled = await self.page.evaluate("""
+                                        () => {
+                                            const btn = document.getElementById('pay');
+                                            return btn && !btn.disabled;
+                                        }
+                                    """)
                                     
-                                    # Проверяем текущий URL
-                                    current_url = self.page.url
-                                    if 'sender-details' in current_url:
-                                        log("⚠️ Все еще на странице sender-details, пробую отправить форму вручную", "WARNING")
+                                    if is_enabled:
+                                        log("Основная кнопка Продолжить активна, кликаю...", "DEBUG")
                                         
-                                        # Последняя попытка - кликаем кнопку еще раз
+                                        # Кликаем и ждем навигации
                                         try:
                                             await self.page.locator('#pay').click(force=True)
-                                            log("Повторный клик по кнопке Продолжить", "DEBUG")
-                                            await self.page.wait_for_timeout(3000)
+                                            log("✅ Основная кнопка Продолжить нажата", "SUCCESS")
                                             
-                                            # Проверяем изменился ли URL
-                                            if self.page.url != current_url:
-                                                log(f"✅ URL изменился после повторного клика: {self.page.url}", "SUCCESS")
-                                        except Exception as e:
-                                            log(f"Ошибка при повторном клике: {e}", "DEBUG")
+                                            # Ждем навигации
+                                            await self.page.wait_for_url(lambda url: 'sender-details' not in url, timeout=5000)
+                                            log(f"✅ Навигация выполнена: {self.page.url}", "SUCCESS")
+                                        except:
+                                            log("⚠️ Навигация не произошла после клика основной кнопки", "WARNING")
+                                    else:
+                                        log("⚠️ Основная кнопка Продолжить не активна", "WARNING")
+                                except Exception as e:
+                                    log(f"Ошибка при клике основной кнопки: {e}", "WARNING")
                                 
                                 # КРИТИЧНО: Проверяем модалку с ошибкой сразу после закрытия модалки подтверждения
                                 log("Проверяю модалку с ошибкой после подтверждения...", "DEBUG")
