@@ -1148,7 +1148,7 @@ class PaymentService:
                     'logs': current_payment_logs.copy()
                 }
             
-            # Кнопка "Продолжить" - пробуем разные способы отправки формы
+            # Кнопка "Продолжить" - отправляем форму и ждем навигации
             log("Отправляю форму (этап 2)...", "DEBUG")
             
             # Сохраняем текущий URL перед отправкой
@@ -1169,51 +1169,22 @@ class PaymentService:
                     if is_enabled:
                         log(f"Кнопка активна (попытка #{attempt + 1})", "DEBUG")
                         
-                        # СПОСОБ 1: Отправляем форму напрямую через submit()
-                        if attempt == 0:
-                            try:
-                                submitted = await self.page.evaluate("""
-                                    () => {
-                                        const form = document.querySelector('form');
-                                        if (form) {
-                                            // Находим кнопку submit
-                                            const submitBtn = form.querySelector('button[type="submit"]') || document.getElementById('pay');
-                                            if (submitBtn) {
-                                                // Убираем все обработчики preventDefault
-                                                const newBtn = submitBtn.cloneNode(true);
-                                                submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-                                                // Кликаем
-                                                newBtn.click();
-                                                return true;
-                                            }
-                                        }
-                                        return false;
-                                    }
-                                """)
-                                if submitted:
-                                    log("Форма отправлена (клонирование кнопки)", "SUCCESS")
-                                    button_clicked = True
-                                    await self.page.wait_for_timeout(2000)
-                                    break
-                            except Exception as e:
-                                log(f"Ошибка при клонировании кнопки: {e}", "DEBUG")
-                        
-                        # СПОСОБ 2: JS клик по кнопке
-                        if not button_clicked:
+                        # Кликаем и ждем навигации или сетевой активности
+                        try:
+                            # Ждем либо навигации, либо сетевого запроса
+                            async with self.page.expect_event("response", timeout=5000) as response_info:
+                                await self.page.locator('#pay').click(force=True)
+                            
+                            response = await response_info.value
+                            log(f"Получен ответ: {response.url}", "DEBUG")
+                            button_clicked = True
+                            await self.page.wait_for_timeout(2000)
+                            break
+                        except:
+                            # Если не дождались ответа - пробуем просто кликнуть
                             try:
                                 await self.page.locator('#pay').evaluate('el => el.click()')
                                 log("Кнопка Продолжить нажата (JS клик)", "SUCCESS")
-                                button_clicked = True
-                                await self.page.wait_for_timeout(2000)
-                                break
-                            except:
-                                pass
-                        
-                        # СПОСОБ 3: Force клик
-                        if not button_clicked:
-                            try:
-                                await self.page.locator('#pay').click(force=True, timeout=2000)
-                                log("Кнопка Продолжить нажата (force клик)", "SUCCESS")
                                 button_clicked = True
                                 await self.page.wait_for_timeout(2000)
                                 break
@@ -1541,7 +1512,43 @@ class PaymentService:
                             
                             if clicked:
                                 log("✅ Модалка закрыта, продолжаю...", "SUCCESS")
-                                await self.page.wait_for_timeout(500)
+                                await self.page.wait_for_timeout(1000)
+                                
+                                # ВАЖНО: После закрытия модалки нужно дождаться отправки формы
+                                # Проверяем изменился ли URL
+                                url_after_modal = self.page.url
+                                log(f"URL после закрытия модалки: {url_after_modal}", "DEBUG")
+                                
+                                if url_after_modal == url_before and 'sender-details' in url_after_modal:
+                                    log("⚠️ URL не изменился после модалки, форма не отправилась!", "WARNING")
+                                    log("Пробую отправить форму вручную...", "DEBUG")
+                                    
+                                    # Пробуем отправить форму разными способами
+                                    try:
+                                        # Способ 1: requestSubmit
+                                        await self.page.evaluate("""
+                                            () => {
+                                                const form = document.querySelector('form');
+                                                if (form && form.requestSubmit) {
+                                                    console.log('Отправка через requestSubmit');
+                                                    form.requestSubmit();
+                                                }
+                                            }
+                                        """)
+                                        await self.page.wait_for_timeout(2000)
+                                        
+                                        if self.page.url != url_before:
+                                            log(f"✅ Форма отправлена через requestSubmit: {self.page.url}", "SUCCESS")
+                                        else:
+                                            # Способ 2: Кликаем кнопку еще раз
+                                            log("Пробую кликнуть кнопку Продолжить еще раз...", "DEBUG")
+                                            await self.page.locator('#pay').evaluate('el => el.click()')
+                                            await self.page.wait_for_timeout(2000)
+                                            
+                                            if self.page.url != url_before:
+                                                log(f"✅ Форма отправлена после повторного клика: {self.page.url}", "SUCCESS")
+                                    except Exception as e:
+                                        log(f"Ошибка при отправке формы: {e}", "WARNING")
                                 
                                 # КРИТИЧНО: Проверяем модалку с ошибкой сразу после закрытия модалки подтверждения
                                 log("Проверяю модалку с ошибкой после подтверждения...", "DEBUG")
