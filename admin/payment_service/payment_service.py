@@ -1516,6 +1516,12 @@ class PaymentService:
                                 # Ждем чтобы модалка точно закрылась
                                 await self.page.wait_for_timeout(2000)
                                 
+                                # СКРИНШОТ 1: Сразу после закрытия модалки
+                                timestamp = int(time.time())
+                                screenshot1_path = f"screenshots/after_modal_close_{timestamp}.png"
+                                await self.page.screenshot(path=screenshot1_path, full_page=True)
+                                log(f"📸 Скриншот после закрытия модалки: {screenshot1_path}", "INFO")
+                                
                                 # ПРОВЕРЯЕМ ВСЁ, ЧТО ЕСТЬ НА СТРАНИЦЕ
                                 page_state = await self.page.evaluate("""
                                     () => {
@@ -1573,6 +1579,12 @@ class PaymentService:
                                 # Проверяем есть ли ещё капча
                                 if any('captcha' in str(c).lower() for c in page_state['captchas']) or len(page_state['captchas']) > 0:
                                     log("⚠️ ОБНАРУЖЕНА ЕЩЁ ОДНА КАПЧА после модалки!", "WARNING")
+                                    
+                                    # СКРИНШОТ 2: Перед решением второй капчи
+                                    screenshot2_path = f"screenshots/before_second_captcha_{timestamp}.png"
+                                    await self.page.screenshot(path=screenshot2_path, full_page=True)
+                                    log(f"📸 Скриншот перед второй капчей: {screenshot2_path}", "INFO")
+                                    
                                     # Пробуем решить
                                     try:
                                         captcha_iframe_selector = 'iframe[src*="smartcaptcha.yandexcloud.net/checkbox"]'
@@ -1584,8 +1596,13 @@ class PaymentService:
                                         await checkbox_button.click(timeout=2000)
                                         log("✅ Вторая капча решена", "SUCCESS")
                                         await self.page.wait_for_timeout(2000)
-                                    except:
-                                        log("Не удалось решить вторую капчу", "DEBUG")
+                                        
+                                        # СКРИНШОТ 3: После решения второй капчи
+                                        screenshot3_path = f"screenshots/after_second_captcha_{timestamp}.png"
+                                        await self.page.screenshot(path=screenshot3_path, full_page=True)
+                                        log(f"📸 Скриншот после второй капчи: {screenshot3_path}", "INFO")
+                                    except Exception as e:
+                                        log(f"Не удалось решить вторую капчу: {e}", "DEBUG")
                                 
                                 # Теперь пробуем кликнуть основную кнопку
                                 try:
@@ -1598,6 +1615,12 @@ class PaymentService:
                                     
                                     if is_enabled:
                                         log("Основная кнопка Продолжить активна, кликаю...", "DEBUG")
+                                        
+                                        # СКРИНШОТ 4: Перед кликом основной кнопки
+                                        screenshot4_path = f"screenshots/before_main_button_{timestamp}.png"
+                                        await self.page.screenshot(path=screenshot4_path, full_page=True)
+                                        log(f"📸 Скриншот перед кликом основной кнопки: {screenshot4_path}", "INFO")
+                                        
                                         await self.page.locator('#pay').click(force=True)
                                         log("✅ Основная кнопка нажата", "SUCCESS")
                                         
@@ -1605,10 +1628,25 @@ class PaymentService:
                                         try:
                                             await self.page.wait_for_url(lambda url: 'sender-details' not in url, timeout=5000)
                                             log(f"✅ Навигация выполнена: {self.page.url}", "SUCCESS")
+                                            
+                                            # СКРИНШОТ 5: После успешной навигации
+                                            screenshot5_path = f"screenshots/after_navigation_{timestamp}.png"
+                                            await self.page.screenshot(path=screenshot5_path, full_page=True)
+                                            log(f"📸 Скриншот после навигации: {screenshot5_path}", "INFO")
                                         except:
                                             log("⚠️ Навигация не произошла", "WARNING")
+                                            
+                                            # СКРИНШОТ 6: Если навигация не произошла
+                                            screenshot6_path = f"screenshots/no_navigation_{timestamp}.png"
+                                            await self.page.screenshot(path=screenshot6_path, full_page=True)
+                                            log(f"📸 Скриншот - навигация не произошла: {screenshot6_path}", "INFO")
                                     else:
                                         log("⚠️ Основная кнопка не активна", "WARNING")
+                                        
+                                        # СКРИНШОТ 7: Кнопка не активна
+                                        screenshot7_path = f"screenshots/button_disabled_{timestamp}.png"
+                                        await self.page.screenshot(path=screenshot7_path, full_page=True)
+                                        log(f"📸 Скриншот - кнопка не активна: {screenshot7_path}", "INFO")
                                 except Exception as e:
                                     log(f"Ошибка при клике: {e}", "WARNING")
                                 
