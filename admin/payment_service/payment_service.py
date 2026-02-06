@@ -1511,74 +1511,31 @@ class PaymentService:
                                     pass
                             
                             if clicked:
-                                log("✅ Модалка закрыта, ждем отправки формы...", "SUCCESS")
+                                log("✅ Модалка закрыта, ждем навигации...", "SUCCESS")
                                 
-                                # Ждем немного чтобы модалка точно закрылась
-                                await self.page.wait_for_timeout(500)
-                                
-                                # Проверяем изменился ли URL (форма должна отправиться автоматически)
-                                url_after_modal = self.page.url
-                                log(f"URL после закрытия модалки: {url_after_modal}", "DEBUG")
-                                
-                                # Если URL не изменился - значит форма не отправилась
-                                # Пробуем отправить вручную
-                                if url_after_modal == url_before and 'sender-details' in url_after_modal:
-                                    log("⚠️ Форма не отправилась автоматически, отправляю вручную...", "WARNING")
+                                # Ждем навигации на следующую страницу (до 10 секунд)
+                                try:
+                                    await self.page.wait_for_url(lambda url: 'sender-details' not in url, timeout=10000)
+                                    log(f"✅ Навигация выполнена: {self.page.url}", "SUCCESS")
+                                except:
+                                    log("⚠️ Навигация не произошла за 10 секунд", "WARNING")
                                     
-                                    # Ждем чтобы все обработчики отработали
-                                    await self.page.wait_for_timeout(1000)
-                                    
-                                    # Пробуем отправить форму через нативный submit (обходим все обработчики)
-                                    try:
-                                        submitted = await self.page.evaluate("""
-                                            async () => {
-                                                const form = document.querySelector('form');
-                                                if (!form) return false;
-                                                
-                                                // Получаем action и method формы
-                                                const action = form.action;
-                                                const method = form.method || 'POST';
-                                                
-                                                // Собираем все данные формы
-                                                const formData = new FormData(form);
-                                                const data = {};
-                                                for (let [key, value] of formData.entries()) {
-                                                    data[key] = value;
-                                                }
-                                                
-                                                console.log('Отправка формы:', action, method, data);
-                                                
-                                                // Отправляем через fetch (обходим все обработчики)
-                                                try {
-                                                    const response = await fetch(action, {
-                                                        method: method,
-                                                        body: formData,
-                                                        credentials: 'same-origin'
-                                                    });
-                                                    
-                                                    if (response.redirected) {
-                                                        window.location.href = response.url;
-                                                        return true;
-                                                    }
-                                                    
-                                                    return response.ok;
-                                                } catch (e) {
-                                                    console.error('Ошибка отправки:', e);
-                                                    return false;
-                                                }
-                                            }
-                                        """)
+                                    # Проверяем текущий URL
+                                    current_url = self.page.url
+                                    if 'sender-details' in current_url:
+                                        log("⚠️ Все еще на странице sender-details, пробую отправить форму вручную", "WARNING")
                                         
-                                        if submitted:
-                                            log("✅ Форма отправлена через fetch", "SUCCESS")
+                                        # Последняя попытка - кликаем кнопку еще раз
+                                        try:
+                                            await self.page.locator('#pay').click(force=True)
+                                            log("Повторный клик по кнопке Продолжить", "DEBUG")
                                             await self.page.wait_for_timeout(3000)
                                             
-                                            if self.page.url != url_before:
-                                                log(f"✅ URL изменился: {self.page.url}", "SUCCESS")
-                                        else:
-                                            log("⚠️ Не удалось отправить форму через fetch", "WARNING")
-                                    except Exception as e:
-                                        log(f"Ошибка при отправке формы: {e}", "WARNING")
+                                            # Проверяем изменился ли URL
+                                            if self.page.url != current_url:
+                                                log(f"✅ URL изменился после повторного клика: {self.page.url}", "SUCCESS")
+                                        except Exception as e:
+                                            log(f"Ошибка при повторном клике: {e}", "DEBUG")
                                 
                                 # КРИТИЧНО: Проверяем модалку с ошибкой сразу после закрытия модалки подтверждения
                                 log("Проверяю модалку с ошибкой после подтверждения...", "DEBUG")
