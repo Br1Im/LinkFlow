@@ -343,22 +343,75 @@ class PaymentService:
         
         launch_args = [
             '--disable-blink-features=AutomationControlled',
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-site-isolation-trials',
             window_size,
             window_position
         ]
         
         self.browser = await self.playwright.chromium.launch(
             headless=headless,
-            args=launch_args
-        )
-        self.context = await self.browser.new_context(
-            viewport=viewport_size,
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            args=launch_args,
+            chromium_sandbox=False
         )
         
+        # Более реалистичный User-Agent
+        user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        
+        self.context = await self.browser.new_context(
+            viewport=viewport_size,
+            user_agent=user_agent,
+            locale='ru-RU',
+            timezone_id='Europe/Moscow',
+            permissions=['geolocation'],
+            geolocation={'latitude': 55.7558, 'longitude': 37.6173},  # Москва
+            color_scheme='dark',
+            extra_http_headers={
+                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0'
+            }
+        )
+        
+        # Скрываем признаки автоматизации
         await self.context.add_init_script("""
+            // Переопределяем webdriver
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined,
+            });
+            
+            // Добавляем chrome объект
+            window.chrome = {
+                runtime: {},
+            };
+            
+            // Переопределяем permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+            
+            // Добавляем плагины
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5],
+            });
+            
+            // Добавляем языки
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['ru-RU', 'ru', 'en-US', 'en'],
             });
         """)
         
