@@ -1511,14 +1511,84 @@ class PaymentService:
                                     pass
                             
                             if clicked:
-                                log("✅ Модалка закрыта, кликаю основную кнопку Продолжить...", "SUCCESS")
+                                log("✅ Модалка закрыта, проверяю что на странице...", "SUCCESS")
                                 
                                 # Ждем чтобы модалка точно закрылась
-                                await self.page.wait_for_timeout(1000)
+                                await self.page.wait_for_timeout(2000)
                                 
-                                # Теперь кликаем основную кнопку Продолжить (#pay)
+                                # ПРОВЕРЯЕМ ВСЁ, ЧТО ЕСТЬ НА СТРАНИЦЕ
+                                page_state = await self.page.evaluate("""
+                                    () => {
+                                        const state = {
+                                            url: window.location.href,
+                                            modals: [],
+                                            captchas: [],
+                                            buttons: [],
+                                            errors: []
+                                        };
+                                        
+                                        // Ищем все модалки
+                                        const modalTexts = document.querySelectorAll('h4, h3, h2');
+                                        modalTexts.forEach(h => {
+                                            if (h.offsetParent !== null) {
+                                                state.modals.push(h.textContent.trim());
+                                            }
+                                        });
+                                        
+                                        // Ищем капчи
+                                        const captchaIframes = document.querySelectorAll('iframe[src*="captcha"]');
+                                        state.captchas.push(`Найдено капч: ${captchaIframes.length}`);
+                                        
+                                        // Ищем кнопки
+                                        const buttons = document.querySelectorAll('button');
+                                        buttons.forEach(btn => {
+                                            if (btn.offsetParent !== null && btn.textContent.trim()) {
+                                                state.buttons.push({
+                                                    text: btn.textContent.trim(),
+                                                    disabled: btn.disabled,
+                                                    id: btn.id
+                                                });
+                                            }
+                                        });
+                                        
+                                        // Ищем ошибки
+                                        const errorElements = document.querySelectorAll('.error, .invalid-feedback, [class*="error"]');
+                                        errorElements.forEach(err => {
+                                            if (err.offsetParent !== null && err.textContent.trim()) {
+                                                state.errors.push(err.textContent.trim());
+                                            }
+                                        });
+                                        
+                                        return state;
+                                    }
+                                """)
+                                
+                                log(f"📊 Состояние страницы после закрытия модалки:", "INFO")
+                                log(f"   URL: {page_state['url']}", "INFO")
+                                log(f"   Модалки: {page_state['modals']}", "INFO")
+                                log(f"   Капчи: {page_state['captchas']}", "INFO")
+                                log(f"   Кнопки: {page_state['buttons'][:5]}", "INFO")  # Первые 5
+                                log(f"   Ошибки: {page_state['errors']}", "INFO")
+                                
+                                # Проверяем есть ли ещё капча
+                                if any('captcha' in str(c).lower() for c in page_state['captchas']) or len(page_state['captchas']) > 0:
+                                    log("⚠️ ОБНАРУЖЕНА ЕЩЁ ОДНА КАПЧА после модалки!", "WARNING")
+                                    # Пробуем решить
+                                    try:
+                                        captcha_iframe_selector = 'iframe[src*="smartcaptcha.yandexcloud.net/checkbox"]'
+                                        await self.page.wait_for_selector(captcha_iframe_selector, state='visible', timeout=2000)
+                                        log("Решаю вторую капчу...", "DEBUG")
+                                        
+                                        captcha_frame = self.page.frame_locator(captcha_iframe_selector)
+                                        checkbox_button = captcha_frame.locator('#js-button')
+                                        await checkbox_button.click(timeout=2000)
+                                        log("✅ Вторая капча решена", "SUCCESS")
+                                        await self.page.wait_for_timeout(2000)
+                                    except:
+                                        log("Не удалось решить вторую капчу", "DEBUG")
+                                
+                                # Теперь пробуем кликнуть основную кнопку
                                 try:
-                                    # Проверяем что кнопка активна
                                     is_enabled = await self.page.evaluate("""
                                         () => {
                                             const btn = document.getElementById('pay');
@@ -1528,23 +1598,21 @@ class PaymentService:
                                     
                                     if is_enabled:
                                         log("Основная кнопка Продолжить активна, кликаю...", "DEBUG")
+                                        await self.page.locator('#pay').click(force=True)
+                                        log("✅ Основная кнопка нажата", "SUCCESS")
                                         
-                                        # Кликаем и ждем навигации
+                                        # Ждем навигации
                                         try:
-                                            await self.page.locator('#pay').click(force=True)
-                                            log("✅ Основная кнопка Продолжить нажата", "SUCCESS")
-                                            
-                                            # Ждем навигации
                                             await self.page.wait_for_url(lambda url: 'sender-details' not in url, timeout=5000)
                                             log(f"✅ Навигация выполнена: {self.page.url}", "SUCCESS")
                                         except:
-                                            log("⚠️ Навигация не произошла после клика основной кнопки", "WARNING")
+                                            log("⚠️ Навигация не произошла", "WARNING")
                                     else:
-                                        log("⚠️ Основная кнопка Продолжить не активна", "WARNING")
+                                        log("⚠️ Основная кнопка не активна", "WARNING")
                                 except Exception as e:
-                                    log(f"Ошибка при клике основной кнопки: {e}", "WARNING")
+                                    log(f"Ошибка при клике: {e}", "WARNING")
                                 
-                                # КРИТИЧНО: Проверяем модалку с ошибкой сразу после закрытия модалки подтверждения
+                                # КРИТИЧНО: Проверяем модалку с ошибкой
                                 log("Проверяю модалку с ошибкой после подтверждения...", "DEBUG")
                                 try:
                                     error_check = await self.page.evaluate("""
