@@ -893,57 +893,39 @@ class PaymentService:
             log("ЭТАП 2: ЗАПОЛНЕНИЕ ПОЛЕЙ", "INFO")
             log("=" * 50, "INFO")
             
-            print("\n⚡ Заполняю поля отправителя (с человечными задержками и движениями мыши)...")
+            print("\n⚡ Заполняю поля отправителя (оптимизированные задержки)...")
             
-            # Добавляем случайное движение мыши перед началом
-            try:
-                await self.page.mouse.move(random.randint(100, 500), random.randint(100, 500))
-                await self.page.wait_for_timeout(random.randint(300, 700))
-            except:
-                pass
-            
-            # Последовательное заполнение с БОЛЬШИМИ случайными паузами
+            # Убираем начальное движение мыши - не критично
+            # Последовательное заполнение с ОПТИМИЗИРОВАННЫМИ задержками (300-600мс вместо 500-1200мс)
             await fill_field_simple(self.page, "sender_documents_series", SENDER_DATA["passport_series"], "Серия паспорта")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
+            await self.page.wait_for_timeout(random.randint(300, 500))
             
             await fill_field_simple(self.page, "sender_documents_number", SENDER_DATA["passport_number"], "Номер паспорта")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
+            await self.page.wait_for_timeout(random.randint(300, 500))
             
             await fill_field_simple(self.page, "issueDate", SENDER_DATA["passport_issue_date"], "Дата выдачи")
-            await self.page.wait_for_timeout(random.randint(600, 1200))
-            
-            # Случайное движение мыши
-            try:
-                await self.page.mouse.move(random.randint(200, 600), random.randint(200, 600))
-            except:
-                pass
+            await self.page.wait_for_timeout(random.randint(400, 600))
             
             await fill_field_simple(self.page, "sender_middleName", SENDER_DATA["middle_name"], "Отчество")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
+            await self.page.wait_for_timeout(random.randint(300, 500))
             
             await fill_field_simple(self.page, "sender_firstName", SENDER_DATA["first_name"], "Имя отправителя")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
+            await self.page.wait_for_timeout(random.randint(300, 500))
             
             await fill_field_simple(self.page, "sender_lastName", SENDER_DATA["last_name"], "Фамилия отправителя")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
-            
-            # Случайное движение мыши
-            try:
-                await self.page.mouse.move(random.randint(300, 700), random.randint(300, 700))
-            except:
-                pass
+            await self.page.wait_for_timeout(random.randint(300, 500))
             
             await fill_field_simple(self.page, "birthDate", SENDER_DATA["birth_date"], "Дата рождения")
-            await self.page.wait_for_timeout(random.randint(600, 1200))
+            await self.page.wait_for_timeout(random.randint(400, 600))
             
             await fill_field_simple(self.page, "phoneNumber", SENDER_DATA["phone"], "Телефон")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
+            await self.page.wait_for_timeout(random.randint(300, 500))
             
             await fill_field_simple(self.page, "birthPlaceAddress_full", SENDER_DATA["birth_place"], "Место рождения")
-            await self.page.wait_for_timeout(random.randint(600, 1200))
+            await self.page.wait_for_timeout(random.randint(400, 600))
             
             await fill_field_simple(self.page, "registrationAddress_full", SENDER_DATA["registration_place"], "Место регистрации")
-            await self.page.wait_for_timeout(random.randint(600, 1200))
+            await self.page.wait_for_timeout(random.randint(400, 600))
             
             print("\n🌍 Заполняю страны...")
             # Страны
@@ -963,9 +945,9 @@ class PaymentService:
             except:
                 pass
             
-            # Пауза перед заполнением получателя
+            # Пауза перед заполнением получателя (уменьшена с 700 до 400)
             log("Жду обработки полей отправителя...", "DEBUG")
-            await self.page.wait_for_timeout(700)
+            await self.page.wait_for_timeout(400)
             
             print("\n💳 Заполняю реквизиты получателя (в конце)...")
             # КРИТИЧЕСКИ ВАЖНО: Заполняем поля получателя В САМОМ КОНЦЕ
