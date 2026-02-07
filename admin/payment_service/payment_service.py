@@ -29,7 +29,7 @@ except ImportError:
     print("⚠️ База данных недоступна, используется fallback режим")
 
 # Импортируем модульные этапы
-from steps import process_step1, process_step2
+from steps import process_step1, process_step2, process_step3
 
 
 # Глобальное хранилище логов для текущего платежа
@@ -326,6 +326,22 @@ class PaymentService:
                 }
             
             step2_time = step2_result['time']
+            
+            # ЭТАП 3: Модалка и капча (используем модуль)
+            step3_result = await process_step3(self.page, log)
+            
+            if not step3_result['success']:
+                return {
+                    'success': False,
+                    'qr_link': None,
+                    'time': time.time() - start_time,
+                    'step1_time': step1_time,
+                    'step2_time': step2_time,
+                    'error': step3_result['error'],
+                    'logs': current_payment_logs.copy()
+                }
+            
+            step3_time = step3_result['time']
             
             # Ждем QR ссылку
             log("Жду QR-ссылку...", "DEBUG")
