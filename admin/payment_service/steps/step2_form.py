@@ -242,6 +242,91 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         
         await page.wait_for_timeout(1000)
         
+        # === ОБРАБОТКА КАПЧИ И МОДАЛКИ ===
+        log("Проверяю наличие капчи...", "DEBUG")
+        try:
+            captcha_iframe_selector = 'iframe[src*="smartcaptcha.yandexcloud.net/checkbox"]'
+            await page.wait_for_selector(captcha_iframe_selector, state='visible', timeout=3000)
+            
+            log("Капча обнаружена, решаю...", "DEBUG")
+            await page.wait_for_timeout(300)
+            
+            captcha_frame = page.frame_locator(captcha_iframe_selector)
+            checkbox_button = captcha_frame.locator('#js-button')
+            await checkbox_button.wait_for(state='visible', timeout=3000)
+            
+            # Пробуем решить капчу
+            for attempt in range(3):
+                try:
+                    await checkbox_button.click(timeout=2000)
+                    log(f"Капча решена (попытка {attempt + 1})", "SUCCESS")
+                    break
+                except:
+                    try:
+                        await checkbox_button.click(force=True, timeout=2000)
+                        log(f"Капча решена force (попытка {attempt + 1})", "SUCCESS")
+                        break
+                    except:
+                        pass
+            
+            await page.wait_for_timeout(800)
+        except:
+            log("Капча не обнаружена", "DEBUG")
+        
+        # Модалка "Проверка данных"
+        log("Проверяю модалку проверки данных...", "DEBUG")
+        try:
+            modal_info = await page.evaluate("""
+                () => {
+                    const headers = document.querySelectorAll('h4');
+                    for (const h of headers) {
+                        if (h.textContent.includes('Проверка данных')) {
+                            const parent = h.closest('div');
+                            const paragraphs = parent ? parent.querySelectorAll('p') : [];
+                            let text = '';
+                            paragraphs.forEach(p => { text += p.textContent + ' '; });
+                            return { found: true, text: text.trim() };
+                        }
+                    }
+                    return { found: false, text: '' };
+                }
+            """)
+            
+            if modal_info['found']:
+                log(f"📋 Модалка 'Проверка данных'", "INFO")
+                
+                if 'Ошибка' in modal_info['text'] or 'ошибка' in modal_info['text']:
+                    log("⚠️ ОШИБКА: Реквизиты получателя устарели!", "WARNING")
+                    return {
+                        'success': False,
+                        'time': time.time() - start_time,
+                        'error': 'Реквизиты получателя больше не актуальны'
+                    }
+                else:
+                    log("✅ Модалка подтверждения - нажимаю 'Продолжить'", "SUCCESS")
+                    try:
+                        button = page.locator('button:has-text("Продолжить")').last
+                        await button.wait_for(state='visible', timeout=3000)
+                        
+                        for method in ['click', 'force', 'js']:
+                            try:
+                                if method == 'click':
+                                    await button.click(timeout=2000)
+                                elif method == 'force':
+                                    await button.click(force=True, timeout=2000)
+                                elif method == 'js':
+                                    await button.evaluate('el => el.click()')
+                                log(f"Кнопка нажата ({method})", "DEBUG")
+                                break
+                            except:
+                                pass
+                        
+                        await page.wait_for_timeout(2000)
+                    except Exception as e:
+                        log(f"⚠️ Ошибка при нажатии кнопки: {e}", "WARNING")
+        except:
+            log("Модалка не обнаружена", "DEBUG")
+        
         elapsed_time = time.time() - start_time
         log(f"⏱️ Этап 2 занял: {elapsed_time:.2f}s", "INFO")
         
