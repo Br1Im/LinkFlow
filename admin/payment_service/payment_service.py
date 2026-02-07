@@ -893,57 +893,30 @@ class PaymentService:
             log("ЭТАП 2: ЗАПОЛНЕНИЕ ПОЛЕЙ", "INFO")
             log("=" * 50, "INFO")
             
-            print("\n⚡ Заполняю поля отправителя (с человечными задержками и движениями мыши)...")
+            print("\n⚡ Заполняю поля отправителя МАКСИМАЛЬНО БЫСТРО...")
             
-            # Добавляем случайное движение мыши перед началом
-            try:
-                await self.page.mouse.move(random.randint(100, 500), random.randint(100, 500))
-                await self.page.wait_for_timeout(random.randint(300, 700))
-            except:
-                pass
+            # АГРЕССИВНАЯ ОПТИМИЗАЦИЯ: Параллельное заполнение БЕЗ задержек
+            # Группа 1: Паспортные данные + дата выдачи (параллельно)
+            await asyncio.gather(
+                fill_field_simple(self.page, "sender_documents_series", SENDER_DATA["passport_series"], "Серия паспорта"),
+                fill_field_simple(self.page, "sender_documents_number", SENDER_DATA["passport_number"], "Номер паспорта"),
+                fill_field_simple(self.page, "issueDate", SENDER_DATA["passport_issue_date"], "Дата выдачи"),
+            )
             
-            # Последовательное заполнение с БОЛЬШИМИ случайными паузами
-            await fill_field_simple(self.page, "sender_documents_series", SENDER_DATA["passport_series"], "Серия паспорта")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
+            # Группа 2: ФИО (параллельно)
+            await asyncio.gather(
+                fill_field_simple(self.page, "sender_middleName", SENDER_DATA["middle_name"], "Отчество"),
+                fill_field_simple(self.page, "sender_firstName", SENDER_DATA["first_name"], "Имя отправителя"),
+                fill_field_simple(self.page, "sender_lastName", SENDER_DATA["last_name"], "Фамилия отправителя"),
+            )
             
-            await fill_field_simple(self.page, "sender_documents_number", SENDER_DATA["passport_number"], "Номер паспорта")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
-            
-            await fill_field_simple(self.page, "issueDate", SENDER_DATA["passport_issue_date"], "Дата выдачи")
-            await self.page.wait_for_timeout(random.randint(600, 1200))
-            
-            # Случайное движение мыши
-            try:
-                await self.page.mouse.move(random.randint(200, 600), random.randint(200, 600))
-            except:
-                pass
-            
-            await fill_field_simple(self.page, "sender_middleName", SENDER_DATA["middle_name"], "Отчество")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
-            
-            await fill_field_simple(self.page, "sender_firstName", SENDER_DATA["first_name"], "Имя отправителя")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
-            
-            await fill_field_simple(self.page, "sender_lastName", SENDER_DATA["last_name"], "Фамилия отправителя")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
-            
-            # Случайное движение мыши
-            try:
-                await self.page.mouse.move(random.randint(300, 700), random.randint(300, 700))
-            except:
-                pass
-            
-            await fill_field_simple(self.page, "birthDate", SENDER_DATA["birth_date"], "Дата рождения")
-            await self.page.wait_for_timeout(random.randint(600, 1200))
-            
-            await fill_field_simple(self.page, "phoneNumber", SENDER_DATA["phone"], "Телефон")
-            await self.page.wait_for_timeout(random.randint(500, 1000))
-            
-            await fill_field_simple(self.page, "birthPlaceAddress_full", SENDER_DATA["birth_place"], "Место рождения")
-            await self.page.wait_for_timeout(random.randint(600, 1200))
-            
-            await fill_field_simple(self.page, "registrationAddress_full", SENDER_DATA["registration_place"], "Место регистрации")
-            await self.page.wait_for_timeout(random.randint(600, 1200))
+            # Группа 3: Дата рождения, телефон и адреса (параллельно)
+            await asyncio.gather(
+                fill_field_simple(self.page, "birthDate", SENDER_DATA["birth_date"], "Дата рождения"),
+                fill_field_simple(self.page, "phoneNumber", SENDER_DATA["phone"], "Телефон"),
+                fill_field_simple(self.page, "birthPlaceAddress_full", SENDER_DATA["birth_place"], "Место рождения"),
+                fill_field_simple(self.page, "registrationAddress_full", SENDER_DATA["registration_place"], "Место регистрации"),
+            )
             
             print("\n🌍 Заполняю страны...")
             # Страны
@@ -963,9 +936,9 @@ class PaymentService:
             except:
                 pass
             
-            # Пауза перед заполнением получателя
+            # Минимальная пауза перед заполнением получателя
             log("Жду обработки полей отправителя...", "DEBUG")
-            await self.page.wait_for_timeout(700)
+            await self.page.wait_for_timeout(200)  # было 700, сократили более чем втрое
             
             print("\n💳 Заполняю реквизиты получателя (в конце)...")
             # КРИТИЧЕСКИ ВАЖНО: Заполняем поля получателя В САМОМ КОНЦЕ
@@ -988,7 +961,7 @@ class PaymentService:
                     'logs': current_payment_logs.copy()
                 }
             
-            await self.page.wait_for_timeout(300)
+            await self.page.wait_for_timeout(150)  # было 300, сократили
             
             fname_ok, lname_ok = await fill_beneficiary_name(self.page, first_name, last_name)
             if not fname_ok or not lname_ok:
@@ -1020,21 +993,21 @@ class PaymentService:
                         # Проверяем что поле видимо
                         if await inp.is_visible():
                             await inp.click(timeout=100)
-                            await self.page.wait_for_timeout(30)
+                            await self.page.wait_for_timeout(10)  # было 30, сократили втрое
                     except:
                         pass
                 
                 # Клик мимо всех полей
                 await self.page.evaluate("document.body.click()")
-                await self.page.wait_for_timeout(200)
+                await self.page.wait_for_timeout(100)  # было 200, сократили вдвое
                 log("Все поля прокликаны", "SUCCESS")
             except Exception as e:
                 log(f"Ошибка при прокликивании полей: {e}", "WARNING")
             
-            # Двойная проверка ошибок с паузами
-            log("Двойная проверка валидации полей...", "DEBUG")
+            # Быстрая проверка ошибок
+            log("Проверка валидации полей...", "DEBUG")
             for check_num in range(2):
-                await self.page.wait_for_timeout(800)
+                await self.page.wait_for_timeout(300)  # было 800, сократили более чем вдвое
                 
                 error_count = await self.page.evaluate("""
                     () => {
