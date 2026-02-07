@@ -316,14 +316,40 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
                                     await button.click(force=True, timeout=2000)
                                 elif method == 'js':
                                     await button.evaluate('el => el.click()')
-                                log(f"Кнопка нажата ({method})", "DEBUG")
+                                log(f"Кнопка модалки нажата ({method})", "DEBUG")
                                 break
                             except:
                                 pass
                         
                         await page.wait_for_timeout(2000)
+                        log("Модалка закрыта, нажимаю основную кнопку", "DEBUG")
+                        
+                        # ВАЖНО: После закрытия модалки нажимаем основную кнопку #pay
+                        try:
+                            is_enabled = await page.evaluate("""
+                                () => {
+                                    const btn = document.getElementById('pay');
+                                    return btn && !btn.disabled;
+                                }
+                            """)
+                            
+                            if is_enabled:
+                                await page.locator('#pay').click(force=True)
+                                log("✅ Основная кнопка Продолжить нажата", "SUCCESS")
+                                
+                                # Ждем навигации или изменения URL
+                                try:
+                                    await page.wait_for_url(lambda url: 'sender-details' not in url, timeout=5000)
+                                    log(f"✅ Навигация выполнена: {page.url}", "SUCCESS")
+                                except:
+                                    log(f"URL не изменился: {page.url}", "DEBUG")
+                            else:
+                                log("⚠️ Основная кнопка не активна", "WARNING")
+                        except Exception as e:
+                            log(f"⚠️ Ошибка при нажатии основной кнопки: {e}", "WARNING")
+                        
                     except Exception as e:
-                        log(f"⚠️ Ошибка при нажатии кнопки: {e}", "WARNING")
+                        log(f"⚠️ Ошибка при обработке модалки: {e}", "WARNING")
         except:
             log("Модалка не обнаружена", "DEBUG")
         
