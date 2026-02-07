@@ -13,8 +13,8 @@ async def main():
     print()
     
     # Данные
-    card_number = '9860606753188378'
-    owner_name = 'ASIYA ESEMURATOVA'
+    card_number = '5614682115648125'
+    owner_name = 'ABDUGANIJON HUSENBAYEV'
     amount = 1000
     
     print(f"Карта: {card_number}")
