@@ -23,34 +23,29 @@ async def fill_react_input(page: Page, selector: str, value: str, field_name_for
         if is_date_field:
             # Для дат используем посимвольный ввод
             await locator.click()
-            await page.wait_for_timeout(50)
             await locator.fill("")
-            await page.wait_for_timeout(50)
             
             # Вводим каждый символ с задержкой
             for char in value:
-                await locator.type(char, delay=10)
+                await locator.type(char, delay=8)
             
-            await page.wait_for_timeout(50)
             await locator.blur()
-            await page.wait_for_timeout(100)
+            await page.wait_for_timeout(50)
         else:
             # Для обычных полей используем РЕАЛЬНЫЙ ВВОД (не JavaScript!)
             # Это единственный способ который правильно триггерит React onChange
             await locator.click(force=True)
-            await page.wait_for_timeout(50)
             
             # Очищаем поле
             await locator.fill("")
-            await page.wait_for_timeout(50)
             
             # Вводим значение посимвольно (как реальный пользователь)
-            await locator.press_sequentially(value, delay=8)
-            await page.wait_for_timeout(80)
+            await locator.press_sequentially(value, delay=5)
+            await page.wait_for_timeout(50)
             
             # Blur для завершения ввода
             await locator.blur()
-            await page.wait_for_timeout(80)
+            await page.wait_for_timeout(50)
         
         # Проверка результата
         current = await locator.input_value()
@@ -103,11 +98,10 @@ async def select_country_async(page: Page, pattern: str, country: str, field_nam
                 # Пробуем до 3 раз
                 for attempt in range(3):
                     await inp.click()
-                    await page.wait_for_timeout(100)
-                    await inp.fill("")
                     await page.wait_for_timeout(50)
+                    await inp.fill("")
                     await inp.fill(country)
-                    await page.wait_for_timeout(200)
+                    await page.wait_for_timeout(150)
                     
                     try:
                         # Ждем появления опций
@@ -121,7 +115,7 @@ async def select_country_async(page: Page, pattern: str, country: str, field_nam
                             text = await option.inner_text()
                             if country.lower() in text.lower():
                                 await option.click()
-                                await page.wait_for_timeout(100)
+                                await page.wait_for_timeout(50)
                                 
                                 # Проверяем что выбралось правильно
                                 current_value = await inp.input_value()
@@ -138,7 +132,7 @@ async def select_country_async(page: Page, pattern: str, country: str, field_nam
                     except Exception:
                         # Если опции не появились, жмем Enter
                         await page.keyboard.press('Enter')
-                        await page.wait_for_timeout(100)
+                        await page.wait_for_timeout(50)
                         
                         # Проверяем результат
                         current_value = await inp.input_value()

@@ -289,7 +289,7 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         
         # Пауза перед заполнением получателя (минимальная)
         log("Жду обработки полей отправителя...", "DEBUG")
-        await page.wait_for_timeout(200)
+        await page.wait_for_timeout(100)
         
         # Заполняем реквизиты получателя
         log("💳 Заполняю реквизиты получателя...", "INFO")
@@ -303,7 +303,7 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
                 'error': 'Не удалось заполнить номер карты'
             }
         
-        await page.wait_for_timeout(100)
+        await page.wait_for_timeout(50)
         
         fname_ok, lname_ok = await fill_beneficiary_name(page, first_name, last_name, log)
         if not fname_ok or not lname_ok:
@@ -324,19 +324,19 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
                 try:
                     if await inp.is_visible():
                         await inp.click(timeout=100)
-                        await page.wait_for_timeout(20)
+                        await page.wait_for_timeout(10)
                 except:
                     pass
             
             await page.evaluate("document.body.click()")
-            await page.wait_for_timeout(100)
+            await page.wait_for_timeout(50)
             log("Все поля прокликаны", "SUCCESS")
         except Exception as e:
             log(f"Ошибка при прокликивании полей: {e}", "WARNING")
         
         # Ждем обработки (минимальная)
         log("Жду обработки всех полей...", "DEBUG")
-        await page.wait_for_timeout(150)
+        await page.wait_for_timeout(100)
         
         # Нажимаем кнопку Продолжить
         try:
@@ -345,7 +345,7 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         except:
             pass
         
-        await page.wait_for_timeout(200)  # Минимальная - быстрее переходим к капче
+        await page.wait_for_timeout(100)  # Минимальная - быстрее переходим к капче
         
         # === ОБРАБОТКА КАПЧИ (МАКСИМАЛЬНО БЫСТРАЯ) ===
         log("Отслеживаю появление капчи...", "DEBUG")
@@ -366,12 +366,12 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
             log("✅ Капча решена мгновенно!", "SUCCESS")
             
             # Даём время на появление модалки после капчи
-            await page.wait_for_timeout(300)
+            await page.wait_for_timeout(200)
             
         except Exception as e:
             log(f"Капча не обнаружена или ошибка: {e}", "DEBUG")
             # Если капчи не было, всё равно даём время на модалку
-            await page.wait_for_timeout(200)
+            await page.wait_for_timeout(100)
         
         # Модалка "Проверка данных" - ждём её появления активно
         log("Отслеживаю модалку 'Проверка данных'...", "DEBUG")
@@ -400,7 +400,7 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
                     break
                 
                 if attempt < 5:
-                    await page.wait_for_timeout(300)
+                    await page.wait_for_timeout(200)
             
             modal_info = modal_info if modal_found else {'found': False, 'text': ''}
             
@@ -434,7 +434,7 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
                             except:
                                 pass
                         
-                        await page.wait_for_timeout(200)  # Минимальная - быстрее к основной кнопке
+                        await page.wait_for_timeout(100)  # Минимальная - быстрее к основной кнопке
                         log("Модалка закрыта, нажимаю основную кнопку", "DEBUG")
                         
                         # ВАЖНО: После закрытия модалки нажимаем основную кнопку #pay
