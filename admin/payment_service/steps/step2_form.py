@@ -8,6 +8,63 @@ import time
 from .form_helpers import fill_field_simple, select_country_async
 
 
+async def fill_masked_date(page: Page, field_name: str, value: str, label: str, log) -> bool:
+    """
+    Заполнение поля даты с masked input (react-input-mask / IMask)
+    value — уже в формате dd.mm.yyyy (например "17.08.2012")
+    field_name — "issueDate" или "birthDate"
+    """
+    selector = f'input[name="{field_name}"]'
+    loc = page.locator(selector)
+    
+    try:
+        # 1. Клик → фокус + активация маски
+        await loc.click(force=True, timeout=5000)
+        await page.wait_for_timeout(80)  # дать маске проснуться
+        
+        # 2. Очистка (очень важно!)
+        await loc.fill("", force=True)
+        
+        # 3. Посимвольный ввод — имитируем реального пользователя
+        await loc.press_sequentially(value, delay=25)  # delay 20–40 мс обычно идеально
+        
+        # 4. Явно триггерим события, которые маска и React ждут
+        await loc.evaluate("""
+            (el) => {
+                ['input', 'change', 'blur'].forEach(eventName => {
+                    el.dispatchEvent(new Event(eventName, { bubbles: true, cancelable: true }));
+                });
+            }
+        """)
+        
+        # 5. Даём React обновить состояние
+        await page.wait_for_timeout(150)
+        
+        # Диагностика — что реально видит DOM
+        real_val = await loc.input_value(timeout=2000)
+        log(f"{label} после заполнения → DOM value = '{real_val}' (ожидали '{value}')", "DEBUG")
+        
+        return True
+        
+    except Exception as e:
+        log(f"Ошибка заполнения {label}: {str(e)}", "ERROR")
+        return False
+
+
+def ensure_dd_mm_yyyy(s: str) -> str:
+    """Нормализация формата даты в dd.mm.yyyy"""
+    s = s.strip()
+    if '.' not in s:
+        return s
+    parts = s.split('.')
+    if len(parts) == 3:
+        d, m, y = [p.zfill(2) if len(p) <= 2 else p for p in parts]
+        if len(y) == 2:
+            y = '20' + y if int(y) < 50 else '19' + y
+        return f"{d}.{m}.{y}"
+    return s
+
+
 async def fill_beneficiary_card(page: Page, card_number: str, log_func) -> bool:
     """Заполнение номера карты получателя"""
     from .form_helpers import fill_react_input
@@ -64,7 +121,7 @@ async def fill_beneficiary_name(page: Page, first_name: str, last_name: str, log
     return (fname_ok, lname_ok)
 
 
-async def process_step2(page: Page, card_number: str, owner_name: str, sender_data: dict, log_func) -> dict:
+async def process_step2(page: Page, card_number: str, owner_name: str, sender_data: dict, log_func, amount: int = 0) -> dict:
     """
     Этап 2: Заполнение формы с данными
     
@@ -74,6 +131,7 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         owner_name: Имя владельца карты
         sender_data: Данные отправителя из БД
         log_func: Функция для логирования
+        amount: Сумма платежа для отправки в PayzTeam API
     
     Returns:
         dict: {'success': bool, 'time': float, 'error': str or None}
@@ -133,7 +191,10 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         await page.wait_for_timeout(100)
         
         log("📝 Дата выдачи паспорта...", "DEBUG")
-        await fill_field_simple(page, "issueDate", sender_data["passport_issue_date"], "Дата выдачи", log)
+        issue_date = ensure_dd_mm_yyyy(sender_data["passport_issue_date"])
+        ok_issue = await fill_masked_date(page, "issueDate", issue_date, "Дата выдачи паспорта", log)
+        if not ok_issue:
+            log("⚠️ Дата выдачи паспорта не заполнена корректно", "WARNING")
         await page.wait_for_timeout(100)
         
         log("📝 Отчество...", "DEBUG")
@@ -149,7 +210,10 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         await page.wait_for_timeout(100)
         
         log("📝 Дата рождения...", "DEBUG")
-        await fill_field_simple(page, "birthDate", sender_data["birth_date"], "Дата рождения", log)
+        birth_date = ensure_dd_mm_yyyy(sender_data["birth_date"])
+        ok_birth = await fill_masked_date(page, "birthDate", birth_date, "Дата рождения", log)
+        if not ok_birth:
+            log("⚠️ Дата рождения не заполнена корректно", "WARNING")
         await page.wait_for_timeout(100)
         
         log("📝 Телефон...", "DEBUG")
@@ -182,9 +246,9 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         except:
             pass
         
-        # Пауза перед заполнением получателя
+        # Пауза перед заполнением получателя (увеличена для React debounce валидации)
         log("Жду обработки полей отправителя...", "DEBUG")
-        await page.wait_for_timeout(700)
+        await page.wait_for_timeout(800)
         
         # Заполняем реквизиты получателя
         log("💳 Заполняю реквизиты получателя...", "INFO")
@@ -229,9 +293,9 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         except Exception as e:
             log(f"Ошибка при прокликивании полей: {e}", "WARNING")
         
-        # Ждем обработки
+        # Ждем обработки (балансированная)
         log("Жду обработки всех полей...", "DEBUG")
-        await page.wait_for_timeout(700)
+        await page.wait_for_timeout(500)
         
         # Нажимаем кнопку Продолжить
         try:
@@ -240,60 +304,68 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         except:
             pass
         
-        await page.wait_for_timeout(1000)
+        await page.wait_for_timeout(500)  # Оптимизировано с 1000 - быстрее переходим к капче
         
-        # === ОБРАБОТКА КАПЧИ И МОДАЛКИ ===
-        log("Проверяю наличие капчи...", "DEBUG")
+        # === ОБРАБОТКА КАПЧИ (МАКСИМАЛЬНО БЫСТРАЯ) ===
+        log("Отслеживаю появление капчи...", "DEBUG")
         try:
             captcha_iframe_selector = 'iframe[src*="smartcaptcha.yandexcloud.net/checkbox"]'
-            await page.wait_for_selector(captcha_iframe_selector, state='visible', timeout=3000)
             
-            log("Капча обнаружена, решаю...", "DEBUG")
-            await page.wait_for_timeout(300)
+            # Ждем появления iframe капчи
+            await page.wait_for_selector(captcha_iframe_selector, state='visible', timeout=2000)
+            log("✅ Капча появилась!", "SUCCESS")
             
+            # Сразу получаем фрейм и кнопку БЕЗ ЗАДЕРЖЕК
             captcha_frame = page.frame_locator(captcha_iframe_selector)
             checkbox_button = captcha_frame.locator('#js-button')
-            await checkbox_button.wait_for(state='visible', timeout=3000)
             
-            # Пробуем решить капчу
-            for attempt in range(3):
-                try:
-                    await checkbox_button.click(timeout=2000)
-                    log(f"Капча решена (попытка {attempt + 1})", "SUCCESS")
-                    break
-                except:
-                    try:
-                        await checkbox_button.click(force=True, timeout=2000)
-                        log(f"Капча решена force (попытка {attempt + 1})", "SUCCESS")
-                        break
-                    except:
-                        pass
+            # Ждем кнопку и НЕМЕДЛЕННО кликаем
+            await checkbox_button.wait_for(state='visible', timeout=1500)
+            await checkbox_button.click(timeout=1000)
+            log("✅ Капча решена мгновенно!", "SUCCESS")
             
+            # Даём время на появление модалки после капчи
             await page.wait_for_timeout(800)
-        except:
-            log("Капча не обнаружена", "DEBUG")
+            
+        except Exception as e:
+            log(f"Капча не обнаружена или ошибка: {e}", "DEBUG")
+            # Если капчи не было, всё равно даём время на модалку
+            await page.wait_for_timeout(500)
         
-        # Модалка "Проверка данных"
-        log("Проверяю модалку проверки данных...", "DEBUG")
+        # Модалка "Проверка данных" - ждём её появления активно
+        log("Отслеживаю модалку 'Проверка данных'...", "DEBUG")
+        modal_found = False
         try:
-            modal_info = await page.evaluate("""
-                () => {
-                    const headers = document.querySelectorAll('h4');
-                    for (const h of headers) {
-                        if (h.textContent.includes('Проверка данных')) {
-                            const parent = h.closest('div');
-                            const paragraphs = parent ? parent.querySelectorAll('p') : [];
-                            let text = '';
-                            paragraphs.forEach(p => { text += p.textContent + ' '; });
-                            return { found: true, text: text.trim() };
+            # Активное ожидание модалки до 3 секунд
+            for attempt in range(6):
+                modal_info = await page.evaluate("""
+                    () => {
+                        const headers = document.querySelectorAll('h4');
+                        for (const h of headers) {
+                            if (h.textContent.includes('Проверка данных')) {
+                                const parent = h.closest('div');
+                                const paragraphs = parent ? parent.querySelectorAll('p') : [];
+                                let text = '';
+                                paragraphs.forEach(p => { text += p.textContent + ' '; });
+                                return { found: true, text: text.trim() };
+                            }
                         }
+                        return { found: false, text: '' };
                     }
-                    return { found: false, text: '' };
-                }
-            """)
+                """)
+                
+                if modal_info['found']:
+                    modal_found = True
+                    break
+                
+                if attempt < 5:
+                    await page.wait_for_timeout(500)
+            
+            modal_info = modal_info if modal_found else {'found': False, 'text': ''}
             
             if modal_info['found']:
-                log(f"📋 Модалка 'Проверка данных'", "INFO")
+                log(f"📋 Модалка 'Проверка данных' обнаружена!", "INFO")
+                log(f"Текст модалки: {modal_info['text']}", "DEBUG")
                 
                 if 'Ошибка' in modal_info['text'] or 'ошибка' in modal_info['text']:
                     log("⚠️ ОШИБКА: Реквизиты получателя устарели!", "WARNING")
@@ -321,7 +393,7 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
                             except:
                                 pass
                         
-                        await page.wait_for_timeout(2000)
+                        await page.wait_for_timeout(500)  # Оптимизировано с 1000 - быстрее к основной кнопке
                         log("Модалка закрыта, нажимаю основную кнопку", "DEBUG")
                         
                         # ВАЖНО: После закрытия модалки нажимаем основную кнопку #pay
@@ -350,8 +422,10 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
                         
                     except Exception as e:
                         log(f"⚠️ Ошибка при обработке модалки: {e}", "WARNING")
-        except:
-            log("Модалка не обнаружена", "DEBUG")
+            else:
+                log("Модалка 'Проверка данных' не появилась (это нормально)", "DEBUG")
+        except Exception as e:
+            log(f"Ошибка при отслеживании модалки: {e}", "WARNING")
         
         elapsed_time = time.time() - start_time
         log(f"⏱️ Этап 2 занял: {elapsed_time:.2f}s", "INFO")

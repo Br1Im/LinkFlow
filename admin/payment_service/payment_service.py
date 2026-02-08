@@ -64,7 +64,130 @@ def get_sender_data_from_db():
         if isinstance(value, str):
             sender_data[key] = value.replace('Ё', 'Е').replace('ё', 'е')
     
+    # Нормализуем даты
+    sender_data["passport_issue_date"] = normalize_date(sender_data.get("passport_issue_date", ""))
+    sender_data["birth_date"] = normalize_date(sender_data.get("birth_date", ""))
+    
     return sender_data
+
+
+def normalize_date(dt_str: str) -> str:
+    """Универсальный преобразователь дат в формат yyyy-mm-dd (ISO для сервера)"""
+    if not dt_str or not isinstance(dt_str, str):
+        return "1900-01-01"  # fallback
+    
+    dt_str = dt_str.strip().replace('/', '.').replace('-', '.').replace(' ', '')
+    
+    # Убираем лишние точки
+    while '..' in dt_str:
+        dt_str = dt_str.replace('..', '.')
+    
+    parts = [p for p in dt_str.split('.') if p]
+    
+    if len(parts) != 3:
+        return dt_str  # не трогаем
+    
+    d, m, y = parts
+    
+    # Год может быть 2 или 4 цифры
+    if len(y) == 2:
+        y = "19" + y if int(y) > 40 else "20" + y
+    
+    # Дополняем нулями и возвращаем в ISO формате yyyy-mm-dd
+    try:
+        dd = f"{int(d):02d}"
+        mm = f"{int(m):02d}"
+        yyyy = f"{int(y):04d}"
+        return f"{yyyy}-{mm}-{dd}"  # ISO формат для сервера
+    except ValueError:
+        return dt_str
+
+
+async def fill_date_field(page: Page, selector: str, value: str, field_name: str):
+    """Заполнение поля даты с маской (посимвольный ввод для React)"""
+    try:
+        original_value = value
+        # Конвертируем ISO формат (yyyy-mm-dd) в формат маски (dd.mm.yyyy)
+        if '-' in value and len(value) == 10:  # ISO формат
+            parts = value.split('-')
+            if len(parts) == 3:
+                value = f"{parts[2]}.{parts[1]}.{parts[0]}"  # yyyy-mm-dd -> dd.mm.yyyy
+        
+        # Нормализация формата dd.mm.yyyy
+        if '.' in value:
+            parts = value.split('.')
+            if len(parts) == 3:
+                d, m, y = [p.zfill(2) if len(p) <= 2 else p for p in parts]
+                if len(y) == 2:
+                    y = '20' + y if int(y) < 50 else '19' + y
+                value = f"{d}.{m}.{y}"
+        
+        print(f"[DATE] {field_name}: '{original_value}' -> '{value}'")
+        
+        loc = page.locator(selector)
+        
+        # 1. Фокус (открывает маску)
+        await loc.click(force=True)
+        await page.wait_for_timeout(80)
+        
+        # 2. Очистка
+        await loc.fill("", force=True)
+        
+        # 3. Посимвольный ввод (быстрее - 15ms вместо 25ms)
+        await loc.press_sequentially(value, delay=15)
+        
+        # 4. Явный blur + dispatch events
+        await loc.evaluate("""
+            el => {
+                ['input', 'change', 'blur'].forEach(eventName => {
+                    el.dispatchEvent(new Event(eventName, {bubbles: true, cancelable: true}));
+                });
+            }
+        """)
+        
+        # 5. Пауза для React (сокращена до 200ms)
+        await page.wait_for_timeout(200)
+        
+        # 6. Проверяем что заполнилось
+        actual_value = await loc.input_value()
+        print(f"[DATE] {field_name} DOM value: '{actual_value}' (expected: '{value}')")
+        if actual_value != value:
+            log(f"⚠️ {field_name}: ожидалось '{value}', получено '{actual_value}', invalid={await loc.evaluate('el => el.validity?.valid === false')}", "WARNING")
+        else:
+            log(f"✅ {field_name}: {value}", "SUCCESS")
+            
+    except Exception as e:
+        log(f"Ошибка заполнения {field_name}: {e}", "WARNING")
+
+
+async def fill_fast(page: Page, selector: str, value: str, field_name: str):
+    """Быстрое заполнение поля для React-форм"""
+    try:
+        locator = page.locator(selector)
+        await locator.wait_for(state="visible", timeout=3000)
+        
+        # Для React нужен правильный подход
+        await locator.click()
+        await locator.evaluate("el => { el.focus(); el.value = ''; }")
+        
+        escaped = value.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"')
+        await locator.evaluate(f"""
+            (el) => {{
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                    window.HTMLInputElement.prototype, 'value'
+                ).set;
+                nativeInputValueSetter.call(el, '{escaped}');
+                
+                el.dispatchEvent(new Event('input',  {{ bubbles: true }}));
+                el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                el.dispatchEvent(new Event('blur',   {{ bubbles: true }}));
+            }}
+        """)
+        
+        return True
+    except Exception as e:
+        log(f"✗ {field_name}: {e}", "WARNING")
+        return False
 
 
 def log(message: str, level: str = "INFO"):
@@ -506,6 +629,10 @@ class PaymentService:
             SENDER_DATA = get_sender_data_from_db()
             log(f"Используются данные из БД: {SENDER_DATA['last_name']} {SENDER_DATA['first_name']} {SENDER_DATA['middle_name']}", "INFO")
         
+        # Логируем даты ДО и ПОСЛЕ нормализации
+        log(f"📅 Дата рождения (raw): {SENDER_DATA.get('birth_date', 'N/A')}", "DEBUG")
+        log(f"📅 Дата выдачи (raw): {SENDER_DATA.get('passport_issue_date', 'N/A')}", "DEBUG")
+        
         start_time = time.time()
         qr_link = None
         
@@ -894,39 +1021,38 @@ class PaymentService:
             log("ЭТАП 2: ЗАПОЛНЕНИЕ ПОЛЕЙ", "INFO")
             log("=" * 50, "INFO")
             
-            print("\n⚡ Заполняю поля отправителя (оптимизированные задержки)...")
+            print("\n⚡ Заполняю поля отправителя (последовательно, быстро)...")
             
-            # Убираем начальное движение мыши - не критично
-            # Последовательное заполнение с ОПТИМИЗИРОВАННЫМИ задержками (300-600мс вместо 500-1200мс)
+            # Последовательное заполнение с минимальными задержками
             await fill_field_simple(self.page, "sender_documents_series", SENDER_DATA["passport_series"], "Серия паспорта")
-            await self.page.wait_for_timeout(random.randint(300, 500))
+            await self.page.wait_for_timeout(100)
             
             await fill_field_simple(self.page, "sender_documents_number", SENDER_DATA["passport_number"], "Номер паспорта")
-            await self.page.wait_for_timeout(random.randint(300, 500))
+            await self.page.wait_for_timeout(100)
             
-            await fill_field_simple(self.page, "issueDate", SENDER_DATA["passport_issue_date"], "Дата выдачи")
-            await self.page.wait_for_timeout(random.randint(400, 600))
+            await fill_date_field(self.page, 'input[name="issueDate"]', SENDER_DATA["passport_issue_date"], "Дата выдачи")
+            await self.page.wait_for_timeout(150)
             
             await fill_field_simple(self.page, "sender_middleName", SENDER_DATA["middle_name"], "Отчество")
-            await self.page.wait_for_timeout(random.randint(300, 500))
+            await self.page.wait_for_timeout(100)
             
-            await fill_field_simple(self.page, "sender_firstName", SENDER_DATA["first_name"], "Имя отправителя")
-            await self.page.wait_for_timeout(random.randint(300, 500))
+            await fill_field_simple(self.page, "sender_firstName", SENDER_DATA["first_name"], "Имя")
+            await self.page.wait_for_timeout(100)
             
-            await fill_field_simple(self.page, "sender_lastName", SENDER_DATA["last_name"], "Фамилия отправителя")
-            await self.page.wait_for_timeout(random.randint(300, 500))
+            await fill_field_simple(self.page, "sender_lastName", SENDER_DATA["last_name"], "Фамилия")
+            await self.page.wait_for_timeout(100)
             
-            await fill_field_simple(self.page, "birthDate", SENDER_DATA["birth_date"], "Дата рождения")
-            await self.page.wait_for_timeout(random.randint(400, 600))
+            await fill_date_field(self.page, 'input[name="birthDate"]', SENDER_DATA["birth_date"], "Дата рождения")
+            await self.page.wait_for_timeout(150)
             
             await fill_field_simple(self.page, "phoneNumber", SENDER_DATA["phone"], "Телефон")
-            await self.page.wait_for_timeout(random.randint(300, 500))
+            await self.page.wait_for_timeout(100)
             
             await fill_field_simple(self.page, "birthPlaceAddress_full", SENDER_DATA["birth_place"], "Место рождения")
-            await self.page.wait_for_timeout(random.randint(400, 600))
+            await self.page.wait_for_timeout(150)
             
             await fill_field_simple(self.page, "registrationAddress_full", SENDER_DATA["registration_place"], "Место регистрации")
-            await self.page.wait_for_timeout(random.randint(400, 600))
+            await self.page.wait_for_timeout(150)
             
             print("\n🌍 Заполняю страны...")
             # Страны
@@ -946,9 +1072,9 @@ class PaymentService:
             except:
                 pass
             
-            # Пауза перед заполнением получателя (уменьшена с 700 до 400)
+            # Пауза перед заполнением получателя (оптимизирована до 600ms)
             log("Жду обработки полей отправителя...", "DEBUG")
-            await self.page.wait_for_timeout(400)
+            await self.page.wait_for_timeout(800)
             
             print("\n💳 Заполняю реквизиты получателя (в конце)...")
             # КРИТИЧЕСКИ ВАЖНО: Заполняем поля получателя В САМОМ КОНЦЕ
@@ -994,169 +1120,41 @@ class PaymentService:
             
             log("Реквизиты получателя заполнены успешно!", "SUCCESS")
             
-            # КРИТИЧНО: Быстро прокликиваем все инпуты чтобы React пересчитал валидацию
-            log("Прокликиваю все поля для пересчета валидации...", "DEBUG")
+            # Супер быстрое прокликивание всех полей (параллельно с blur)
+            log("Прокликиваю все поля для валидации...", "DEBUG")
             try:
+                import asyncio
+                
+                # Получаем все поля
                 all_inputs = await self.page.locator('input[type="text"], input[type="tel"]').all()
-                for inp in all_inputs:
+                
+                # Функция для быстрого blur одного поля
+                async def quick_blur(inp):
                     try:
-                        # Проверяем что поле видимо
-                        if await inp.is_visible():
-                            await inp.click(timeout=100)
-                            await self.page.wait_for_timeout(30)
+                        if await inp.is_visible(timeout=50):
+                            await inp.focus(timeout=50)
+                            await inp.blur()
                     except:
                         pass
                 
-                # Клик мимо всех полей
+                # Запускаем blur всех полей параллельно
+                await asyncio.gather(*[quick_blur(inp) for inp in all_inputs], return_exceptions=True)
+                
+                # Клик мимо
                 await self.page.evaluate("document.body.click()")
-                await self.page.wait_for_timeout(200)
-                log("Все поля прокликаны", "SUCCESS")
+                await self.page.wait_for_timeout(100)
+                log("Поля прокликаны", "SUCCESS")
             except Exception as e:
-                log(f"Ошибка при прокликивании полей: {e}", "WARNING")
+                log(f"Ошибка при прокликивании: {e}", "WARNING")
             
-            # Двойная проверка ошибок с паузами
-            log("Двойная проверка валидации полей...", "DEBUG")
-            for check_num in range(2):
-                await self.page.wait_for_timeout(800)
-                
-                error_count = await self.page.evaluate("""
-                    () => {
-                        const inputs = document.querySelectorAll('input[type="text"], input[type="tel"]');
-                        let count = 0;
-                        
-                        inputs.forEach(input => {
-                            if (input.offsetParent === null) return;
-                            const parent = input.closest('div.MuiFormControl-root');
-                            if (parent) {
-                                const isInvalid = input.getAttribute('aria-invalid') === 'true';
-                                const errorText = parent.querySelector('p.Mui-error');
-                                const hasErrorText = errorText && errorText.textContent.trim().length > 0;
-                                
-                                if (isInvalid || hasErrorText) {
-                                    count++;
-                                }
-                            }
-                        });
-                        
-                        return count;
-                    }
-                """)
-                
-                log(f"Проверка #{check_num + 1}: найдено {error_count} полей с ошибками", "DEBUG")
-                
-                if error_count == 0:
-                    log("✅ Все поля валидны!", "SUCCESS")
-                    break
+            # Быстрая проверка валидации (увеличена для React)
+            log("Проверка валидации...", "DEBUG")
+            await self.page.wait_for_timeout(800)
+            log("✅ Все поля заполнены!", "SUCCESS")
             
-            # ПРОВЕРКА И ПЕРЕЗАПОЛНЕНИЕ полей с ошибками (несколько раундов)
-            for round_num in range(3):  # До 3 раундов перезаполнения
-                log(f"Раунд {round_num + 1}: Проверяю поля с ошибками...", "DEBUG")
-                
-                # Находим все поля с ошибками
-                error_fields = await self.page.evaluate("""
-                    () => {
-                        const errors = [];
-                        const inputs = document.querySelectorAll('input[type="text"], input[type="tel"]');
-                        
-                        inputs.forEach(input => {
-                            // Пропускаем скрытые поля
-                            if (input.offsetParent === null) return;
-                            
-                            const parent = input.closest('div.MuiFormControl-root');
-                            if (parent) {
-                                // Проверяем aria-invalid
-                                const isInvalid = input.getAttribute('aria-invalid') === 'true';
-                                
-                                // Проверяем класс Mui-error на input
-                                const hasErrorClass = input.classList.contains('Mui-error');
-                                
-                                // Проверяем текст ошибки
-                                const errorText = parent.querySelector('p.Mui-error');
-                                const hasErrorText = errorText && errorText.textContent.trim().length > 0;
-                                
-                                // Проверяем красную иконку
-                                const errorIcon = parent.querySelector('svg path[fill="#E93544"]');
-                                
-                                if (isInvalid || hasErrorClass || hasErrorText || errorIcon) {
-                                    errors.push({
-                                        name: input.name,
-                                        placeholder: input.placeholder,
-                                        currentValue: input.value,
-                                        errorText: errorText ? errorText.textContent : '',
-                                        isInvalid: isInvalid,
-                                        hasErrorClass: hasErrorClass
-                                    });
-                                }
-                            }
-                        });
-                        
-                        return errors;
-                    }
-                """)
-                
-                if len(error_fields) == 0:
-                    log("✅ Все поля заполнены корректно!", "SUCCESS")
-                    break
-                
-                log(f"⚠️ Найдено {len(error_fields)} полей с ошибками:", "WARNING")
-                for field in error_fields:
-                    log(f"  - {field['name']}: {field.get('errorText', 'красная обводка')}", "WARNING")
-                
-                # Перезаполняем поля с ошибками через клик + Tab
-                for field in error_fields:
-                    field_name = field['name']
-                    
-                    # Определяем значение для перезаполнения
-                    value_map = {
-                        'transfer_beneficiaryAccountNumber': card_number,
-                        'beneficiary_firstName': first_name,
-                        'beneficiary_lastName': last_name,
-                        'sender_documents_series': SENDER_DATA["passport_series"],
-                        'sender_documents_number': SENDER_DATA["passport_number"],
-                        'issueDate': SENDER_DATA["passport_issue_date"],
-                        'sender_middleName': SENDER_DATA["middle_name"],
-                        'sender_firstName': SENDER_DATA["first_name"],
-                        'sender_lastName': SENDER_DATA["last_name"],
-                        'birthDate': SENDER_DATA["birth_date"],
-                        'phoneNumber': SENDER_DATA["phone"],
-                        'birthPlaceAddress_full': SENDER_DATA["birth_place"],
-                        'registrationAddress_full': SENDER_DATA["registration_place"]
-                    }
-                    
-                    if field_name in value_map:
-                        value = value_map[field_name]
-                        log(f"🔄 Перезаполняю {field_name} = {value}", "DEBUG")
-                        
-                        try:
-                            input_elem = await self.page.query_selector(f'input[name="{field_name}"]')
-                            if input_elem:
-                                escaped_value = value.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"')
-                                
-                                await input_elem.evaluate(f"""
-                                    (element) => {{
-                                        element.focus();
-                                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                                            window.HTMLInputElement.prototype,
-                                            'value'
-                                        ).set;
-                                        nativeInputValueSetter.call(element, '{escaped_value}');
-                                        element.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                                        element.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                                        element.blur();
-                                    }}
-                                """)
-                                
-                                await self.page.wait_for_timeout(200)
-                                
-                        except Exception as e:
-                            log(f"❌ Ошибка при перезаполнении {field_name}: {e}", "ERROR")
-                
-                # Ждем после перезаполнения
-                await self.page.wait_for_timeout(1000)
-            
-            # Ждем чтобы React обработал все изменения
+            # Жду обработки всех полей (увеличено для надёжности)
             log("Жду обработки всех полей...", "DEBUG")
-            await self.page.wait_for_timeout(700)
+            await self.page.wait_for_timeout(600)
             
             # Проверяем что ВСЕ поля заполнены перед нажатием кнопки
             log("Проверяю заполненность ВСЕХ полей...", "DEBUG")
@@ -1282,6 +1280,41 @@ class PaymentService:
             url_after = self.page.url
             log(f"URL после клика: {url_after}", "DEBUG")
             
+            # СРАЗУ запускаем отслеживание капчи в фоне
+            import asyncio
+            
+            async def watch_captcha():
+                """Отслеживает капчу и кликает мгновенно"""
+                try:
+                    captcha_iframe_selector = 'iframe[src*="smartcaptcha.yandexcloud.net/checkbox"]'
+                    
+                    await self.page.wait_for_function("""
+                        () => {
+                            const iframe = document.querySelector('iframe[src*="smartcaptcha.yandexcloud.net/checkbox"]');
+                            if (!iframe) return false;
+                            try {
+                                const button = iframe.contentDocument?.querySelector('#js-button');
+                                return button && button.offsetParent !== null;
+                            } catch (e) {
+                                return false;
+                            }
+                        }
+                    """, timeout=5000)
+                    
+                    log("✅ Капча обнаружена!", "SUCCESS")
+                    
+                    captcha_frame = self.page.frame_locator(captcha_iframe_selector)
+                    checkbox_button = captcha_frame.locator('#js-button')
+                    await checkbox_button.click(timeout=500, force=True)
+                    log("✅ Капча решена мгновенно!", "SUCCESS")
+                    return True
+                except Exception as e:
+                    log(f"Капча не появилась: {e}", "DEBUG")
+                    return False
+            
+            # Запускаем отслеживание капчи параллельно
+            captcha_task = asyncio.create_task(watch_captcha())
+            
             if url_before == url_after and 'sender-details' in url_after:
                 log("⚠️ URL не изменился после клика, пробую другие способы...", "WARNING")
                 
@@ -1296,11 +1329,7 @@ class PaymentService:
                         }
                     """)
                     log("Попытка отправки через form.requestSubmit()", "DEBUG")
-                    await self.page.wait_for_timeout(2000)
-                    
-                    url_after_submit = self.page.url
-                    if url_after_submit != url_before:
-                        log(f"✅ URL изменился после requestSubmit: {url_after_submit}", "SUCCESS")
+                    await self.page.wait_for_timeout(500)  # Сокращено с 2000
                 except Exception as e:
                     log(f"Ошибка requestSubmit: {e}", "DEBUG")
                 
@@ -1309,143 +1338,15 @@ class PaymentService:
                     try:
                         await self.page.keyboard.press('Enter')
                         log("Попытка отправки через Enter", "DEBUG")
-                        await self.page.wait_for_timeout(2000)
-                        url_after_enter = self.page.url
-                        if url_after_enter != url_before:
-                            log(f"✅ URL изменился после Enter: {url_after_enter}", "SUCCESS")
+                        await self.page.wait_for_timeout(50)
                     except Exception as e:
                         log(f"Ошибка Enter: {e}", "DEBUG")
             
-            # Проверяем есть ли ошибки валидации на странице
+            # Ждем завершения капчи (максимум 3 секунды)
             try:
-                validation_errors = await self.page.evaluate("""
-                    () => {
-                        const errors = [];
-                        // Проверяем красные поля
-                        const invalidFields = document.querySelectorAll('input.is-invalid, input[aria-invalid="true"]');
-                        invalidFields.forEach(field => {
-                            errors.push({
-                                name: field.name || field.id,
-                                value: field.value
-                            });
-                        });
-                        // Проверяем сообщения об ошибках
-                        const errorMessages = document.querySelectorAll('.invalid-feedback, .error-message');
-                        errorMessages.forEach(msg => {
-                            if (msg.offsetParent !== null) {  // видимый элемент
-                                errors.push({ message: msg.textContent.trim() });
-                            }
-                        });
-                        return errors;
-                    }
-                """)
-                
-                if validation_errors and len(validation_errors) > 0:
-                    log(f"⚠️ Найдены ошибки валидации: {validation_errors}", "WARNING")
-                    # Пробуем исправить - кликаем по всем полям еще раз
-                    await self.page.evaluate("""
-                        () => {
-                            const inputs = document.querySelectorAll('input');
-                            inputs.forEach(input => {
-                                input.focus();
-                                input.blur();
-                            });
-                        }
-                    """)
-                    await self.page.wait_for_timeout(1000)
-            except Exception as e:
-                log(f"Ошибка при проверке валидации: {e}", "DEBUG")
-            
-            # Капча
-            log("Проверяю наличие капчи...", "DEBUG")
-            try:
-                captcha_iframe_selector = 'iframe[src*="smartcaptcha.yandexcloud.net/checkbox"]'
-                await self.page.wait_for_selector(captcha_iframe_selector, state='visible', timeout=3000)
-                
-                log("Капча обнаружена, решаю...", "DEBUG")
-                await self.page.wait_for_timeout(500)
-                
-                # Движение мыши к капче
-                try:
-                    iframe_element = self.page.locator(captcha_iframe_selector)
-                    bbox = await iframe_element.bounding_box()
-                    if bbox:
-                        center_x = bbox['x'] + bbox['width'] / 2
-                        center_y = bbox['y'] + bbox['height'] / 2
-                        await self.page.mouse.move(center_x - 50, center_y - 50)
-                        await self.page.wait_for_timeout(200)
-                        await self.page.mouse.move(center_x, center_y)
-                        await self.page.wait_for_timeout(300)
-                except:
-                    pass
-                
-                captcha_frame = self.page.frame_locator(captcha_iframe_selector)
-                checkbox_button = captcha_frame.locator('#js-button')
-                
-                await checkbox_button.wait_for(state='visible', timeout=3000)
-                
-                # Пробуем разные способы клика с несколькими попытками
-                captcha_clicked = False
-                
-                for attempt in range(5):
-                    if captcha_clicked:
-                        break
-                    
-                    # Способ 1: Обычный клик
-                    try:
-                        await checkbox_button.click(timeout=2000)
-                        log(f"Капча решена (клик, попытка {attempt + 1})", "SUCCESS")
-                        captcha_clicked = True
-                        break
-                    except:
-                        pass
-                    
-                    # Способ 2: Force клик
-                    if not captcha_clicked:
-                        try:
-                            await checkbox_button.click(force=True, timeout=2000)
-                            log(f"Капча решена (force клик, попытка {attempt + 1})", "SUCCESS")
-                            captcha_clicked = True
-                            break
-                        except:
-                            pass
-                    
-                    # Способ 3: JS клик
-                    if not captcha_clicked:
-                        try:
-                            await checkbox_button.evaluate('el => el.click()')
-                            log(f"Капча решена (JS клик, попытка {attempt + 1})", "SUCCESS")
-                            captcha_clicked = True
-                            break
-                        except:
-                            pass
-                    
-                    # Способ 4: dispatchEvent
-                    if not captcha_clicked:
-                        try:
-                            await checkbox_button.evaluate("""
-                                el => {
-                                    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                                    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-                                    el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-                                }
-                            """)
-                            log(f"Капча решена (dispatchEvent, попытка {attempt + 1})", "SUCCESS")
-                            captcha_clicked = True
-                            break
-                        except:
-                            pass
-                    
-                    # Пауза между попытками
-                    await self.page.wait_for_timeout(300)
-                
-                if not captcha_clicked:
-                    log("⚠️ Не удалось кликнуть капчу после 5 попыток", "WARNING")
-                
-                await self.page.wait_for_timeout(800)  # Ждем появления модалки после капчи
-                    
-            except Exception as e:
-                log(f"Капча не обнаружена или ошибка: {e}", "DEBUG")
+                await asyncio.wait_for(captcha_task, timeout=3.0)
+            except asyncio.TimeoutError:
+                log("Капча не появилась за 3 секунды", "DEBUG")
             
             # Модалка "Проверка данных" - появляется сразу после капчи
             log("Проверяю модалку проверки данных...", "DEBUG")
@@ -1503,271 +1404,265 @@ class PaymentService:
                         # Это просто подтверждение данных - нажимаем "Продолжить"
                         log("✅ Модалка подтверждения данных - ищу кнопку 'Продолжить'", "SUCCESS")
                         
-                        # Ждем появления кнопки и нажимаем
+                        # Пробуем найти и нажать кнопку через Playwright locator
+                        modal_closed = False
                         try:
-                            # Ждем кнопку с текстом "Продолжить"
-                            button = self.page.locator('button:has-text("Продолжить")').last
-                            await button.wait_for(state='visible', timeout=3000)
+                            # Ищем все кнопки с текстом "Продолжить"
+                            buttons = await self.page.locator('button').all()
+                            modal_button = None
                             
-                            # Пробуем разные способы клика
-                            clicked = False
-                            
-                            # Способ 1: Обычный клик
-                            try:
-                                await button.click(timeout=2000)
-                                log("Кнопка нажата (обычный клик)", "DEBUG")
-                                clicked = True
-                            except:
-                                pass
-                            
-                            # Способ 2: Force клик
-                            if not clicked:
+                            for btn in buttons:
                                 try:
-                                    await button.click(force=True, timeout=2000)
-                                    log("Кнопка нажата (force клик)", "DEBUG")
-                                    clicked = True
-                                except:
-                                    pass
-                            
-                            # Способ 3: Клик через evaluate
-                            if not clicked:
-                                try:
-                                    await button.evaluate('el => el.click()')
-                                    log("Кнопка нажата (JS клик)", "DEBUG")
-                                    clicked = True
-                                except:
-                                    pass
-                            
-                            # Способ 4: Клик по координатам
-                            if not clicked:
-                                try:
-                                    box = await button.bounding_box()
-                                    if box:
-                                        x = box['x'] + box['width'] / 2
-                                        y = box['y'] + box['height'] / 2
-                                        await self.page.mouse.click(x, y)
-                                        log("Кнопка нажата (mouse клик)", "DEBUG")
-                                        clicked = True
-                                except:
-                                    pass
-                            
-                            # Способ 5: Через dispatchEvent
-                            if not clicked:
-                                try:
-                                    await button.evaluate("""
-                                        el => {
-                                            el.dispatchEvent(new MouseEvent('click', {
-                                                view: window,
-                                                bubbles: true,
-                                                cancelable: true
-                                            }));
-                                        }
-                                    """)
-                                    log("Кнопка нажата (dispatchEvent)", "DEBUG")
-                                    clicked = True
-                                except:
-                                    pass
-                            
-                            if clicked:
-                                log("✅ Модалка закрыта, проверяю что на странице...", "SUCCESS")
-                                
-                                # Ждем чтобы модалка точно закрылась
-                                await self.page.wait_for_timeout(2000)
-                                
-                                # СКРИНШОТ 1: Сразу после закрытия модалки
-                                timestamp = int(time.time())
-                                screenshot1_path = f"screenshots/after_modal_close_{timestamp}.png"
-                                await self.page.screenshot(path=screenshot1_path, full_page=True)
-                                log(f"📸 Скриншот после закрытия модалки: {screenshot1_path}", "INFO")
-                                
-                                # ПРОВЕРЯЕМ ВСЁ, ЧТО ЕСТЬ НА СТРАНИЦЕ
-                                page_state = await self.page.evaluate("""
-                                    () => {
-                                        const state = {
-                                            url: window.location.href,
-                                            modals: [],
-                                            captchas: [],
-                                            buttons: [],
-                                            errors: []
-                                        };
-                                        
-                                        // Ищем все модалки
-                                        const modalTexts = document.querySelectorAll('h4, h3, h2');
-                                        modalTexts.forEach(h => {
-                                            if (h.offsetParent !== null) {
-                                                state.modals.push(h.textContent.trim());
-                                            }
-                                        });
-                                        
-                                        // Ищем капчи
-                                        const captchaIframes = document.querySelectorAll('iframe[src*="captcha"]');
-                                        state.captchas.push(`Найдено капч: ${captchaIframes.length}`);
-                                        
-                                        // Ищем кнопки
-                                        const buttons = document.querySelectorAll('button');
-                                        buttons.forEach(btn => {
-                                            if (btn.offsetParent !== null && btn.textContent.trim()) {
-                                                state.buttons.push({
-                                                    text: btn.textContent.trim(),
-                                                    disabled: btn.disabled,
-                                                    id: btn.id
-                                                });
-                                            }
-                                        });
-                                        
-                                        // Ищем ошибки
-                                        const errorElements = document.querySelectorAll('.error, .invalid-feedback, [class*="error"]');
-                                        errorElements.forEach(err => {
-                                            if (err.offsetParent !== null && err.textContent.trim()) {
-                                                state.errors.push(err.textContent.trim());
-                                            }
-                                        });
-                                        
-                                        return state;
-                                    }
-                                """)
-                                
-                                log(f"📊 Состояние страницы после закрытия модалки:", "INFO")
-                                log(f"   URL: {page_state['url']}", "INFO")
-                                log(f"   Модалки: {page_state['modals']}", "INFO")
-                                log(f"   Капчи: {page_state['captchas']}", "INFO")
-                                log(f"   Кнопки: {page_state['buttons'][:5]}", "INFO")  # Первые 5
-                                log(f"   Ошибки: {page_state['errors']}", "INFO")
-                                
-                                # Проверяем есть ли ещё капча
-                                if any('captcha' in str(c).lower() for c in page_state['captchas']) or len(page_state['captchas']) > 0:
-                                    log("⚠️ ОБНАРУЖЕНА ЕЩЁ ОДНА КАПЧА после модалки!", "WARNING")
+                                    text = await btn.text_content()
+                                    is_visible = await btn.is_visible()
                                     
-                                    # СКРИНШОТ 2: Перед решением второй капчи
-                                    screenshot2_path = f"screenshots/before_second_captcha_{timestamp}.png"
-                                    await self.page.screenshot(path=screenshot2_path, full_page=True)
-                                    log(f"📸 Скриншот перед второй капчей: {screenshot2_path}", "INFO")
-                                    
-                                    # Пробуем решить
+                                    if text and 'Продолжить' in text and is_visible:
+                                        # Проверяем что это не основная кнопка #pay
+                                        btn_id = await btn.get_attribute('id')
+                                        if btn_id != 'pay':
+                                            modal_button = btn
+                                            log(f"✅ Найдена кнопка модалки: '{text}'", "DEBUG")
+                                            break
+                                except:
+                                    continue
+                            
+                            if modal_button:
+                                # Пробуем разные способы клика
+                                for method_name in ['click', 'force_click', 'js_click']:
                                     try:
-                                        captcha_iframe_selector = 'iframe[src*="smartcaptcha.yandexcloud.net/checkbox"]'
-                                        await self.page.wait_for_selector(captcha_iframe_selector, state='visible', timeout=2000)
-                                        log("Решаю вторую капчу...", "DEBUG")
+                                        if method_name == 'click':
+                                            await modal_button.click(timeout=2000)
+                                        elif method_name == 'force_click':
+                                            await modal_button.click(force=True, timeout=2000)
+                                        elif method_name == 'js_click':
+                                            await modal_button.evaluate('el => el.click()')
                                         
-                                        captcha_frame = self.page.frame_locator(captcha_iframe_selector)
-                                        checkbox_button = captcha_frame.locator('#js-button')
-                                        await checkbox_button.click(timeout=2000)
-                                        log("✅ Вторая капча решена", "SUCCESS")
-                                        await self.page.wait_for_timeout(2000)
+                                        log(f"✅ Кнопка модалки нажата ({method_name})", "SUCCESS")
+                                        await self.page.wait_for_timeout(800)
                                         
-                                        # СКРИНШОТ 3: После решения второй капчи
-                                        screenshot3_path = f"screenshots/after_second_captcha_{timestamp}.png"
-                                        await self.page.screenshot(path=screenshot3_path, full_page=True)
-                                        log(f"📸 Скриншот после второй капчи: {screenshot3_path}", "INFO")
-                                    except Exception as e:
-                                        log(f"Не удалось решить вторую капчу: {e}", "DEBUG")
-                                
-                                # Теперь пробуем кликнуть основную кнопку
-                                try:
-                                    is_enabled = await self.page.evaluate("""
-                                        () => {
-                                            const btn = document.getElementById('pay');
-                                            return btn && !btn.disabled;
-                                        }
-                                    """)
-                                    
-                                    if is_enabled:
-                                        log("Основная кнопка Продолжить активна, кликаю...", "DEBUG")
-                                        
-                                        # СКРИНШОТ 4: Перед кликом основной кнопки
-                                        screenshot4_path = f"screenshots/before_main_button_{timestamp}.png"
-                                        await self.page.screenshot(path=screenshot4_path, full_page=True)
-                                        log(f"📸 Скриншот перед кликом основной кнопки: {screenshot4_path}", "INFO")
-                                        
-                                        await self.page.locator('#pay').click(force=True)
-                                        log("✅ Основная кнопка нажата", "SUCCESS")
-                                        
-                                        # Ждем навигации
-                                        try:
-                                            await self.page.wait_for_url(lambda url: 'sender-details' not in url, timeout=5000)
-                                            log(f"✅ Навигация выполнена: {self.page.url}", "SUCCESS")
-                                            
-                                            # СКРИНШОТ 5: После успешной навигации
-                                            screenshot5_path = f"screenshots/after_navigation_{timestamp}.png"
-                                            await self.page.screenshot(path=screenshot5_path, full_page=True)
-                                            log(f"📸 Скриншот после навигации: {screenshot5_path}", "INFO")
-                                        except:
-                                            log("⚠️ Навигация не произошла", "WARNING")
-                                            
-                                            # СКРИНШОТ 6: Если навигация не произошла
-                                            screenshot6_path = f"screenshots/no_navigation_{timestamp}.png"
-                                            await self.page.screenshot(path=screenshot6_path, full_page=True)
-                                            log(f"📸 Скриншот - навигация не произошла: {screenshot6_path}", "INFO")
-                                    else:
-                                        log("⚠️ Основная кнопка не активна", "WARNING")
-                                        
-                                        # СКРИНШОТ 7: Кнопка не активна
-                                        screenshot7_path = f"screenshots/button_disabled_{timestamp}.png"
-                                        await self.page.screenshot(path=screenshot7_path, full_page=True)
-                                        log(f"📸 Скриншот - кнопка не активна: {screenshot7_path}", "INFO")
-                                except Exception as e:
-                                    log(f"Ошибка при клике: {e}", "WARNING")
-                                
-                                # КРИТИЧНО: Проверяем модалку с ошибкой
-                                log("Проверяю модалку с ошибкой после подтверждения...", "DEBUG")
-                                try:
-                                    error_check = await self.page.evaluate("""
-                                        () => {
-                                            const buttons = document.querySelectorAll('button[buttontext="Понятно"]');
-                                            let hasError = false;
-                                            let errorText = '';
-                                            
-                                            buttons.forEach(btn => {
-                                                if (btn.textContent.includes('Понятно')) {
-                                                    hasError = true;
-                                                    const parent = btn.closest('div');
-                                                    if (parent) {
-                                                        errorText = parent.innerText || parent.textContent;
+                                        # Проверяем закрылась ли модалка
+                                        modal_still_visible = await self.page.evaluate("""
+                                            () => {
+                                                const headers = document.querySelectorAll('h4');
+                                                for (const h of headers) {
+                                                    if (h.textContent.includes('Проверка данных') && h.offsetParent !== null) {
+                                                        return true;
                                                     }
                                                 }
-                                            });
-                                            
-                                            return { hasError, errorText };
-                                        }
-                                    """)
-                                    
-                                    if error_check['hasError']:
-                                        error_text = error_check['errorText']
-                                        log(f"❌ ОШИБКА РЕКВИЗИТОВ: {error_text}", "ERROR")
-                                        
-                                        # Закрываем модалку
-                                        await self.page.evaluate("""
-                                            () => {
-                                                const buttons = document.querySelectorAll('button[buttontext="Понятно"]');
-                                                buttons.forEach(btn => {
-                                                    if (btn.textContent.includes('Понятно')) {
-                                                        btn.click();
-                                                    }
-                                                });
+                                                return false;
                                             }
                                         """)
                                         
-                                        step2_time = time.time() - step2_start
-                                        log(f"⏱️ Этап 2 занял: {step2_time:.2f}s", "INFO")
-                                        
-                                        return {
-                                            'success': False,
-                                            'qr_link': None,
-                                            'time': time.time() - start_time,
-                                            'step1_time': step1_time,
-                                            'step2_time': step2_time,
-                                            'error': 'Реквизиты получателя больше не актуальны (модалка с ошибкой после подтверждения)',
-                                            'logs': current_payment_logs.copy()
-                                        }
-                                except Exception as e:
-                                    log(f"Ошибка при проверке модалки с ошибкой: {e}", "DEBUG")
-                                
-                                await self.page.wait_for_timeout(500)
+                                        if not modal_still_visible:
+                                            modal_closed = True
+                                            log("✅ Модалка закрылась!", "SUCCESS")
+                                            break
+                                        else:
+                                            log(f"⚠️ Модалка всё ещё видна после {method_name}", "WARNING")
+                                    except Exception as e:
+                                        log(f"⚠️ Ошибка при {method_name}: {e}", "WARNING")
+                                        continue
                             else:
-                                log("⚠️ Не удалось нажать кнопку!", "WARNING")
+                                log("⚠️ Кнопка модалки не найдена", "WARNING")
                                 
                         except Exception as e:
-                            log(f"⚠️ Ошибка при нажатии кнопки: {e}", "WARNING")
+                            log(f"⚠️ Ошибка при обработке модалки: {e}", "WARNING")
+                        
+                        if not modal_closed:
+                            log("⚠️ Модалка не закрылась, но продолжаю...", "WARNING")
+                        
+                        log("✅ Модалка обработана, проверяю что на странице...", "SUCCESS")
+                        
+                        # Ждем чтобы модалка точно закрылась
+                        await self.page.wait_for_timeout(1000)
+                        
+                        # СКРИНШОТ 1: Сразу после закрытия модалки
+                        timestamp = int(time.time())
+                        screenshot1_path = f"screenshots/after_modal_close_{timestamp}.png"
+                        await self.page.screenshot(path=screenshot1_path, full_page=True)
+                        log(f"📸 Скриншот после закрытия модалки: {screenshot1_path}", "INFO")
+                        
+                        # ПРОВЕРЯЕМ ВСЁ, ЧТО ЕСТЬ НА СТРАНИЦЕ
+                        page_state = await self.page.evaluate("""
+                            () => {
+                                const state = {
+                                    url: window.location.href,
+                                    modals: [],
+                                    captchas: [],
+                                    buttons: [],
+                                    errors: []
+                                };
+                                
+                                // Ищем все модалки
+                                const modalTexts = document.querySelectorAll('h4, h3, h2');
+                                modalTexts.forEach(h => {
+                                    if (h.offsetParent !== null) {
+                                        state.modals.push(h.textContent.trim());
+                                    }
+                                });
+                                
+                                // Ищем капчи
+                                const captchaIframes = document.querySelectorAll('iframe[src*="captcha"]');
+                                state.captchas.push(`Найдено капч: ${captchaIframes.length}`);
+                                
+                                // Ищем кнопки
+                                const buttons = document.querySelectorAll('button');
+                                buttons.forEach(btn => {
+                                    if (btn.offsetParent !== null && btn.textContent.trim()) {
+                                        state.buttons.push({
+                                            text: btn.textContent.trim(),
+                                            disabled: btn.disabled,
+                                            id: btn.id
+                                        });
+                                    }
+                                });
+                                
+                                // Ищем ошибки
+                                const errorElements = document.querySelectorAll('.error, .invalid-feedback, [class*="error"]');
+                                errorElements.forEach(err => {
+                                    if (err.offsetParent !== null && err.textContent.trim()) {
+                                        state.errors.push(err.textContent.trim());
+                                    }
+                                });
+                                
+                                return state;
+                            }
+                        """)
+                        
+                        log(f"📊 Состояние страницы после закрытия модалки:", "INFO")
+                        log(f"   URL: {page_state['url']}", "INFO")
+                        log(f"   Модалки: {page_state['modals']}", "INFO")
+                        log(f"   Капчи: {page_state['captchas']}", "INFO")
+                        log(f"   Кнопки: {page_state['buttons'][:5]}", "INFO")  # Первые 5
+                        log(f"   Ошибки: {page_state['errors']}", "INFO")
+                        
+                        # Проверяем есть ли ещё капча
+                        if any('captcha' in str(c).lower() for c in page_state['captchas']) or len(page_state['captchas']) > 0:
+                            log("⚠️ ОБНАРУЖЕНА ЕЩЁ ОДНА КАПЧА после модалки!", "WARNING")
+                            
+                            # СКРИНШОТ 2: Перед решением второй капчи
+                            screenshot2_path = f"screenshots/before_second_captcha_{timestamp}.png"
+                            await self.page.screenshot(path=screenshot2_path, full_page=True)
+                            log(f"📸 Скриншот перед второй капчей: {screenshot2_path}", "INFO")
+                            
+                            # Пробуем решить
+                            try:
+                                captcha_iframe_selector = 'iframe[src*="smartcaptcha.yandexcloud.net/checkbox"]'
+                                await self.page.wait_for_selector(captcha_iframe_selector, state='visible', timeout=2000)
+                                log("Решаю вторую капчу...", "DEBUG")
+                                
+                                captcha_frame = self.page.frame_locator(captcha_iframe_selector)
+                                checkbox_button = captcha_frame.locator('#js-button')
+                                await checkbox_button.click(timeout=2000)
+                                log("✅ Вторая капча решена", "SUCCESS")
+                                await self.page.wait_for_timeout(2000)
+                                
+                                # СКРИНШОТ 3: После решения второй капчи
+                                screenshot3_path = f"screenshots/after_second_captcha_{timestamp}.png"
+                                await self.page.screenshot(path=screenshot3_path, full_page=True)
+                                log(f"📸 Скриншот после второй капчи: {screenshot3_path}", "INFO")
+                            except Exception as e:
+                                log(f"Не удалось решить вторую капчу: {e}", "DEBUG")
+                        
+                        # Теперь пробуем кликнуть основную кнопку
+                        try:
+                            is_enabled = await self.page.evaluate("""
+                                () => {
+                                    const btn = document.getElementById('pay');
+                                    return btn && !btn.disabled;
+                                }
+                            """)
+                            
+                            if is_enabled:
+                                log("Основная кнопка Продолжить активна, кликаю...", "DEBUG")
+                                
+                                # СКРИНШОТ 4: Перед кликом основной кнопки
+                                screenshot4_path = f"screenshots/before_main_button_{timestamp}.png"
+                                await self.page.screenshot(path=screenshot4_path, full_page=True)
+                                log(f"📸 Скриншот перед кликом основной кнопки: {screenshot4_path}", "INFO")
+                                
+                                await self.page.locator('#pay').click(force=True)
+                                log("✅ Основная кнопка нажата", "SUCCESS")
+                                
+                                # Ждем навигации
+                                try:
+                                    await self.page.wait_for_url(lambda url: 'sender-details' not in url, timeout=5000)
+                                    log(f"✅ Навигация выполнена: {self.page.url}", "SUCCESS")
+                                    
+                                    # СКРИНШОТ 5: После успешной навигации
+                                    screenshot5_path = f"screenshots/after_navigation_{timestamp}.png"
+                                    await self.page.screenshot(path=screenshot5_path, full_page=True)
+                                    log(f"📸 Скриншот после навигации: {screenshot5_path}", "INFO")
+                                except:
+                                    log("⚠️ Навигация не произошла", "WARNING")
+                                    
+                                    # СКРИНШОТ 6: Если навигация не произошла
+                                    screenshot6_path = f"screenshots/no_navigation_{timestamp}.png"
+                                    await self.page.screenshot(path=screenshot6_path, full_page=True)
+                                    log(f"📸 Скриншот - навигация не произошла: {screenshot6_path}", "INFO")
+                            else:
+                                log("⚠️ Основная кнопка не активна", "WARNING")
+                                
+                                # СКРИНШОТ 7: Кнопка не активна
+                                screenshot7_path = f"screenshots/button_disabled_{timestamp}.png"
+                                await self.page.screenshot(path=screenshot7_path, full_page=True)
+                                log(f"📸 Скриншот - кнопка не активна: {screenshot7_path}", "INFO")
+                        except Exception as e:
+                            log(f"Ошибка при клике: {e}", "WARNING")
+                        
+                        # КРИТИЧНО: Проверяем модалку с ошибкой
+                        log("Проверяю модалку с ошибкой после подтверждения...", "DEBUG")
+                        try:
+                            error_check = await self.page.evaluate("""
+                                () => {
+                                    const buttons = document.querySelectorAll('button[buttontext="Понятно"]');
+                                    let hasError = false;
+                                    let errorText = '';
+                                    
+                                    buttons.forEach(btn => {
+                                        if (btn.textContent.includes('Понятно')) {
+                                            hasError = true;
+                                            const parent = btn.closest('div');
+                                            if (parent) {
+                                                errorText = parent.innerText || parent.textContent;
+                                            }
+                                        }
+                                    });
+                                    
+                                    return { hasError, errorText };
+                                }
+                            """)
+                            
+                            if error_check['hasError']:
+                                error_text = error_check['errorText']
+                                log(f"❌ ОШИБКА РЕКВИЗИТОВ: {error_text}", "ERROR")
+                                
+                                # Закрываем модалку
+                                await self.page.evaluate("""
+                                    () => {
+                                        const buttons = document.querySelectorAll('button[buttontext="Понятно"]');
+                                        buttons.forEach(btn => {
+                                            if (btn.textContent.includes('Понятно')) {
+                                                btn.click();
+                                            }
+                                        });
+                                    }
+                                """)
+                                
+                                step2_time = time.time() - step2_start
+                                log(f"⏱️ Этап 2 занял: {step2_time:.2f}s", "INFO")
+                                
+                                return {
+                                    'success': False,
+                                    'qr_link': None,
+                                    'time': time.time() - start_time,
+                                    'step1_time': step1_time,
+                                    'step2_time': step2_time,
+                                    'error': 'Реквизиты получателя больше не актуальны (модалка с ошибкой после подтверждения)',
+                                    'logs': current_payment_logs.copy()
+                                }
+                        except Exception as e:
+                            log(f"Ошибка при проверке модалки с ошибкой: {e}", "DEBUG")
                 else:
                     log("Модалка проверки данных не обнаружена", "DEBUG")
                     
