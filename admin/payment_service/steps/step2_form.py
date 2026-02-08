@@ -65,7 +65,7 @@ async def fill_masked_date(page: Page, field_name: str, value: str, label: str, 
                     }});
                 }}
             """)
-            await page.wait_for_timeout(200)
+            await page.wait_for_timeout(80)  # Сокращено с 200
             
             # Проверяем сработало ли
             check_value = await loc.input_value(timeout=1000)
@@ -88,8 +88,8 @@ async def fill_masked_date(page: Page, field_name: str, value: str, label: str, 
             }
         """)
         
-        # 7. Даём React обновить состояние
-        await page.wait_for_timeout(250)
+        # 7. Даём React обновить состояние (минимально)
+        await page.wait_for_timeout(100)  # Сокращено с 250
         
         # 8. Финальная проверка
         real_val = await loc.input_value(timeout=2000)
@@ -287,9 +287,9 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         except:
             pass
         
-        # Пауза перед заполнением получателя (минимальная)
+        # Пауза перед заполнением получателя (убрана)
         log("Жду обработки полей отправителя...", "DEBUG")
-        await page.wait_for_timeout(100)
+        # await page.wait_for_timeout(100)  # Убрано для скорости
         
         # Заполняем реквизиты получателя
         log("💳 Заполняю реквизиты получателя...", "INFO")
@@ -316,27 +316,19 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         
         log("✅ Реквизиты получателя заполнены успешно!", "SUCCESS")
         
-        # Прокликиваем все поля для валидации
-        log("Прокликиваю все поля для пересчета валидации...", "DEBUG")
+        # Прокликиваем ключевые поля для валидации (оптимизировано)
+        log("Прокликиваю ключевые поля для валидации...", "DEBUG")
         try:
-            all_inputs = await page.locator('input[type="text"], input[type="tel"]').all()
-            for inp in all_inputs:
-                try:
-                    if await inp.is_visible():
-                        await inp.click(timeout=100)
-                        await page.wait_for_timeout(10)
-                except:
-                    pass
-            
+            # Клик по body для общей валидации
             await page.evaluate("document.body.click()")
-            await page.wait_for_timeout(50)
-            log("Все поля прокликаны", "SUCCESS")
+            await page.wait_for_timeout(30)  # Минимальная пауза
+            log("Поля прокликаны", "SUCCESS")
         except Exception as e:
             log(f"Ошибка при прокликивании полей: {e}", "WARNING")
         
-        # Ждем обработки (минимальная)
+        # Ждем обработки (убрана)
         log("Жду обработки всех полей...", "DEBUG")
-        await page.wait_for_timeout(100)
+        # await page.wait_for_timeout(100)  # Убрано для скорости
         
         # Нажимаем кнопку Продолжить
         try:
@@ -345,7 +337,7 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         except:
             pass
         
-        await page.wait_for_timeout(100)  # Минимальная - быстрее переходим к капче
+        await page.wait_for_timeout(50)  # Сокращено с 100
         
         # === ОБРАБОТКА КАПЧИ (МАКСИМАЛЬНО БЫСТРАЯ) ===
         log("Отслеживаю появление капчи...", "DEBUG")
@@ -366,19 +358,19 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
             log("✅ Капча решена мгновенно!", "SUCCESS")
             
             # Даём время на появление модалки после капчи
-            await page.wait_for_timeout(200)
+            await page.wait_for_timeout(100)  # Сокращено с 200
             
         except Exception as e:
             log(f"Капча не обнаружена или ошибка: {e}", "DEBUG")
             # Если капчи не было, всё равно даём время на модалку
             await page.wait_for_timeout(100)
         
-        # Модалка "Проверка данных" - ждём её появления активно
+        # Модалка "Проверка данных" - ждём её появления активно (оптимизировано)
         log("Отслеживаю модалку 'Проверка данных'...", "DEBUG")
         modal_found = False
         try:
-            # Активное ожидание модалки до 3 секунд
-            for attempt in range(6):
+            # Активное ожидание модалки до 2 секунд (было 3)
+            for attempt in range(4):  # Было 6
                 modal_info = await page.evaluate("""
                     () => {
                         const headers = document.querySelectorAll('h4');
@@ -399,8 +391,8 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
                     modal_found = True
                     break
                 
-                if attempt < 5:
-                    await page.wait_for_timeout(200)
+                if attempt < 3:  # Было 5
+                    await page.wait_for_timeout(150)  # Было 200
             
             modal_info = modal_info if modal_found else {'found': False, 'text': ''}
             
@@ -434,7 +426,7 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
                             except:
                                 pass
                         
-                        await page.wait_for_timeout(100)  # Минимальная - быстрее к основной кнопке
+                        await page.wait_for_timeout(50)  # Сокращено с 100
                         log("Модалка закрыта, нажимаю основную кнопку", "DEBUG")
                         
                         # ВАЖНО: После закрытия модалки нажимаем основную кнопку #pay
