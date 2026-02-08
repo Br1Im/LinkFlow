@@ -706,22 +706,14 @@ class PaymentService:
                 except:
                     pass
                 
-                # Вводим сумму
-                await amount_input.evaluate(f"""
-                    (element) => {{
-                        element.focus();
-                        element.click();
-                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                            window.HTMLInputElement.prototype, 
-                            'value'
-                        ).set;
-                        nativeInputValueSetter.call(element, '{amount}');
-                        element.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        element.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        element.dispatchEvent(new KeyboardEvent('keydown', {{ key: 'Enter', bubbles: true }}));
-                        element.dispatchEvent(new KeyboardEvent('keyup', {{ key: 'Enter', bubbles: true }}));
-                    }}
-                """)
+                # Вводим сумму РЕАЛЬНЫМ ВВОДОМ (не через JavaScript!)
+                await amount_input.click()
+                await self.page.wait_for_timeout(100)
+                await amount_input.fill("")  # Очищаем
+                await self.page.wait_for_timeout(100)
+                await amount_input.press_sequentially(str(amount), delay=50)  # Медленный ввод для headless
+                await self.page.keyboard.press('Enter')  # Подтверждаем
+                await self.page.wait_for_timeout(200)
                 
                 # Проверяем комиссию - ждем пока значение изменится
                 try:
@@ -1076,6 +1068,14 @@ class PaymentService:
             log("Жду обработки полей отправителя...", "DEBUG")
             await self.page.wait_for_timeout(800)
             
+            # СКРИНШОТ: После заполнения полей отправителя
+            screenshot_sender = f"screenshots/debug_after_sender_{int(time.time())}.png"
+            try:
+                await self.page.screenshot(path=screenshot_sender, full_page=True)
+                log(f"📸 Скриншот после заполнения отправителя: {screenshot_sender}", "DEBUG")
+            except:
+                pass
+            
             print("\n💳 Заполняю реквизиты получателя (в конце)...")
             # КРИТИЧЕСКИ ВАЖНО: Заполняем поля получателя В САМОМ КОНЦЕ
             card_ok = await fill_beneficiary_card(self.page, card_number)
@@ -1377,9 +1377,12 @@ class PaymentService:
                 if modal_info['found']:
                     log(f"📋 Модалка 'Проверка данных': {modal_info['text']}", "INFO")
                     
-                    # Проверяем текст модалки
-                    if 'Ошибка' in modal_info['text'] or 'ошибка' in modal_info['text']:
-                        log("⚠️ ОШИБКА: Реквизиты получателя устарели!", "WARNING")
+                    # Проверяем текст модалки на ошибки
+                    error_keywords = ['Ошибка', 'ошибка', 'Карта получателя не найдена', 'не найдена', 'не актуальны', 'некорректна']
+                    has_error = any(keyword in modal_info['text'] for keyword in error_keywords)
+                    
+                    if has_error:
+                        log(f"⚠️ ОШИБКА РЕКВИЗИТОВ: {modal_info['text'][:200]}", "ERROR")
                         
                         # Закрываем модалку
                         buttons = await self.page.locator('button[buttontext="Продолжить"]').all()
@@ -1404,77 +1407,156 @@ class PaymentService:
                         # Это просто подтверждение данных - нажимаем "Продолжить"
                         log("✅ Модалка подтверждения данных - ищу кнопку 'Продолжить'", "SUCCESS")
                         
-                        # Пробуем найти и нажать кнопку через Playwright locator
+                        # СУПЕР АГРЕССИВНАЯ ЛОГИКА: Кликаем пока не закроется
                         modal_closed = False
-                        try:
-                            # Ищем все кнопки с текстом "Продолжить"
-                            buttons = await self.page.locator('button').all()
-                            modal_button = None
-                            
-                            for btn in buttons:
-                                try:
-                                    text = await btn.text_content()
-                                    is_visible = await btn.is_visible()
-                                    
-                                    if text and 'Продолжить' in text and is_visible:
-                                        # Проверяем что это не основная кнопка #pay
-                                        btn_id = await btn.get_attribute('id')
-                                        if btn_id != 'pay':
-                                            modal_button = btn
-                                            log(f"✅ Найдена кнопка модалки: '{text}'", "DEBUG")
-                                            break
-                                except:
-                                    continue
-                            
-                            if modal_button:
-                                # Пробуем разные способы клика
-                                for method_name in ['click', 'force_click', 'js_click']:
+                        
+                        for attempt in range(30):  # До 30 попыток
+                            try:
+                                # Проверяем видна ли ещё модалка
+                                modal_still_visible = await self.page.evaluate("""
+                                    () => {
+                                        const headers = document.querySelectorAll('h4');
+                                        for (const h of headers) {
+                                            if (h.textContent.includes('Проверка данных') && h.offsetParent !== null) {
+                                                return true;
+                                            }
+                                        }
+                                        return false;
+                                    }
+                                """)
+                                
+                                if not modal_still_visible:
+                                    modal_closed = True
+                                    log(f"✅ Модалка закрылась на попытке #{attempt + 1}!", "SUCCESS")
+                                    break
+                                
+                                if attempt % 5 == 0:
+                                    log(f"Попытка #{attempt + 1} закрыть модалку...", "DEBUG")
+                                
+                                # Чередуем методы для максимальной эффективности
+                                method = attempt % 6
+                                
+                                if method == 0:
+                                    # Playwright обычный клик
                                     try:
-                                        if method_name == 'click':
-                                            await modal_button.click(timeout=2000)
-                                        elif method_name == 'force_click':
-                                            await modal_button.click(force=True, timeout=2000)
-                                        elif method_name == 'js_click':
-                                            await modal_button.evaluate('el => el.click()')
-                                        
-                                        log(f"✅ Кнопка модалки нажата ({method_name})", "SUCCESS")
-                                        await self.page.wait_for_timeout(800)
-                                        
-                                        # Проверяем закрылась ли модалка
-                                        modal_still_visible = await self.page.evaluate("""
+                                        buttons = await self.page.locator('button').all()
+                                        for btn in buttons:
+                                            text = await btn.text_content()
+                                            is_visible = await btn.is_visible()
+                                            if text and 'Продолжить' in text and is_visible:
+                                                btn_id = await btn.get_attribute('id')
+                                                if btn_id != 'pay':
+                                                    await btn.click(timeout=500)
+                                                    break
+                                    except:
+                                        pass
+                                
+                                elif method == 1:
+                                    # Playwright force клик
+                                    try:
+                                        buttons = await self.page.locator('button').all()
+                                        for btn in buttons:
+                                            text = await btn.text_content()
+                                            is_visible = await btn.is_visible()
+                                            if text and 'Продолжить' in text and is_visible:
+                                                btn_id = await btn.get_attribute('id')
+                                                if btn_id != 'pay':
+                                                    await btn.click(force=True, timeout=500)
+                                                    break
+                                    except:
+                                        pass
+                                
+                                elif method == 2:
+                                    # JS простой клик
+                                    try:
+                                        await self.page.evaluate("""
                                             () => {
-                                                const headers = document.querySelectorAll('h4');
-                                                for (const h of headers) {
-                                                    if (h.textContent.includes('Проверка данных') && h.offsetParent !== null) {
+                                                const buttons = document.querySelectorAll('button');
+                                                for (const btn of buttons) {
+                                                    if (btn.textContent.includes('Продолжить') && btn.id !== 'pay' && btn.offsetParent !== null) {
+                                                        btn.click();
                                                         return true;
                                                     }
                                                 }
                                                 return false;
                                             }
                                         """)
-                                        
-                                        if not modal_still_visible:
-                                            modal_closed = True
-                                            log("✅ Модалка закрылась!", "SUCCESS")
-                                            break
-                                        else:
-                                            log(f"⚠️ Модалка всё ещё видна после {method_name}", "WARNING")
-                                    except Exception as e:
-                                        log(f"⚠️ Ошибка при {method_name}: {e}", "WARNING")
-                                        continue
-                            else:
-                                log("⚠️ Кнопка модалки не найдена", "WARNING")
+                                    except:
+                                        pass
                                 
-                        except Exception as e:
-                            log(f"⚠️ Ошибка при обработке модалки: {e}", "WARNING")
+                                elif method == 3:
+                                    # JS агрессивный клик с событиями
+                                    try:
+                                        await self.page.evaluate("""
+                                            () => {
+                                                const buttons = document.querySelectorAll('button');
+                                                for (const btn of buttons) {
+                                                    if (btn.textContent.includes('Продолжить') && btn.id !== 'pay' && btn.offsetParent !== null) {
+                                                        btn.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
+                                                        btn.dispatchEvent(new MouseEvent('mouseup', {bubbles: true}));
+                                                        btn.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+                                                        btn.click();
+                                                        return true;
+                                                    }
+                                                }
+                                                return false;
+                                            }
+                                        """)
+                                    except:
+                                        pass
+                                
+                                elif method == 4:
+                                    # Клик мышью по координатам
+                                    try:
+                                        buttons = await self.page.locator('button').all()
+                                        for btn in buttons:
+                                            text = await btn.text_content()
+                                            is_visible = await btn.is_visible()
+                                            if text and 'Продолжить' in text and is_visible:
+                                                btn_id = await btn.get_attribute('id')
+                                                if btn_id != 'pay':
+                                                    box = await btn.bounding_box()
+                                                    if box:
+                                                        x = box['x'] + box['width'] / 2
+                                                        y = box['y'] + box['height'] / 2
+                                                        await self.page.mouse.move(x, y)
+                                                        await self.page.mouse.down()
+                                                        await self.page.mouse.up()
+                                                    break
+                                    except:
+                                        pass
+                                
+                                else:  # method == 5
+                                    # Enter на кнопке
+                                    try:
+                                        buttons = await self.page.locator('button').all()
+                                        for btn in buttons:
+                                            text = await btn.text_content()
+                                            is_visible = await btn.is_visible()
+                                            if text and 'Продолжить' in text and is_visible:
+                                                btn_id = await btn.get_attribute('id')
+                                                if btn_id != 'pay':
+                                                    await btn.focus()
+                                                    await self.page.keyboard.press('Enter')
+                                                    break
+                                    except:
+                                        pass
+                                
+                                # Короткая пауза между попытками
+                                await self.page.wait_for_timeout(300)
+                                    
+                            except Exception as e:
+                                if attempt % 5 == 0:
+                                    log(f"  Ошибка на попытке #{attempt + 1}: {e}", "WARNING")
+                                await self.page.wait_for_timeout(200)
                         
-                        if not modal_closed:
-                            log("⚠️ Модалка не закрылась, но продолжаю...", "WARNING")
+                        if modal_closed:
+                            log("✅ Модалка успешно закрыта!", "SUCCESS")
+                        else:
+                            log("⚠️ Модалка не закрылась после 30 попыток, продолжаю...", "WARNING")
                         
-                        log("✅ Модалка обработана, проверяю что на странице...", "SUCCESS")
-                        
-                        # Ждем чтобы модалка точно закрылась
-                        await self.page.wait_for_timeout(1000)
+                        # Небольшая пауза после закрытия
+                        await self.page.wait_for_timeout(500)
                         
                         # СКРИНШОТ 1: Сразу после закрытия модалки
                         timestamp = int(time.time())

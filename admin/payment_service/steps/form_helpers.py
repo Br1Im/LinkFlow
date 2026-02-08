@@ -35,25 +35,22 @@ async def fill_react_input(page: Page, selector: str, value: str, field_name_for
             await locator.blur()
             await page.wait_for_timeout(100)
         else:
-            # Для обычных полей используем JavaScript подход
+            # Для обычных полей используем РЕАЛЬНЫЙ ВВОД (не JavaScript!)
+            # Это единственный способ который правильно триггерит React onChange
             await locator.click(force=True)
-            await locator.evaluate("el => { el.focus(); el.value = ''; }")
-            await page.wait_for_timeout(30)
+            await page.wait_for_timeout(50)
             
-            escaped = value.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"')
-            await locator.evaluate(f"""
-                (el) => {{
-                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                        window.HTMLInputElement.prototype, 'value'
-                    ).set;
-                    nativeInputValueSetter.call(el, '{escaped}');
-                    
-                    el.dispatchEvent(new Event('input',  {{ bubbles: true }}));
-                    el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                    el.dispatchEvent(new Event('blur',   {{ bubbles: true }}));
-                }}
-            """)
-            await page.wait_for_timeout(120)
+            # Очищаем поле
+            await locator.fill("")
+            await page.wait_for_timeout(50)
+            
+            # Вводим значение посимвольно (как реальный пользователь)
+            await locator.press_sequentially(value, delay=10)
+            await page.wait_for_timeout(100)
+            
+            # Blur для завершения ввода
+            await locator.blur()
+            await page.wait_for_timeout(100)
         
         # Проверка результата
         current = await locator.input_value()

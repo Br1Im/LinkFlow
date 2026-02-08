@@ -18,17 +18,68 @@ async def fill_masked_date(page: Page, field_name: str, value: str, label: str, 
     loc = page.locator(selector)
     
     try:
-        # 1. Клик → фокус + активация маски
-        await loc.click(force=True, timeout=5000)
-        await page.wait_for_timeout(80)  # дать маске проснуться
+        # Конвертируем в ISO формат для внутреннего значения
+        iso_value = ""
+        if '.' in value and len(value.split('.')) == 3:
+            d, m, y = value.split('.')
+            iso_value = f"{y}-{m.zfill(2)}-{d.zfill(2)}"
         
-        # 2. Очистка (очень важно!)
+        log(f"{label}: пробую форматы '{value}' (display) и '{iso_value}' (ISO)", "DEBUG")
+        
+        # 1. Диагностика - проверяем скрытые поля
+        hidden_info = await page.evaluate(f"""
+            () => {{
+                const el = document.querySelector('input[name="{field_name}"]');
+                const hidden = document.querySelector('input[name="{field_name}_hidden"], input[type="hidden"][name*="{field_name}"]');
+                return {{
+                    visible: el ? el.value : 'not found',
+                    hidden: hidden ? hidden.value : 'no hidden',
+                    dataRaw: el ? (el.dataset.rawValue || el.dataset.unmasked || 'no data') : 'not found',
+                    type: el ? el.type : 'unknown'
+                }};
+            }}
+        """)
+        log(f"{label} internals: {hidden_info}", "DEBUG")
+        
+        # 2. Клик → фокус + активация маски
+        await loc.click(force=True, timeout=5000)
+        await page.wait_for_timeout(80)
+        
+        # 3. Очистка
         await loc.fill("", force=True)
         
-        # 3. Посимвольный ввод — имитируем реального пользователя
-        await loc.press_sequentially(value, delay=25)  # delay 20–40 мс обычно идеально
+        # 4. Пробуем заполнить ISO формат через прямую установку value
+        if iso_value:
+            await loc.evaluate(f"""
+                (el) => {{
+                    // Устанавливаем ISO значение напрямую
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                        window.HTMLInputElement.prototype,
+                        'value'
+                    ).set;
+                    nativeInputValueSetter.call(el, '{iso_value}');
+                    
+                    // Триггерим все события
+                    ['input', 'change', 'blur'].forEach(eventName => {{
+                        el.dispatchEvent(new Event(eventName, {{ bubbles: true, cancelable: true }}));
+                    }});
+                }}
+            """)
+            await page.wait_for_timeout(200)
+            
+            # Проверяем сработало ли
+            check_value = await loc.input_value(timeout=1000)
+            if check_value and len(check_value) >= 8:
+                log(f"{label} ISO формат сработал: '{check_value}'", "SUCCESS")
+                return True
         
-        # 4. Явно триггерим события, которые маска и React ждут
+        # 5. Fallback - посимвольный ввод display формата
+        await loc.click(force=True)
+        await page.wait_for_timeout(50)
+        await loc.fill("", force=True)
+        await loc.press_sequentially(value, delay=15)
+        
+        # 6. Явно триггерим события
         await loc.evaluate("""
             (el) => {
                 ['input', 'change', 'blur'].forEach(eventName => {
@@ -37,10 +88,10 @@ async def fill_masked_date(page: Page, field_name: str, value: str, label: str, 
             }
         """)
         
-        # 5. Даём React обновить состояние
-        await page.wait_for_timeout(150)
+        # 7. Даём React обновить состояние (увеличено)
+        await page.wait_for_timeout(400)
         
-        # Диагностика — что реально видит DOM
+        # 8. Финальная проверка
         real_val = await loc.input_value(timeout=2000)
         log(f"{label} после заполнения → DOM value = '{real_val}' (ожидали '{value}')", "DEBUG")
         

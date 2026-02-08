@@ -34,8 +34,8 @@ async def test_payment():
     service = PaymentService()
     
     try:
-        # Запускаем браузер (headless=False чтобы видеть процесс)
-        await service.start(headless=False, compact_window=True)
+        # Запускаем браузер в headless режиме для production
+        await service.start(headless=True, compact_window=False)
         
         # Создаем платеж
         result = await service.create_payment_link(
