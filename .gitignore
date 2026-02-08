@@ -34,10 +34,12 @@ env/
 
 # Screenshots
 screenshots/*.png
+admin/screenshots/*.png
 !screenshots/.gitkeep
 
 # Logs
 *.log
+admin/current_payment_logs.json
 
 # OS
 .DS_Store
@@ -51,6 +53,7 @@ Thumbs.db
 /tmp/
 
 # Database (keep linkflow.db for local testing)
+*.db
 *.db-journal
 *.db-wal
 *.db-shm
