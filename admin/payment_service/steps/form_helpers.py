@@ -45,12 +45,12 @@ async def fill_react_input(page: Page, selector: str, value: str, field_name_for
             await page.wait_for_timeout(50)
             
             # Вводим значение посимвольно (как реальный пользователь)
-            await locator.press_sequentially(value, delay=10)
-            await page.wait_for_timeout(100)
+            await locator.press_sequentially(value, delay=8)
+            await page.wait_for_timeout(80)
             
             # Blur для завершения ввода
             await locator.blur()
-            await page.wait_for_timeout(100)
+            await page.wait_for_timeout(80)
         
         # Проверка результата
         current = await locator.input_value()

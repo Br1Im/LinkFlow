@@ -1543,7 +1543,7 @@ class PaymentService:
                                         pass
                                 
                                 # Короткая пауза между попытками
-                                await self.page.wait_for_timeout(300)
+                                await self.page.wait_for_timeout(200)
                                     
                             except Exception as e:
                                 if attempt % 5 == 0:

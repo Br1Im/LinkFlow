@@ -88,8 +88,8 @@ async def fill_masked_date(page: Page, field_name: str, value: str, label: str, 
             }
         """)
         
-        # 7. Даём React обновить состояние (увеличено)
-        await page.wait_for_timeout(400)
+        # 7. Даём React обновить состояние
+        await page.wait_for_timeout(250)
         
         # 8. Финальная проверка
         real_val = await loc.input_value(timeout=2000)
@@ -138,7 +138,7 @@ async def fill_beneficiary_card(page: Page, card_number: str, log_func) -> bool:
         if success:
             return True
         
-        await page.wait_for_timeout(300)
+        await page.wait_for_timeout(200)
     
     log("Не удалось заполнить номер карты после 3 попыток", "ERROR")
     return False
@@ -159,7 +159,7 @@ async def fill_beneficiary_name(page: Page, first_name: str, last_name: str, log
         log_func
     )
     
-    await page.wait_for_timeout(250)
+    await page.wait_for_timeout(150)
     
     lname_ok = await fill_react_input(
         page,

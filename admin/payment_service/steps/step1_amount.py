@@ -128,7 +128,7 @@ async def process_step1(page: Page, amount: int, log_func) -> dict:
             except:
                 continue
         
-        await page.wait_for_timeout(200)
+        await page.wait_for_timeout(150)
         
         # Выбор Uzcard с retry
         uzcard_selected = False
@@ -171,11 +171,11 @@ async def process_step1(page: Page, amount: int, log_func) -> dict:
                     log(f"Uzcard выбран через JS (попытка #{uzcard_attempt + 1})", "DEBUG")
                     break
                 
-                await page.wait_for_timeout(200)
+                await page.wait_for_timeout(150)
                 
             except Exception as e:
                 log(f"Попытка #{uzcard_attempt + 1} выбора Uzcard не удалась: {e}", "WARNING")
-                await page.wait_for_timeout(200)
+                await page.wait_for_timeout(150)
         
         if not uzcard_selected:
             log("Не удалось выбрать Uzcard", "ERROR")
@@ -185,7 +185,7 @@ async def process_step1(page: Page, amount: int, log_func) -> dict:
                 'error': 'Не удалось выбрать Uzcard'
             }
         
-        await page.wait_for_timeout(200)
+        await page.wait_for_timeout(150)
         
         # Ждем активации кнопки "Продолжить"
         log("Жду активации кнопки Продолжить...", "DEBUG")
@@ -229,7 +229,7 @@ async def process_step1(page: Page, amount: int, log_func) -> dict:
                         }}
                     """)
                     
-                    await page.wait_for_timeout(500)
+                    await page.wait_for_timeout(400)
                     
                     # Повторно выбираем Uzcard
                     await page.evaluate("""
@@ -240,7 +240,7 @@ async def process_step1(page: Page, amount: int, log_func) -> dict:
                             if (uzcardBtn) uzcardBtn.click();
                         }
                     """)
-                    await page.wait_for_timeout(300)
+                    await page.wait_for_timeout(250)
                 
                 # Повторный клик по "Способ перевода" на 7 попытке
                 if btn_attempt == 7:
@@ -249,7 +249,7 @@ async def process_step1(page: Page, amount: int, log_func) -> dict:
                         transfer_block = page.locator('div:has-text("Способ перевода")').first
                         if await transfer_block.is_visible(timeout=500):
                             await transfer_block.click()
-                            await page.wait_for_timeout(200)
+                            await page.wait_for_timeout(150)
                     except:
                         pass
                     
@@ -261,7 +261,7 @@ async def process_step1(page: Page, amount: int, log_func) -> dict:
                             if (uzcardBtn) uzcardBtn.click();
                         }
                     """)
-                    await page.wait_for_timeout(300)
+                    await page.wait_for_timeout(250)
                 
                 # Периодический клик по Uzcard
                 if btn_attempt > 4 and btn_attempt % 2 == 0:
@@ -275,11 +275,11 @@ async def process_step1(page: Page, amount: int, log_func) -> dict:
                     """)
                     log(f"Повторный клик по Uzcard (попытка #{btn_attempt + 1})", "WARNING")
                 
-                await page.wait_for_timeout(300)
+                await page.wait_for_timeout(250)
                 
             except Exception as e:
                 log(f"Ошибка проверки кнопки: {e}", "WARNING")
-                await page.wait_for_timeout(300)
+                await page.wait_for_timeout(250)
         
         if not button_active:
             log("Кнопка Продолжить не активировалась", "ERROR")
