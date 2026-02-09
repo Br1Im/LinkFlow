@@ -205,7 +205,10 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
     
     # Возвращаем результат
     if result.get('success'):
-        print(f"📤 Возвращаю {len(logs)} логов в ответе (успех)")  # Отладка
+        # Оставляем только важные логи (ошибки и предупреждения)
+        important_logs = [l for l in logs if l.get('level') in ['error', 'warning']]
+        print(f"📤 Успех. Логов: {len(logs)}, важных: {len(important_logs)}")
+        
         return jsonify({
             'success': True,
             'order_id': order_id,
@@ -216,18 +219,20 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
             'total_time': total_elapsed_time,
             'step1_time': result.get('step1_time'),
             'step2_time': result.get('step2_time'),
-            'message': 'Payment created successfully',
-            'logs': logs
+            'message': 'Payment created successfully'
         }), 201
     else:
-        print(f"📤 Возвращаю {len(logs)} логов в ответе (ошибка)")  # Отладка
+        # При ошибке возвращаем только последние 5 логов
+        error_logs = logs[-5:] if len(logs) > 5 else logs
+        print(f"📤 Ошибка. Возвращаю последние {len(error_logs)} логов")
+        
         return jsonify({
             'success': False,
             'order_id': order_id,
             'error': result.get('error', 'Payment creation failed'),
             'payment_time': result.get('time'),
             'total_time': total_elapsed_time,
-            'logs': logs
+            'logs': error_logs
         }), 500
 
 
