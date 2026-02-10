@@ -14,13 +14,20 @@ cursor = conn.cursor()
 cursor.execute("DELETE FROM beneficiaries")
 print("✅ Все старые реквизиты удалены")
 
-# Добавляем новый реквизит
+# Добавляем новые реквизиты
 cursor.execute("""
     INSERT INTO beneficiaries (card_number, card_owner, is_active, is_verified)
     VALUES (?, ?, 1, 1)
-""", ("5614682115648125", "ABDUGANIJON HUSENBAYEV"))
+""", ("9860096601965088", "Azizbek Medetbaev"))
 
-print("✅ Добавлен новый реквизит: ABDUGANIJON HUSENBAYEV (5614682115648125)")
+cursor.execute("""
+    INSERT INTO beneficiaries (card_number, card_owner, is_active, is_verified)
+    VALUES (?, ?, 1, 1)
+""", ("5614686701465695", "Azizbek Medetbaev"))
+
+print("✅ Добавлены новые реквизиты:")
+print("   1. Azizbek Medetbaev (9860096601965088)")
+print("   2. Azizbek Medetbaev (5614686701465695)")
 
 # Сохраняем изменения
 conn.commit()
