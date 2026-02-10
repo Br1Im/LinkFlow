@@ -39,7 +39,10 @@ def create_payment(amount):
     return response.json()
 
 for i in range(1, 11):
-    amount = random.randint(3000, 10000)
+    amount = random.randint(1000, 5000)
+    print(f"\n{'='*60}")
+    print(f"Запрос #{i}: {amount} RUB")
+    print('='*60)
     result = create_payment(amount)
     print(json.dumps(result, indent=2, ensure_ascii=False))
     time.sleep(0.5)

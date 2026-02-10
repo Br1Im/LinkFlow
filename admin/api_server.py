@@ -68,13 +68,6 @@ def run_async(coro):
 def create_payment():
     """API для создания платежа"""
     
-    # Проверка авторизации
-    if not check_auth():
-        return jsonify({
-            'success': False,
-            'error': 'Unauthorized'
-        }), 401
-    
     try:
         # Получаем JSON данные
         print(f"📥 Content-Type: {request.content_type}")
