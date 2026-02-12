@@ -1,0 +1,5 @@
+{
+"name": "Nutrition",
+"script": "run.py",
+"interpreter": "python3.11"
+}

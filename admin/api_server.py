@@ -107,7 +107,7 @@ def create_payment():
                 'error': 'Amount must be between 100 and 120000 RUB'
             }), 400
         
-        # Получаем данные получателя из запроса или из БД
+        # Получаем данные получателя из запроса
         card_number = data.get('card_number')
         owner_name = data.get('card_owner')
         custom_sender = data.get('custom_sender')  # dict с кастомными данными отправителя
@@ -116,25 +116,28 @@ def create_payment():
         if card_number is not None:
             card_number = str(card_number)
         
-        # Если не указаны в запросе, берем случайный из БД
-        if not card_number or not owner_name:
-            import database
-            beneficiary = database.get_random_beneficiary()
-            
-            if not beneficiary:
-                return jsonify({
-                    'success': False,
-                    'error': 'No active beneficiaries found in database'
-                }), 400
-            
-            card_number = str(beneficiary['card_number'])  # Преобразуем в строку
-            owner_name = beneficiary['card_owner']
-            log(f"Используется случайный реквизит: {owner_name} ({card_number})", "INFO")
+        # НЕ получаем из БД здесь - это будет сделано в create_payment_playwright
+        # с возможностью использования PayzTeam API
         
         # Режим работы зависит от наличия Playwright
         if PLAYWRIGHT_AVAILABLE:
             return create_payment_playwright(amount, order_id, card_number, owner_name, custom_sender)
         else:
+            # Для прокси режима нужны реквизиты из БД
+            if not card_number or not owner_name:
+                import database
+                beneficiary = database.get_random_beneficiary()
+                
+                if not beneficiary:
+                    return jsonify({
+                        'success': False,
+                        'error': 'No active beneficiaries found in database'
+                    }), 400
+                
+                card_number = str(beneficiary['card_number'])
+                owner_name = beneficiary['card_owner']
+                log(f"Используется случайный реквизит: {owner_name} ({card_number})", "INFO")
+            
             return create_payment_proxy(amount, order_id)
         
     except Exception as e:
@@ -148,6 +151,13 @@ def create_payment():
 def create_payment_playwright(amount, order_id, card_number, owner_name, custom_sender=None):
     """Создание платежа через Playwright"""
     import time
+    import concurrent.futures
+    
+    # Импортируем функцию получения реквизитов
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'payment_service'))
+    from payzteam_api import get_payzteam_requisite
     
     log(f"Создаю платеж через Playwright: amount={amount}, orderId={order_id}", "INFO")
     if custom_sender:
@@ -170,15 +180,31 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
         payment_service = PaymentService()
         run_async(payment_service.start(headless=True))
     
-    # Создаем платеж
+    # Запускаем запрос к PayzTeam API параллельно
+    payzteam_future = None
+    payzteam_result = None
+    requisite_source = "database"  # По умолчанию из БД
+    
+    # Если реквизиты не указаны явно, пробуем получить от PayzTeam
+    if not card_number or not owner_name:
+        log("Запускаю параллельный запрос к PayzTeam API...", "INFO")
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            payzteam_future = executor.submit(get_payzteam_requisite, amount)
+    
+    # Создаем платеж (первый этап начнется сразу)
+    # Если реквизиты не указаны, передаем None - они будут получены позже
     result = run_async(
         payment_service.create_payment_link(
             amount=amount,
             card_number=card_number,
             owner_name=owner_name,
-            custom_sender=custom_sender
+            custom_sender=custom_sender,
+            payzteam_future=payzteam_future  # Передаем future для ожидания
         )
     )
+    
+    # Определяем источник реквизитов из результата
+    requisite_source = result.get('requisite_source', 'database')
     
     total_elapsed_time = time.time() - total_start_time
     
@@ -208,10 +234,13 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
             'amount': amount,
             'status': 'completed',
             'qr_link': result.get('qr_link'),
+            'card_number': result.get('card_number'),
+            'card_owner': result.get('card_owner'),
             'payment_time': result.get('time'),
             'total_time': total_elapsed_time,
             'step1_time': result.get('step1_time'),
             'step2_time': result.get('step2_time'),
+            'requisite_source': requisite_source,
             'message': 'Payment created successfully'
         }), 201
     else:
@@ -225,6 +254,7 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
             'error': result.get('error', 'Payment creation failed'),
             'payment_time': result.get('time'),
             'total_time': total_elapsed_time,
+            'requisite_source': requisite_source,
             'logs': error_logs
         }), 500
 

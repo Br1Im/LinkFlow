@@ -575,15 +575,16 @@ class PaymentService:
         self.is_ready = False
         print("🛑 Сервис остановлен")
         
-    async def create_payment_link(self, amount: int, card_number: str, owner_name: str, custom_sender: dict = None) -> dict:
+    async def create_payment_link(self, amount: int, card_number: str = None, owner_name: str = None, custom_sender: dict = None, payzteam_future=None) -> dict:
         """
         Создает платежную ссылку
         
         Args:
             amount: Сумма платежа
-            card_number: Номер карты получателя
-            owner_name: Имя владельца карты
+            card_number: Номер карты получателя (опционально, если None - будет получен от PayzTeam или из БД)
+            owner_name: Имя владельца карты (опционально)
             custom_sender: Кастомные данные отправителя (опционально)
+            payzteam_future: Future для получения реквизитов от PayzTeam (опционально)
         
         Returns:
             dict: {
@@ -592,6 +593,7 @@ class PaymentService:
                 'time': float,
                 'step1_time': float,
                 'step2_time': float,
+                'requisite_source': str ('payzteam' or 'database'),
                 'error': str or None,
                 'logs': list
             }
@@ -599,11 +601,22 @@ class PaymentService:
         global current_payment_logs
         
         if not self.is_ready:
-            return {'success': False, 'error': 'Сервис не запущен', 'time': 0, 'logs': []}
+            return {'success': False, 'error': 'Сервис не запущен', 'time': 0, 'logs': [], 'requisite_source': 'none'}
         
         # Очищаем логи перед началом нового платежа
         current_payment_logs.clear()
-        log(f"Начало создания платежа: {amount}₽, карта {card_number}, владелец {owner_name}", "INFO")
+        
+        requisite_source = "database"  # По умолчанию из БД
+        
+        # Если реквизиты не указаны и есть future - будем ждать PayzTeam после этапа 1
+        if not card_number or not owner_name:
+            if payzteam_future:
+                log(f"Начало создания платежа: {amount}₽, реквизиты будут получены от PayzTeam", "INFO")
+            else:
+                log(f"Начало создания платежа: {amount}₽, реквизиты будут взяты из БД", "INFO")
+        else:
+            log(f"Начало создания платежа: {amount}₽, карта {card_number}, владелец {owner_name}", "INFO")
+            requisite_source = "manual"  # Указаны вручную
         
         # Получаем данные отправителя: кастомные или из БД
         if custom_sender:
@@ -738,7 +751,7 @@ class PaymentService:
                     log(f"Скриншот сохранен: {screenshot_path}", "INFO")
                 except:
                     pass
-                return {'success': False, 'error': 'Не удалось рассчитать комиссию', 'time': time.time() - start_time, 'logs': current_payment_logs.copy()}
+                return {'success': False, 'error': 'Не удалось рассчитать комиссию', 'time': time.time() - start_time, 'requisite_source': 'none', 'logs': current_payment_logs.copy()}
             
             # Выбор способа платежа и Uzcard с улучшенной логикой
             log("Выбираю способ перевода и Uzcard...", "DEBUG")
@@ -817,7 +830,7 @@ class PaymentService:
                     log(f"Скриншот сохранен: {screenshot_path}", "INFO")
                 except:
                     pass
-                return {'success': False, 'error': 'Не удалось выбрать Uzcard', 'time': time.time() - start_time, 'logs': current_payment_logs.copy()}
+                return {'success': False, 'error': 'Не удалось выбрать Uzcard', 'time': time.time() - start_time, 'requisite_source': 'none', 'logs': current_payment_logs.copy()}
             
             await self.page.wait_for_timeout(200)
             
@@ -959,7 +972,7 @@ class PaymentService:
                     log(f"Скриншот сохранен: {screenshot_path}", "INFO")
                 except Exception as e:
                     log(f"Не удалось сохранить скриншот: {e}", "WARNING")
-                return {'success': False, 'error': 'Кнопка Продолжить не активировалась', 'time': time.time() - start_time, 'logs': current_payment_logs.copy()}
+                return {'success': False, 'error': 'Кнопка Продолжить не активировалась', 'time': time.time() - start_time, 'requisite_source': 'none', 'logs': current_payment_logs.copy()}
             
             # Клик по кнопке
             await self.page.locator('#pay').evaluate('el => el.click()')
@@ -969,6 +982,48 @@ class PaymentService:
             log("Переход на страницу заполнения данных", "SUCCESS")
             
             step1_time = time.time() - start_time
+            
+            # ОЖИДАНИЕ РЕКВИЗИТОВ ОТ PAYZTEAM (если запрошены)
+            if payzteam_future and (not card_number or not owner_name):
+                log("Ожидание реквизитов от PayzTeam API...", "INFO")
+                try:
+                    payzteam_result = payzteam_future.result(timeout=5)  # Ждем максимум 5 секунд
+                    
+                    if payzteam_result:
+                        card_number = payzteam_result['card_number']
+                        owner_name = payzteam_result['card_owner']
+                        requisite_source = "payzteam"
+                        log(f"✅ Реквизиты получены от PayzTeam: {owner_name} ({card_number})", "SUCCESS")
+                    else:
+                        log("❌ PayzTeam не вернул реквизиты", "ERROR")
+                        return {
+                            'success': False,
+                            'error': 'PayzTeam API не вернул реквизиты (нет свободных)',
+                            'time': time.time() - start_time,
+                            'requisite_source': 'none',
+                            'logs': current_payment_logs.copy()
+                        }
+                except Exception as e:
+                    log(f"❌ Ошибка получения реквизитов от PayzTeam: {e}", "ERROR")
+                    return {
+                        'success': False,
+                        'error': f'Ошибка PayzTeam API: {str(e)}',
+                        'time': time.time() - start_time,
+                        'requisite_source': 'none',
+                        'logs': current_payment_logs.copy()
+                    }
+            
+            # Если реквизиты все еще не определены - ошибка
+            if not card_number or not owner_name:
+                log("❌ Реквизиты не указаны и не получены от PayzTeam", "ERROR")
+                return {
+                    'success': False,
+                    'error': 'Реквизиты не указаны. Используйте PayzTeam API или передайте реквизиты явно',
+                    'time': time.time() - start_time,
+                    'requisite_source': 'none',
+                    'logs': current_payment_logs.copy()
+                }
+            
             step2_start = time.time()
             
             # ЭТАП 2: Заполнение полей
@@ -1806,6 +1861,7 @@ class PaymentService:
                                     'time': time.time() - start_time,
                                     'step1_time': step1_time,
                                     'step2_time': step2_time,
+                                    'requisite_source': requisite_source,
                                     'error': f'Ошибка валидации: {error_text}',
                                     'logs': current_payment_logs.copy()
                                 }
@@ -1853,9 +1909,12 @@ class PaymentService:
             return {
                 'success': success,
                 'qr_link': qr_link,
+                'card_number': card_number,
+                'card_owner': owner_name,
                 'time': elapsed,
                 'step1_time': step1_time,
                 'step2_time': step2_time,
+                'requisite_source': requisite_source,
                 'error': None if success else 'QR-ссылка не получена',
                 'logs': current_payment_logs.copy()  # Добавляем логи в результат
             }
@@ -1875,6 +1934,7 @@ class PaymentService:
                 'time': time.time() - start_time,
                 'step1_time': 0,
                 'step2_time': 0,
+                'requisite_source': requisite_source if 'requisite_source' in locals() else 'none',
                 'error': str(e),
                 'logs': current_payment_logs.copy()
             }

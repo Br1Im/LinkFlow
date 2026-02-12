@@ -38,8 +38,8 @@ def create_payment(amount):
     response = requests.post(url, json=payload, headers=headers)
     return response.json()
 
-for i in range(1, 11):
-    amount = random.randint(1000, 5000)
+for i in range(1, 6):
+    amount = random.randint(2000, 2500)
     print(f"\n{'='*60}")
     print(f"Запрос #{i}: {amount} RUB")
     print('='*60)

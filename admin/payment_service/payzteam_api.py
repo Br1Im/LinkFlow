@@ -42,6 +42,7 @@ API для P2P оплат:
 import requests
 import hashlib
 import json
+import time
 from typing import Dict, Optional
 
 
@@ -315,3 +316,59 @@ if __name__ == "__main__":
         print("\n--- Отмена платежа ---")
         cancel_result = api.cancel_payment(deal_id)
         print(json.dumps(cancel_result, indent=2, ensure_ascii=False))
+
+
+# Глобальная функция для быстрого получения реквизитов
+def get_payzteam_requisite(amount: float) -> Optional[Dict]:
+    """
+    Быстрое получение реквизитов от PayzTeam
+    
+    Args:
+        amount: Сумма платежа
+        
+    Returns:
+        Dict с реквизитами или None если недоступны
+        {
+            'card_number': '5614682414447872',
+            'card_owner': 'Ziedullo Goziev',
+            'bank': 'Trast Bank'
+        }
+    """
+    # Конфигурация PayzTeam
+    MERCHANT_ID = "747"
+    API_KEY = "f046a50c7e398bc48124437b612ac7ab"
+    SECRET_KEY = "aa7c2689-98f2-428f-9c03-93e3835c3b1d"
+    
+    api = PayzTeamAPI(
+        merchant_id=MERCHANT_ID,
+        api_key=API_KEY,
+        secret_key=SECRET_KEY
+    )
+    
+    try:
+        uuid = f"REQ_{int(time.time() * 1000)}"
+        
+        result = api.create_deal(
+            amount=amount,
+            uuid=uuid,
+            client_email="requisite@linkflow.com",
+            payment_method="abh_c2c"
+        )
+        
+        if result.get("success") and "paymentInfo" in result:
+            credentials = result["paymentInfo"].get("paymentCredentials", "")
+            parts = credentials.split("|")
+            
+            if len(parts) >= 2:
+                return {
+                    'card_number': parts[0],
+                    'card_owner': parts[1],
+                    'bank': parts[2] if len(parts) > 2 else 'Unknown',
+                    'deal_id': result.get('id')
+                }
+        
+        return None
+        
+    except Exception as e:
+        print(f"PayzTeam API error: {e}")
+        return None

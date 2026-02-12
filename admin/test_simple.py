@@ -10,7 +10,7 @@ import time
 
 client = "test@example.com"
 uuid = f"TEST_{int(time.time())}"
-amount = "1500.00"
+amount = "1000.00"
 fiat_currency = "rub"
 payment_method = "abh_c2c"
 

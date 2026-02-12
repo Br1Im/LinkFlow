@@ -76,18 +76,161 @@ def index():
     return render_template('index.html')
 
 
+def create_mulenpay_payment(amount, order_id):
+    """Создание платежа через MulenPay API"""
+    import asyncio
+    from mulenpay import MulenPayClient
+    
+    try:
+        # Валидация суммы для MulenPay (3000-5000)
+        if amount < 3000 or amount > 5000:
+            return jsonify({
+                'success': False,
+                'error': 'Для MulenPay сумма должна быть от 3000 до 5000 RUB'
+            }), 400
+        
+        # Конфигурация MulenPay (из рабочего бота Nutrition)
+        private_key2 = 'nVT5DyeFCJGMe04THqN8hE7usCTiiSpuHiOHdWkac9f96f48'
+        secret_key = 'b48d74485fcf7b4a2cade546bdebcaf3692945ffeeb7ff98729a758f6322684c'
+        shop_id = '280'  # Строка, как в боте
+        
+        # Создаем клиент
+        client = MulenPayClient(secret_key=secret_key)
+        
+        # Создаем платеж асинхронно
+        async def create_async():
+            try:
+                # Создаём платёж
+                result = await client.create_payment(
+                    private_key2=private_key2,
+                    currency="rub",
+                    amount=str(amount),
+                    uuid=order_id,
+                    shopId=shop_id,
+                    description=f"Платеж {order_id}",
+                    items=[
+                        {
+                            "description": f"Платеж {order_id}",
+                            "quantity": 1,
+                            "price": str(amount),
+                            "vat_code": 0,
+                            "payment_subject": 1,
+                            "payment_mode": 1,
+                        }
+                    ]
+                )
+                
+                # Получаем payment_id для запроса статуса
+                payment_id = result.get('id')
+                payment_url = result.get('paymentUrl', '')
+                
+                # Извлекаем UUID из paymentUrl для запроса /sbp
+                import re
+                uuid_match = re.search(r'/payment/widget/([a-f0-9-]+)', payment_url)
+                if uuid_match:
+                    payment_uuid = uuid_match.group(1)
+                    
+                    # Ждём немного, чтобы система подготовила платёж
+                    import asyncio
+                    await asyncio.sleep(2)
+                    
+                    # Запрашиваем /sbp endpoint для получения прямой QR-ссылки
+                    sbp_url = f'https://mulenpay.ru/payment/widget/{payment_uuid}/sbp'
+                    
+                    # Используем синхронный requests для простоты
+                    import requests
+                    try:
+                        sbp_response = requests.get(sbp_url, timeout=5)
+                        if sbp_response.status_code == 200:
+                            sbp_data = sbp_response.json()
+                            if sbp_data.get('success') and sbp_data.get('sbp'):
+                                qr_link = sbp_data.get('data', {}).get('qrpayload', '')
+                                if qr_link:
+                                    result['qr_link'] = qr_link
+                                else:
+                                    result['qr_link'] = payment_url
+                            else:
+                                result['qr_link'] = payment_url
+                        else:
+                            result['qr_link'] = payment_url
+                    except Exception:
+                        result['qr_link'] = payment_url
+                else:
+                    result['qr_link'] = payment_url
+                
+                await client.aclose()
+                return result
+            except Exception as e:
+                await client.aclose()
+                raise e
+        
+        # Запускаем асинхронную функцию
+        start_time = time.time()
+        result = asyncio.run(create_async())
+        generation_time = time.time() - start_time
+        
+        # Используем QR-ссылку из result (уже извлечена в create_async)
+        qr_link = result.get('qr_link', '')
+        
+        # Генерируем ID платежа
+        all_payments = db.get_all_payments()
+        payment_id = f'PAY-{len(all_payments) + 1}'
+        
+        # Сохраняем в БД
+        payment_record = {
+            'id': payment_id,
+            'order_id': order_id,
+            'amount': amount,
+            'success': True,
+            'status': 'completed',
+            'qr_link': qr_link,
+            'payment_time': round(generation_time, 2),
+            'timestamp': datetime.now().isoformat(),
+            'payment_system': 'mulenpay'
+        }
+        
+        db.add_payment(payment_record)
+        db.add_log('success', f'MulenPay платёж {order_id} создан успешно за {generation_time:.2f}с')
+        
+        return jsonify({
+            'success': True,
+            'order_id': order_id,
+            'payment_id': payment_id,
+            'amount': amount,
+            'status': 'completed',
+            'qr_link': qr_link,
+            'payment_time': round(generation_time, 2),
+            'payment_system': 'mulenpay',
+            'mulenpay_id': result.get('id'),
+            'message': 'Payment created successfully via MulenPay'
+        }), 201
+        
+    except Exception as e:
+        db.add_log('error', f'Ошибка MulenPay: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': f'MulenPay error: {str(e)}'
+        }), 500
+
+
 @app.route('/api/create-payment', methods=['POST'])
 def create_payment():
-    """Создание платежа через реальный API на порту 5001"""
+    """Создание платежа через реальный API на порту 5001 или MulenPay"""
     global current_generation
     
     try:
         data = request.get_json()
         
         amount = data.get('amount')
+        payment_system = data.get('payment_system', 'multitransfer')  # По умолчанию multitransfer
         # ID заказа генерируется автоматически
         order_id = data.get('orderId') or f'ORD-{int(time.time())}-{random.randint(1000, 9999)}'
         
+        # Если выбран MulenPay - используем его
+        if payment_system == 'mulenpay':
+            return create_mulenpay_payment(amount, order_id)
+        
+        # Иначе используем multitransfer (текущая логика)
         # Получаем кастомные данные если указаны
         custom_card = data.get('card_number')
         custom_owner = data.get('card_owner')
@@ -158,22 +301,8 @@ def create_payment():
             # Получаем настройки
             settings = db.get_all_settings()
             
-            # Используем кастомные данные получателя если указаны, иначе из настроек
-            if custom_card and custom_owner:
-                card = custom_card
-                owner = custom_owner
-                log_msg = f'Используются кастомные реквизиты: {owner} ({card})'
-                db.add_log('info', log_msg)
-                with payment_logs_lock:
-                    current_payment_logs.append({
-                        'timestamp': datetime.now().isoformat(),
-                        'level': 'info',
-                        'message': log_msg
-                    })
-            else:
-                card = settings.get('default_card', DEFAULT_CARD)
-                owner = settings.get('default_owner', DEFAULT_OWNER)
-            
+            # НЕ передаем реквизиты - они будут получены от PayzTeam API
+            # Только если явно указаны кастомные реквизиты - используем их
             api_url = settings.get('api_url', API_URL)
             api_token = settings.get('api_token', API_TOKEN)
             
@@ -182,10 +311,30 @@ def create_payment():
             
             api_payload = {
                 'amount': amount,
-                'orderId': order_id,
-                'card_number': card,
-                'card_owner': owner
+                'orderId': order_id
             }
+            
+            # Добавляем кастомные реквизиты только если они явно указаны
+            if custom_card and custom_owner:
+                api_payload['card_number'] = custom_card
+                api_payload['card_owner'] = custom_owner
+                log_msg = f'Используются кастомные реквизиты: {custom_owner} ({custom_card})'
+                db.add_log('info', log_msg)
+                with payment_logs_lock:
+                    current_payment_logs.append({
+                        'timestamp': datetime.now().isoformat(),
+                        'level': 'info',
+                        'message': log_msg
+                    })
+            else:
+                log_msg = 'Реквизиты будут получены от PayzTeam API'
+                db.add_log('info', log_msg)
+                with payment_logs_lock:
+                    current_payment_logs.append({
+                        'timestamp': datetime.now().isoformat(),
+                        'level': 'info',
+                        'message': log_msg
+                    })
             
             # Добавляем кастомные данные отправителя если указаны
             if custom_sender:
@@ -240,6 +389,10 @@ def create_payment():
                     current_payment_logs.extend(api_logs)
                     print(f"📊 Всего логов в хранилище: {len(current_payment_logs)}")  # Отладка
                 
+                # Получаем реквизиты: кастомные если были переданы, иначе из ответа API (или N/A)
+                card_used = custom_card if custom_card else api_data.get('card_number', 'N/A')
+                owner_used = custom_owner if custom_owner else api_data.get('card_owner', 'N/A')
+                
                 payment_data = {
                     'id': payment_id,
                     'order_id': order_id,
@@ -249,8 +402,8 @@ def create_payment():
                     'qr_link': api_data.get('qr_link'),
                     'payment_time': round(generation_time, 2),
                     'timestamp': datetime.now().isoformat(),
-                    'card': card,
-                    'owner': owner
+                    'card': card_used,
+                    'owner': owner_used
                 }
                 
                 # Сохраняем в БД
@@ -289,6 +442,10 @@ def create_payment():
                 except:
                     pass
                 
+                # Получаем реквизиты: кастомные если были переданы, иначе N/A
+                card_used = custom_card if custom_card else 'N/A'
+                owner_used = custom_owner if custom_owner else 'N/A'
+                
                 payment_data = {
                     'id': payment_id,
                     'order_id': order_id,
@@ -298,8 +455,8 @@ def create_payment():
                     'qr_link': None,
                     'payment_time': round(generation_time, 2),
                     'timestamp': datetime.now().isoformat(),
-                    'card': card,
-                    'owner': owner
+                    'card': card_used,
+                    'owner': owner_used
                 }
                 
                 db.add_payment(payment_data)
