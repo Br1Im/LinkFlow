@@ -889,10 +889,11 @@
                         <label class="block text-sm font-medium mb-2 font-mono">API</label>
                         <select 
                             x-model="apiTester.source"
-                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
+                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono text-white"
+                            style="color: white; background-color: rgba(255,255,255,0.05);"
                         >
-                            <option value="h2h">H2H API</option>
-                            <option value="payzteam">PayzTeam API</option>
+                            <option value="h2h" style="color: black; background-color: white;">H2H API</option>
+                            <option value="payzteam" style="color: black; background-color: white;">PayzTeam API</option>
                         </select>
                     </div>
                     <div class="flex items-end">
@@ -1693,10 +1694,10 @@
                         const apiName = this.apiTester.source === 'h2h' ? 'H2H' : 'PayzTeam';
                         this.showToast('info', 'Тест', `Запрос к ${apiName} API...`);
                         
-                        // Прямой вызов API функций
+                        // Прямой вызов API функций через порт 5001
                         const url = this.apiTester.source === 'h2h' 
-                            ? '/api/test-h2h-requisite'
-                            : '/api/test-payzteam-requisite';
+                            ? 'http://85.192.56.74:5001/api/test-h2h-requisite'
+                            : 'http://85.192.56.74:5001/api/test-payzteam-requisite';
                         
                         const response = await fetch(url, {
                             method: 'POST',
