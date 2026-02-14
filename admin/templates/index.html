@@ -871,33 +871,62 @@
                 </div>
             </div>
             
-            <!-- Beneficiaries List -->
-            <div class="pixel-border pixel-corners p-6 scanlines">
-                <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-bold font-mono">СПИСОК РЕКВИЗИТОВ</h3>
-                    
-                    <!-- Generate Requisites Buttons -->
-                    <div class="flex items-center gap-2">
-                        <button 
-                            @click="generateRequisiteFromAPI('h2h')"
-                            :disabled="generatingRequisite"
-                            class="px-4 py-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 pixel-corners text-sm transition-colors font-mono disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            <!-- API Tester -->
+            <div class="pixel-border pixel-corners p-6 scanlines mb-6">
+                <h3 class="text-xl font-bold mb-6 font-mono">ТЕСТЕР API РЕКВИЗИТОВ</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 font-mono">СУММА</label>
+                        <input 
+                            type="number" 
+                            x-model="apiTester.amount"
+                            placeholder="300"
+                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
                         >
-                            <i data-lucide="zap" class="w-4 h-4"></i>
-                            <span x-show="!generatingRequisite || generatingSource !== 'h2h'">H2H API</span>
-                            <span x-show="generatingRequisite && generatingSource === 'h2h'">...</span>
-                        </button>
-                        <button 
-                            @click="generateRequisiteFromAPI('payzteam')"
-                            :disabled="generatingRequisite"
-                            class="px-4 py-2 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 pixel-corners text-sm transition-colors font-mono disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2 font-mono">API</label>
+                        <select 
+                            x-model="apiTester.source"
+                            class="w-full px-4 py-3 bg-white/5 border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono"
                         >
-                            <i data-lucide="zap" class="w-4 h-4"></i>
-                            <span x-show="!generatingRequisite || generatingSource !== 'payzteam'">PayzTeam API</span>
-                            <span x-show="generatingRequisite && generatingSource === 'payzteam'">...</span>
+                            <option value="h2h">H2H API</option>
+                            <option value="payzteam">PayzTeam API</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button 
+                            @click="testRequisiteAPI()"
+                            :disabled="apiTester.loading"
+                            class="w-full px-6 py-3 bg-white text-black pixel-corners font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-mono"
+                        >
+                            <i data-lucide="play" class="w-5 h-5"></i>
+                            <span x-show="!apiTester.loading">ТЕСТ</span>
+                            <span x-show="apiTester.loading">...</span>
                         </button>
                     </div>
                 </div>
+                
+                <!-- API Response -->
+                <div x-show="apiTester.response" class="mt-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-sm font-medium font-mono">ОТВЕТ API</label>
+                        <button 
+                            @click="copyToClipboard(JSON.stringify(apiTester.response, null, 2))"
+                            class="px-3 py-1 bg-white/5 hover:bg-white/10 pixel-corners text-xs transition-colors font-mono flex items-center gap-2"
+                        >
+                            <i data-lucide="copy" class="w-3 h-3"></i>
+                            КОПИРОВАТЬ
+                        </button>
+                    </div>
+                    <pre class="p-4 bg-black/50 border border-white/10 pixel-corners overflow-x-auto text-xs font-mono text-green-400" x-text="JSON.stringify(apiTester.response, null, 2)"></pre>
+                </div>
+            </div>
+            
+            <!-- Beneficiaries List -->
+            <div class="pixel-border pixel-corners p-6 scanlines">
+                <h3 class="text-xl font-bold mb-6 font-mono">СПИСОК РЕКВИЗИТОВ</h3>
                 
                 <div class="space-y-3">
                     <template x-for="(beneficiary, index) in beneficiaries" :key="beneficiary.id">
@@ -1027,8 +1056,12 @@
                 },
                 loadingBeneficiary: false,
                 retestingId: null,
-                generatingRequisite: false,
-                generatingSource: null,
+                apiTester: {
+                    amount: 300,
+                    source: 'h2h',
+                    loading: false,
+                    response: null
+                },
                 toasts: [],
                 searchQuery: '',
                 filterStatus: 'all',
@@ -1652,50 +1685,50 @@
                     }
                 },
                 
-                async generateRequisiteFromAPI(source) {
-                    this.generatingRequisite = true;
-                    this.generatingSource = source;
+                async testRequisiteAPI() {
+                    this.apiTester.loading = true;
+                    this.apiTester.response = null;
                     
                     try {
-                        this.showToast('info', 'Генерация', `Получаю реквизиты от ${source === 'h2h' ? 'H2H' : 'PayzTeam'} API...`);
+                        const apiName = this.apiTester.source === 'h2h' ? 'H2H' : 'PayzTeam';
+                        this.showToast('info', 'Тест', `Запрос к ${apiName} API...`);
                         
-                        // Создаем тестовый платеж с указанным источником реквизитов
-                        const response = await fetch('/api/create-payment', {
+                        // Прямой вызов API функций
+                        const url = this.apiTester.source === 'h2h' 
+                            ? '/api/test-h2h-requisite'
+                            : '/api/test-payzteam-requisite';
+                        
+                        const response = await fetch(url, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                amount: 300,
-                                requisite_api: source
+                                amount: parseInt(this.apiTester.amount)
                             })
                         });
                         
                         const data = await response.json();
+                        this.apiTester.response = data;
                         
-                        if (data.success && data.card_number && data.card_owner) {
-                            // Проверяем, есть ли уже такой реквизит
-                            const exists = this.beneficiaries.some(b => b.card_number === data.card_number);
-                            
-                            if (exists) {
-                                this.showToast('warning', 'Внимание', 'Этот реквизит уже существует в списке');
-                            } else {
-                                // Добавляем реквизит в базу
-                                this.newBeneficiary.card_number = data.card_number;
-                                this.newBeneficiary.card_owner = data.card_owner;
-                                
-                                await this.addBeneficiary();
-                                
-                                this.showToast('success', 'Успех!', `Реквизит от ${source === 'h2h' ? 'H2H' : 'PayzTeam'} API добавлен`);
-                            }
+                        if (data.card_number && data.card_owner) {
+                            this.showToast('success', 'Успех', `${apiName} API вернул реквизиты`);
                         } else {
-                            this.showToast('error', 'Ошибка', data.error || `${source === 'h2h' ? 'H2H' : 'PayzTeam'} API не вернул реквизиты`);
+                            this.showToast('warning', 'Нет реквизитов', data.error || `${apiName} API не вернул реквизиты`);
                         }
                     } catch (error) {
-                        this.showToast('error', 'Ошибка', 'Не удалось получить реквизиты');
-                        console.error('Failed to generate requisite:', error);
+                        this.showToast('error', 'Ошибка', 'Не удалось выполнить запрос');
+                        console.error('Failed to test API:', error);
+                        this.apiTester.response = { error: error.message };
                     } finally {
-                        this.generatingRequisite = false;
-                        this.generatingSource = null;
+                        this.apiTester.loading = false;
                     }
+                },
+                
+                copyToClipboard(text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.showToast('success', 'Скопировано', 'JSON скопирован в буфер обмена');
+                    }).catch(() => {
+                        this.showToast('error', 'Ошибка', 'Не удалось скопировать');
+                    });
                 },
                 
                 copyToClipboard(text) {

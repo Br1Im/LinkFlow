@@ -907,6 +907,102 @@ def set_requisite_source():
         }), 500
 
 
+@app.route('/api/test-h2h-requisite', methods=['POST'])
+def test_h2h_requisite():
+    """Тестовый запрос к H2H API для получения реквизитов
+    
+    Request:
+        {
+            "amount": 300
+        }
+    
+    Response:
+        {
+            "card_number": "1234567890123456",
+            "card_owner": "IVAN IVANOV",
+            "source": "h2h"
+        }
+    """
+    try:
+        data = request.get_json()
+        amount = data.get('amount', 300)
+        
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'payment_service'))
+        from h2h_api import get_h2h_requisite
+        
+        result = get_h2h_requisite(amount)
+        
+        if result:
+            return jsonify({
+                'success': True,
+                'card_number': result['card_number'],
+                'card_owner': result['card_owner'],
+                'source': 'h2h',
+                'amount': amount
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'H2H API не вернул реквизиты',
+                'source': 'h2h',
+                'amount': amount
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'source': 'h2h'
+        }), 500
+
+
+@app.route('/api/test-payzteam-requisite', methods=['POST'])
+def test_payzteam_requisite():
+    """Тестовый запрос к PayzTeam API для получения реквизитов
+    
+    Request:
+        {
+            "amount": 300
+        }
+    
+    Response:
+        {
+            "card_number": "1234567890123456",
+            "card_owner": "IVAN IVANOV",
+            "source": "payzteam"
+        }
+    """
+    try:
+        data = request.get_json()
+        amount = data.get('amount', 300)
+        
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'payment_service'))
+        from payzteam_api import get_payzteam_requisite
+        
+        result = get_payzteam_requisite(amount)
+        
+        if result:
+            return jsonify({
+                'success': True,
+                'card_number': result['card_number'],
+                'card_owner': result['card_owner'],
+                'source': 'payzteam',
+                'amount': amount
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'PayzTeam API не вернул реквизиты',
+                'source': 'payzteam',
+                'amount': amount
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'source': 'payzteam'
+        }), 500
+
+
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("🔌 LinkFlow API Server")
