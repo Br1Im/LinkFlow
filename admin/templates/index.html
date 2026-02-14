@@ -873,7 +873,31 @@
             
             <!-- Beneficiaries List -->
             <div class="pixel-border pixel-corners p-6 scanlines">
-                <h3 class="text-xl font-bold mb-6 font-mono">СПИСОК РЕКВИЗИТОВ</h3>
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold font-mono">СПИСОК РЕКВИЗИТОВ</h3>
+                    
+                    <!-- Generate Requisites Buttons -->
+                    <div class="flex items-center gap-2">
+                        <button 
+                            @click="generateRequisiteFromAPI('h2h')"
+                            :disabled="generatingRequisite"
+                            class="px-4 py-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 pixel-corners text-sm transition-colors font-mono disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            <i data-lucide="zap" class="w-4 h-4"></i>
+                            <span x-show="!generatingRequisite || generatingSource !== 'h2h'">H2H API</span>
+                            <span x-show="generatingRequisite && generatingSource === 'h2h'">...</span>
+                        </button>
+                        <button 
+                            @click="generateRequisiteFromAPI('payzteam')"
+                            :disabled="generatingRequisite"
+                            class="px-4 py-2 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 pixel-corners text-sm transition-colors font-mono disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            <i data-lucide="zap" class="w-4 h-4"></i>
+                            <span x-show="!generatingRequisite || generatingSource !== 'payzteam'">PayzTeam API</span>
+                            <span x-show="generatingRequisite && generatingSource === 'payzteam'">...</span>
+                        </button>
+                    </div>
+                </div>
                 
                 <div class="space-y-3">
                     <template x-for="(beneficiary, index) in beneficiaries" :key="beneficiary.id">
@@ -1003,6 +1027,8 @@
                 },
                 loadingBeneficiary: false,
                 retestingId: null,
+                generatingRequisite: false,
+                generatingSource: null,
                 toasts: [],
                 searchQuery: '',
                 filterStatus: 'all',
@@ -1623,6 +1649,52 @@
                         console.error('Failed to retest beneficiary:', error);
                     } finally {
                         this.retestingId = null;
+                    }
+                },
+                
+                async generateRequisiteFromAPI(source) {
+                    this.generatingRequisite = true;
+                    this.generatingSource = source;
+                    
+                    try {
+                        this.showToast('info', 'Генерация', `Получаю реквизиты от ${source === 'h2h' ? 'H2H' : 'PayzTeam'} API...`);
+                        
+                        // Создаем тестовый платеж с указанным источником реквизитов
+                        const response = await fetch('/api/create-payment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                amount: 300,
+                                requisite_api: source
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success && data.card_number && data.card_owner) {
+                            // Проверяем, есть ли уже такой реквизит
+                            const exists = this.beneficiaries.some(b => b.card_number === data.card_number);
+                            
+                            if (exists) {
+                                this.showToast('warning', 'Внимание', 'Этот реквизит уже существует в списке');
+                            } else {
+                                // Добавляем реквизит в базу
+                                this.newBeneficiary.card_number = data.card_number;
+                                this.newBeneficiary.card_owner = data.card_owner;
+                                
+                                await this.addBeneficiary();
+                                
+                                this.showToast('success', 'Успех!', `Реквизит от ${source === 'h2h' ? 'H2H' : 'PayzTeam'} API добавлен`);
+                            }
+                        } else {
+                            this.showToast('error', 'Ошибка', data.error || `${source === 'h2h' ? 'H2H' : 'PayzTeam'} API не вернул реквизиты`);
+                        }
+                    } catch (error) {
+                        this.showToast('error', 'Ошибка', 'Не удалось получить реквизиты');
+                        console.error('Failed to generate requisite:', error);
+                    } finally {
+                        this.generatingRequisite = false;
+                        this.generatingSource = null;
                     }
                 },
                 
