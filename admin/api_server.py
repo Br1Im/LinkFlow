@@ -93,10 +93,15 @@ def create_payment():
         amount = data.get('amount')
         order_id = data.get('orderId')
         
-        if not amount or not order_id:
+        # Генерируем orderId автоматически, если не передан
+        if not order_id:
+            from datetime import datetime
+            order_id = f"ORDER_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        if not amount:
             return jsonify({
                 'success': False,
-                'error': 'amount and orderId are required'
+                'error': 'amount is required'
             }), 400
         
         amount = int(amount)
@@ -111,6 +116,14 @@ def create_payment():
         card_number = data.get('card_number')
         owner_name = data.get('card_owner')
         custom_sender = data.get('custom_sender')  # dict с кастомными данными отправителя
+        requisite_api = data.get('requisite_api', 'auto')  # auto, h2h, payzteam
+        
+        # Валидация requisite_api
+        if requisite_api not in ['auto', 'h2h', 'payzteam']:
+            return jsonify({
+                'success': False,
+                'error': 'requisite_api must be "auto", "h2h" or "payzteam"'
+            }), 400
         
         # Преобразуем card_number в строку если это число
         if card_number is not None:
@@ -121,7 +134,7 @@ def create_payment():
         
         # Режим работы зависит от наличия Playwright
         if PLAYWRIGHT_AVAILABLE:
-            return create_payment_playwright(amount, order_id, card_number, owner_name, custom_sender)
+            return create_payment_playwright(amount, order_id, card_number, owner_name, custom_sender, requisite_api)
         else:
             # Для прокси режима нужны реквизиты из БД
             if not card_number or not owner_name:
@@ -148,18 +161,23 @@ def create_payment():
         }), 500
 
 
-def create_payment_playwright(amount, order_id, card_number, owner_name, custom_sender=None):
-    """Создание платежа через Playwright"""
+def create_payment_playwright(amount, order_id, card_number, owner_name, custom_sender=None, requisite_api='auto'):
+    """Создание платежа через Playwright
+    
+    Args:
+        requisite_api: 'auto' (H2H -> PayzTeam), 'h2h' (только H2H), 'payzteam' (только PayzTeam)
+    """
     import time
     import concurrent.futures
     
-    # Импортируем функцию получения реквизитов
+    # Импортируем функции получения реквизитов
     import sys
     import os
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'payment_service'))
+    from h2h_api import get_h2h_requisite
     from payzteam_api import get_payzteam_requisite
     
-    log(f"Создаю платеж через Playwright: amount={amount}, orderId={order_id}", "INFO")
+    log(f"Создаю платеж через Playwright: amount={amount}, orderId={order_id}, requisite_api={requisite_api}", "INFO")
     if custom_sender:
         log(f"Используются кастомные данные отправителя: {custom_sender}", "INFO")
     
@@ -180,16 +198,25 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
         payment_service = PaymentService()
         run_async(payment_service.start(headless=True))
     
-    # Запускаем запрос к H2H API параллельно
+    # Запускаем запросы к API параллельно в зависимости от requisite_api
     h2h_future = None
-    h2h_result = None
+    payzteam_future = None
     requisite_source = "database"  # По умолчанию из БД
     
-    # Если реквизиты не указаны явно, пробуем получить от H2H API
+    # Если реквизиты не указаны явно, получаем от API
     if not card_number or not owner_name:
-        log("Запускаю параллельный запрос к H2H API...", "INFO")
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            h2h_future = executor.submit(get_payzteam_requisite, amount)
+            if requisite_api == 'auto':
+                # Запускаем оба параллельно, но приоритет у H2H
+                log("Запускаю параллельные запросы к H2H и PayzTeam API...", "INFO")
+                h2h_future = executor.submit(get_h2h_requisite, amount)
+                payzteam_future = executor.submit(get_payzteam_requisite, amount)
+            elif requisite_api == 'h2h':
+                log("Запускаю запрос к H2H API...", "INFO")
+                h2h_future = executor.submit(get_h2h_requisite, amount)
+            elif requisite_api == 'payzteam':
+                log("Запускаю запрос к PayzTeam API...", "INFO")
+                payzteam_future = executor.submit(get_payzteam_requisite, amount)
     
     # Создаем платеж (первый этап начнется сразу)
     # Если реквизиты не указаны, передаем None - они будут получены позже
@@ -199,7 +226,9 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
             card_number=card_number,
             owner_name=owner_name,
             custom_sender=custom_sender,
-            h2h_future=h2h_future  # Передаем future для ожидания
+            h2h_future=h2h_future,
+            payzteam_future=payzteam_future,
+            requisite_api=requisite_api
         )
     )
     
@@ -806,6 +835,71 @@ def convert_currency():
                 'error': 'Currency conversion failed'
             }), 500
             
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/requisite-source', methods=['GET'])
+def get_requisite_source():
+    """Получить текущий источник реквизитов"""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'payment_service'))
+        from requisite_config import get_requisite_service
+        
+        service = get_requisite_service()
+        
+        return jsonify({
+            'success': True,
+            'source': service
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/requisite-source', methods=['POST'])
+def set_requisite_source():
+    """Установить источник реквизитов
+    
+    Request:
+        {
+            "source": "auto" | "h2h" | "payzteam"
+        }
+    """
+    if not check_auth():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    try:
+        data = request.get_json()
+        source = data.get('source')
+        
+        if not source:
+            return jsonify({
+                'success': False,
+                'error': 'source is required'
+            }), 400
+        
+        if source not in ['auto', 'h2h', 'payzteam']:
+            return jsonify({
+                'success': False,
+                'error': 'source must be "auto", "h2h" or "payzteam"'
+            }), 400
+        
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'payment_service'))
+        from requisite_config import set_requisite_service
+        
+        set_requisite_service(source)
+        
+        return jsonify({
+            'success': True,
+            'source': source,
+            'message': f'Requisite source changed to {source}'
+        })
     except Exception as e:
         return jsonify({
             'success': False,

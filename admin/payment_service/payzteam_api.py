@@ -321,7 +321,7 @@ if __name__ == "__main__":
 # Глобальная функция для быстрого получения реквизитов
 def get_payzteam_requisite(amount: float) -> Optional[Dict]:
     """
-    Быстрое получение реквизитов (поддерживает H2H и PayzTeam)
+    Быстрое получение реквизитов (поддерживает Auto, H2H и PayzTeam)
     
     Args:
         amount: Сумма платежа
@@ -331,7 +331,8 @@ def get_payzteam_requisite(amount: float) -> Optional[Dict]:
         {
             'card_number': '5614682414447872',
             'card_owner': 'Ziedullo Goziev',
-            'bank': 'Trast Bank' (опционально)
+            'bank': 'Trast Bank' (опционально),
+            'source': 'h2h' или 'payzteam'
         }
     """
     try:
@@ -344,13 +345,15 @@ def get_payzteam_requisite(amount: float) -> Optional[Dict]:
         
         service = get_requisite_service()
         
-        if service == 'h2h':
-            # НОВЫЙ СЕРВИС - H2H API
-            from h2h_api import get_h2h_requisite
+        if service == 'auto':
+            # АВТОМАТИЧЕСКИЙ РЕЖИМ: сначала H2H, потом PayzTeam
+            print("🔄 Режим AUTO: пробуем H2H API...")
             
+            # Пробуем H2H API
+            from h2h_api import get_h2h_requisite
             config = get_h2h_config()
             
-            return get_h2h_requisite(
+            h2h_result = get_h2h_requisite(
                 amount=int(amount),
                 base_url=config['base_url'],
                 access_token=config['access_token'],
@@ -358,9 +361,70 @@ def get_payzteam_requisite(amount: float) -> Optional[Dict]:
                 currency=config.get('currency', 'rub'),
                 payment_detail_type=config.get('payment_detail_type', 'card')
             )
+            
+            if h2h_result:
+                print("✅ H2H API вернул реквизиты")
+                h2h_result['source'] = 'h2h'
+                return h2h_result
+            
+            # Если H2H не вернул - пробуем PayzTeam
+            print("⚠️ H2H API не вернул реквизиты, пробуем PayzTeam API...")
+            
+            config = get_payzteam_config()
+            api = PayzTeamAPI(
+                merchant_id=config['merchant_id'],
+                api_key=config['api_key'],
+                secret_key=config['secret_key']
+            )
+            
+            uuid = f"REQ_{int(time.time() * 1000)}"
+            
+            result = api.create_deal(
+                amount=amount,
+                uuid=uuid,
+                client_email="requisite@linkflow.com",
+                payment_method=config.get('payment_method', 'abh_c2c')
+            )
+            
+            if result.get("success") and "paymentInfo" in result:
+                credentials = result["paymentInfo"].get("paymentCredentials", "")
+                parts = credentials.split("|")
+                
+                if len(parts) >= 2:
+                    print("✅ PayzTeam API вернул реквизиты")
+                    return {
+                        'card_number': parts[0],
+                        'card_owner': parts[1],
+                        'bank': parts[2] if len(parts) > 2 else 'Unknown',
+                        'deal_id': result.get('id'),
+                        'source': 'payzteam'
+                    }
+            
+            print("❌ Оба API не вернули реквизиты")
+            return None
+        
+        elif service == 'h2h':
+            # ТОЛЬКО H2H API
+            from h2h_api import get_h2h_requisite
+            
+            config = get_h2h_config()
+            
+            result = get_h2h_requisite(
+                amount=int(amount),
+                base_url=config['base_url'],
+                access_token=config['access_token'],
+                merchant_id=config['merchant_id'],
+                currency=config.get('currency', 'rub'),
+                payment_detail_type=config.get('payment_detail_type', 'card')
+            )
+            
+            if result:
+                result['source'] = 'h2h'
+            
+            return result
         
         elif service == 'payzteam':
-            # СТАРЫЙ СЕРВИС - PayzTeam API
+            # ТОЛЬКО PAYZTEAM API
             config = get_payzteam_config()
             
             api = PayzTeamAPI(
@@ -387,7 +451,8 @@ def get_payzteam_requisite(amount: float) -> Optional[Dict]:
                         'card_number': parts[0],
                         'card_owner': parts[1],
                         'bank': parts[2] if len(parts) > 2 else 'Unknown',
-                        'deal_id': result.get('id')
+                        'deal_id': result.get('id'),
+                        'source': 'payzteam'
                     }
             
             return None

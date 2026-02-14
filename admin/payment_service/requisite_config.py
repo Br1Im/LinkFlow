@@ -3,22 +3,13 @@
 Конфигурация для сервисов получения реквизитов
 """
 
-# Выбор активного сервиса: 'merchant', 'h2h' или 'payzteam'
-# 'h2h' - H2H API (РАБОТАЕТ! Возвращает реквизиты напрямую)
-# 'merchant' - Merchant API (тоже работает, возвращает реквизиты + платежную ссылку)
-# 'payzteam' - старый сервис
-ACTIVE_REQUISITE_SERVICE = 'h2h'
+# Выбор активного сервиса: 'auto', 'h2h' или 'payzteam'
+# 'auto' - Автоматический выбор (сначала H2H, потом PayzTeam если не получилось)
+# 'h2h' - H2H API (Liberty) - только этот источник
+# 'payzteam' - PayzTeam API - только этот источник
+ACTIVE_REQUISITE_SERVICE = 'auto'
 
-# Конфигурация Merchant API (РАБОТАЕТ)
-MERCHANT_CONFIG = {
-    'base_url': 'https://liberty.top',
-    'access_token': 'dtpf8uupsbhumevz4pz2jebrqzqmv62o',
-    'merchant_id': 'd5c17c6c-dc40-428a-80e5-2ca01af99f68',
-    'currency': 'rub',
-    'payment_detail_type': 'card'
-}
-
-# Конфигурация H2H API (РАБОТАЕТ!)
+# Конфигурация H2H API (Liberty)
 H2H_CONFIG = {
     'base_url': 'https://api.liberty.top',
     'access_token': 'dtpf8uupsbhumevz4pz2jebrqzqmv62o',
@@ -27,7 +18,7 @@ H2H_CONFIG = {
     'payment_detail_type': 'card'
 }
 
-# Конфигурация PayzTeam API (старый сервис, закомментирован)
+# Конфигурация PayzTeam API (старый сервис)
 PAYZTEAM_CONFIG = {
     'merchant_id': '747',
     'api_key': 'f046a50c7e398bc48124437b612ac7ab',
@@ -39,6 +30,15 @@ PAYZTEAM_CONFIG = {
 def get_requisite_service():
     """Возвращает название активного сервиса"""
     return ACTIVE_REQUISITE_SERVICE
+
+
+def set_requisite_service(service: str):
+    """Устанавливает активный сервис"""
+    global ACTIVE_REQUISITE_SERVICE
+    if service in ['auto', 'h2h', 'payzteam']:
+        ACTIVE_REQUISITE_SERVICE = service
+    else:
+        raise ValueError(f"Unknown service: {service}. Use 'auto', 'h2h' or 'payzteam'")
 
 
 def get_merchant_config():

@@ -394,23 +394,28 @@
                         </div>
                         </div>
 
-                        <!-- Payment System Selection -->
+                        <!-- Requisite Source Selection -->
                         <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2 font-mono">ПЛАТЁЖНАЯ СИСТЕМА</label>
+                            <label class="block text-sm font-medium mb-2 font-mono">ИСТОЧНИК РЕКВИЗИТОВ</label>
                             <select
-                                x-model="form.paymentSystem"
+                                x-model="form.requisiteSource"
+                                @change="changeRequisiteSource()"
                                 class="w-full px-4 py-3 bg-black/50 text-white border border-white/10 pixel-corners focus:outline-none focus:border-white/30 transition-colors font-mono cursor-pointer"
                                 style="color-scheme: dark;"
                             >
-                                <option value="multitransfer" class="bg-black text-white">Мультик (multitransfer.ru)</option>
-                                <option value="mulenpay" class="bg-black text-white">MulenPay</option>
+                                <option value="auto" class="bg-black text-white">🔄 Авто (H2H → PayzTeam)</option>
+                                <option value="h2h" class="bg-black text-white">🏦 Liberty (только H2H API)</option>
+                                <option value="payzteam" class="bg-black text-white">💳 PayzTeam (только PayzTeam API)</option>
                             </select>
                             <div class="mt-2">
-                                <p class="text-xs text-gray-400 font-mono" x-show="form.paymentSystem === 'multitransfer'">
-                                    Полный контроль | Любая сумма | Реквизиты из БД или PayzTeam API
+                                <p class="text-xs text-gray-400 font-mono" x-show="form.requisiteSource === 'auto'">
+                                    Сначала пробует H2H API, если не получилось - PayzTeam API
                                 </p>
-                                <p class="text-xs text-gray-400 font-mono" x-show="form.paymentSystem === 'mulenpay'">
-                                    Сумма: 3000-5000₽ | Без реквизитов | Быстрая генерация
+                                <p class="text-xs text-gray-400 font-mono" x-show="form.requisiteSource === 'h2h'">
+                                    Только Liberty H2H API (api.liberty.top)
+                                </p>
+                                <p class="text-xs text-gray-400 font-mono" x-show="form.requisiteSource === 'payzteam'">
+                                    Только PayzTeam API (payzteam.com)
                                 </p>
                             </div>
                         </div>
@@ -974,6 +979,7 @@
                 form: {
                     amount: '',
                     paymentSystem: 'multitransfer',
+                    requisiteSource: 'auto',
                     useCustomBeneficiary: false,
                     customCard: '',
                     customOwner: '',
@@ -1009,6 +1015,7 @@
                     this.checkApiStatus();
                     this.loadSummary();
                     this.loadPayments();
+                    this.loadRequisiteSource();
                     this.loadSettings();
                     this.loadLogs();
                     this.loadAnalytics(30);
@@ -1269,6 +1276,45 @@
                     }
                 },
                 
+                async changeRequisiteSource() {
+                    try {
+                        const response = await fetch('/api/requisite-source', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer -3uVLlbWyy90eapOGkv70C2ZltaYTxq-HtDbq-DtlLo'
+                            },
+                            body: JSON.stringify({
+                                source: this.form.requisiteSource
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.showToast('success', 'Успех', `Источник реквизитов изменен на: ${this.form.requisiteSource}`);
+                        } else {
+                            this.showToast('error', 'Ошибка', data.error);
+                        }
+                    } catch (error) {
+                        console.error('Error changing requisite source:', error);
+                        this.showToast('error', 'Ошибка', 'Не удалось изменить источник реквизитов');
+                    }
+                },
+                
+                async loadRequisiteSource() {
+                    try {
+                        const response = await fetch('/api/requisite-source');
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.form.requisiteSource = data.source;
+                        }
+                    } catch (error) {
+                        console.error('Error loading requisite source:', error);
+                    }
+                },
+                
                 async createPayment() {
                     this.loading = true;
                     this.result = null;
@@ -1278,8 +1324,12 @@
                     this.startLogPolling();
                     
                     try {
+                        // Генерируем orderId
+                        const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                        
                         const payload = {
                             amount: parseInt(this.form.amount),
+                            orderId: orderId,
                             payment_system: this.form.paymentSystem
                         };
                         
