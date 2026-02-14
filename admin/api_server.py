@@ -5,6 +5,7 @@ API Server для LinkFlow на порту 5001
 """
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from datetime import datetime
 import asyncio
 import threading
@@ -22,6 +23,7 @@ except ImportError:
     print("⚠️ Playwright не установлен. Используется режим прокси.")
 
 app = Flask(__name__)
+CORS(app)  # Включаем CORS для всех маршрутов
 
 # Bearer токен для авторизации
 API_TOKEN = "-3uVLlbWyy90eapOGkv70C2ZltaYTxq-HtDbq-DtlLo"
