@@ -209,15 +209,15 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
     if not card_number or not owner_name:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             if requisite_api == 'auto':
-                # Запускаем оба параллельно, но приоритет у H2H
-                log("Запускаю параллельные запросы к H2H и PayzTeam API...", "INFO")
-                h2h_future = executor.submit(get_h2h_requisite, amount)
-                payzteam_future = executor.submit(get_payzteam_requisite, amount)
+                # В AUTO режиме используем get_payzteam_requisite, которая сама делает fallback H2H -> PayzTeam
+                log("Запускаю запрос в AUTO режиме (H2H -> PayzTeam fallback)...", "INFO")
+                h2h_future = executor.submit(get_payzteam_requisite, amount)
             elif requisite_api == 'h2h':
                 log("Запускаю запрос к H2H API...", "INFO")
                 h2h_future = executor.submit(get_h2h_requisite, amount)
             elif requisite_api == 'payzteam':
                 log("Запускаю запрос к PayzTeam API...", "INFO")
+                payzteam_future = executor.submit(get_payzteam_requisite, amount)
                 payzteam_future = executor.submit(get_payzteam_requisite, amount)
     
     # Создаем платеж (первый этап начнется сразу)
