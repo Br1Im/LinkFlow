@@ -180,16 +180,16 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
         payment_service = PaymentService()
         run_async(payment_service.start(headless=True))
     
-    # Запускаем запрос к PayzTeam API параллельно
-    payzteam_future = None
-    payzteam_result = None
+    # Запускаем запрос к H2H API параллельно
+    h2h_future = None
+    h2h_result = None
     requisite_source = "database"  # По умолчанию из БД
     
-    # Если реквизиты не указаны явно, пробуем получить от PayzTeam
+    # Если реквизиты не указаны явно, пробуем получить от H2H API
     if not card_number or not owner_name:
-        log("Запускаю параллельный запрос к PayzTeam API...", "INFO")
+        log("Запускаю параллельный запрос к H2H API...", "INFO")
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            payzteam_future = executor.submit(get_payzteam_requisite, amount)
+            h2h_future = executor.submit(get_payzteam_requisite, amount)
     
     # Создаем платеж (первый этап начнется сразу)
     # Если реквизиты не указаны, передаем None - они будут получены позже
@@ -199,7 +199,7 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
             card_number=card_number,
             owner_name=owner_name,
             custom_sender=custom_sender,
-            payzteam_future=payzteam_future  # Передаем future для ожидания
+            h2h_future=h2h_future  # Передаем future для ожидания
         )
     )
     
@@ -304,6 +304,209 @@ def health():
         'browser_ready': is_ready if PLAYWRIGHT_AVAILABLE else None,
         'admin_url': ADMIN_URL if not PLAYWRIGHT_AVAILABLE else None
     })
+
+
+@app.route('/api/get-qr-link', methods=['POST'])
+def get_qr_link():
+    """Получить прямую QR-ссылку из виджета MulenPay
+    
+    Request:
+        {
+            "widget_url": "https://mulenpay.ru/payment/widget/UUID"
+        }
+    
+    Response:
+        {
+            "success": true,
+            "qr_link": "https://qr.nspk.ru/...",
+            "widget_url": "https://mulenpay.ru/payment/widget/UUID"
+        }
+    """
+    import re
+    import requests
+    import time
+    
+    data = request.get_json()
+    widget_url = data.get('widget_url')
+    
+    if not widget_url:
+        return jsonify({
+            'success': False,
+            'error': 'widget_url is required'
+        }), 400
+    
+    # Извлекаем UUID из URL виджета
+    uuid_match = re.search(r'/payment/widget/([a-f0-9-]+)', widget_url)
+    if not uuid_match:
+        return jsonify({
+            'success': False,
+            'error': 'Invalid widget URL format'
+        }), 400
+    
+    payment_uuid = uuid_match.group(1)
+    
+    # Ждём немного, чтобы система подготовила платёж
+    time.sleep(2)
+    
+    # Запрашиваем /sbp endpoint для получения прямой QR-ссылки
+    sbp_url = f'https://mulenpay.ru/payment/widget/{payment_uuid}/sbp'
+    
+    try:
+        sbp_response = requests.get(sbp_url, timeout=5)
+        if sbp_response.status_code == 200:
+            sbp_data = sbp_response.json()
+            if sbp_data.get('success') and sbp_data.get('sbp'):
+                qr_payload = sbp_data.get('data', {}).get('qrpayload', '')
+                if qr_payload:
+                    return jsonify({
+                        'success': True,
+                        'qr_link': qr_payload,
+                        'widget_url': widget_url
+                    })
+        
+        return jsonify({
+            'success': False,
+            'error': 'Failed to get QR link from MulenPay',
+            'widget_url': widget_url
+        }), 500
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'widget_url': widget_url
+        }), 500
+
+
+@app.route('/api/create-qr-payment', methods=['POST'])
+def create_qr_payment():
+    """Создать платеж через MulenPay и получить прямую QR-ссылку
+    
+    Request:
+        {
+            "amount": 3000
+        }
+    
+    Response:
+        {
+            "success": true,
+            "qr_link": "https://qr.nspk.ru/...",
+            "widget_url": "https://mulenpay.ru/payment/widget/UUID",
+            "payment_id": "123456",
+            "amount": 3000
+        }
+    """
+    import re
+    import requests
+    import time
+    import uuid as uuid_lib
+    
+    # Импортируем MulenPay клиент
+    sys.path.insert(0, os.path.dirname(__file__))
+    from mulenpay import MulenPayClient
+    
+    data = request.get_json()
+    amount = data.get('amount')
+    
+    if not amount:
+        return jsonify({
+            'success': False,
+            'error': 'amount is required'
+        }), 400
+    
+    try:
+        amount = int(amount)
+        if amount < 3000 or amount > 5000:
+            return jsonify({
+                'success': False,
+                'error': 'Amount must be between 3000 and 5000 RUB'
+            }), 400
+    except ValueError:
+        return jsonify({
+            'success': False,
+            'error': 'Invalid amount format'
+        }), 400
+    
+    # Создаем MulenPay клиент
+    secret_key = 'b48d74485fcf7b4a2cade546bdebcaf3692945ffeeb7ff98729a758f6322684c'
+    mp_client = MulenPayClient(secret_key=secret_key)
+    
+    try:
+        # Создаем платеж
+        response = run_async(mp_client.create_payment(
+            private_key2="nVT5DyeFCJGMe04THqN8hE7usCTiiSpuHiOHdWkac9f96f48",
+            currency="rub",
+            amount=str(amount),
+            uuid=str(uuid_lib.uuid4()),
+            shopId="280",
+            description=f"Платеж {amount} руб.",
+            items=[
+                {
+                    "description": f"Платеж {amount} руб.",
+                    "quantity": 1,
+                    "price": str(amount),
+                    "vat_code": 0,
+                    "payment_subject": 1,
+                    "payment_mode": 1,
+                }
+            ],
+        ))
+        
+        payment_id = response.get('id')
+        widget_url = response.get('paymentUrl')
+        
+        if not widget_url:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to create payment'
+            }), 500
+        
+        # Извлекаем UUID из URL виджета
+        uuid_match = re.search(r'/payment/widget/([a-f0-9-]+)', widget_url)
+        if not uuid_match:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid widget URL format',
+                'widget_url': widget_url
+            }), 500
+        
+        payment_uuid = uuid_match.group(1)
+        
+        # Ждём немного, чтобы система подготовила платёж
+        time.sleep(2)
+        
+        # Запрашиваем /sbp endpoint для получения прямой QR-ссылки
+        sbp_url = f'https://mulenpay.ru/payment/widget/{payment_uuid}/sbp'
+        
+        sbp_response = requests.get(sbp_url, timeout=5)
+        if sbp_response.status_code == 200:
+            sbp_data = sbp_response.json()
+            if sbp_data.get('success') and sbp_data.get('sbp'):
+                qr_payload = sbp_data.get('data', {}).get('qrpayload', '')
+                if qr_payload:
+                    return jsonify({
+                        'success': True,
+                        'qr_link': qr_payload,
+                        'widget_url': widget_url,
+                        'payment_id': payment_id,
+                        'amount': amount
+                    })
+        
+        # Если не удалось получить QR-ссылку, возвращаем виджет
+        return jsonify({
+            'success': True,
+            'qr_link': widget_url,  # Fallback на виджет
+            'widget_url': widget_url,
+            'payment_id': payment_id,
+            'amount': amount,
+            'warning': 'Failed to get direct QR link, returning widget URL'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @app.route('/restart', methods=['POST'])
@@ -545,6 +748,69 @@ def toggle_beneficiary_endpoint(beneficiary_id):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/convert-currency', methods=['POST'])
+def convert_currency():
+    """Конвертация RUB -> UZS через API multitransfer.ru
+    
+    Request:
+        {
+            "amount_rub": 5000
+        }
+    
+    Response:
+        {
+            "success": true,
+            "amount_rub": 5000.0,
+            "amount_uzs": 758950.0,
+            "exchange_rate": 151.79,
+            "commission": {...}
+        }
+    """
+    try:
+        data = request.get_json()
+        amount_rub = data.get('amount_rub')
+        
+        if not amount_rub:
+            return jsonify({
+                'success': False,
+                'error': 'amount_rub is required'
+            }), 400
+        
+        try:
+            amount_rub = float(amount_rub)
+            if amount_rub <= 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'amount_rub must be positive'
+                }), 400
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid amount_rub format'
+            }), 400
+        
+        # Импортируем конвертер
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'payment_service'))
+        from currency_converter import CurrencyConverter
+        
+        converter = CurrencyConverter()
+        result = converter.convert_rub_to_uzs(amount_rub)
+        
+        if result:
+            return jsonify(result), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Currency conversion failed'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 if __name__ == '__main__':

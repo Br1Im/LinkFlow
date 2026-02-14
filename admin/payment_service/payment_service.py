@@ -575,16 +575,16 @@ class PaymentService:
         self.is_ready = False
         print("🛑 Сервис остановлен")
         
-    async def create_payment_link(self, amount: int, card_number: str = None, owner_name: str = None, custom_sender: dict = None, payzteam_future=None) -> dict:
+    async def create_payment_link(self, amount: int, card_number: str = None, owner_name: str = None, custom_sender: dict = None, h2h_future=None) -> dict:
         """
         Создает платежную ссылку
         
         Args:
             amount: Сумма платежа
-            card_number: Номер карты получателя (опционально, если None - будет получен от PayzTeam или из БД)
+            card_number: Номер карты получателя (опционально, если None - будет получен от H2H API или из БД)
             owner_name: Имя владельца карты (опционально)
             custom_sender: Кастомные данные отправителя (опционально)
-            payzteam_future: Future для получения реквизитов от PayzTeam (опционально)
+            h2h_future: Future для получения реквизитов от H2H API (опционально)
         
         Returns:
             dict: {
@@ -593,7 +593,7 @@ class PaymentService:
                 'time': float,
                 'step1_time': float,
                 'step2_time': float,
-                'requisite_source': str ('payzteam' or 'database'),
+                'requisite_source': str ('h2h' or 'database'),
                 'error': str or None,
                 'logs': list
             }
@@ -608,10 +608,10 @@ class PaymentService:
         
         requisite_source = "database"  # По умолчанию из БД
         
-        # Если реквизиты не указаны и есть future - будем ждать PayzTeam после этапа 1
+        # Если реквизиты не указаны и есть future - будем ждать H2H API после этапа 1
         if not card_number or not owner_name:
-            if payzteam_future:
-                log(f"Начало создания платежа: {amount}₽, реквизиты будут получены от PayzTeam", "INFO")
+            if h2h_future:
+                log(f"Начало создания платежа: {amount}₽, реквизиты будут получены от H2H API", "INFO")
             else:
                 log(f"Начало создания платежа: {amount}₽, реквизиты будут взяты из БД", "INFO")
         else:
@@ -983,31 +983,31 @@ class PaymentService:
             
             step1_time = time.time() - start_time
             
-            # ОЖИДАНИЕ РЕКВИЗИТОВ ОТ PAYZTEAM (если запрошены)
-            if payzteam_future and (not card_number or not owner_name):
-                log("Ожидание реквизитов от PayzTeam API...", "INFO")
+            # ОЖИДАНИЕ РЕКВИЗИТОВ ОТ H2H API (если запрошены)
+            if h2h_future and (not card_number or not owner_name):
+                log("Ожидание реквизитов от H2H API...", "INFO")
                 try:
-                    payzteam_result = payzteam_future.result(timeout=5)  # Ждем максимум 5 секунд
+                    h2h_result = h2h_future.result(timeout=5)  # Ждем максимум 5 секунд
                     
-                    if payzteam_result:
-                        card_number = payzteam_result['card_number']
-                        owner_name = payzteam_result['card_owner']
-                        requisite_source = "payzteam"
-                        log(f"✅ Реквизиты получены от PayzTeam: {owner_name} ({card_number})", "SUCCESS")
+                    if h2h_result:
+                        card_number = h2h_result['card_number']
+                        owner_name = h2h_result['card_owner']
+                        requisite_source = "h2h"
+                        log(f"✅ Реквизиты получены от H2H API: {owner_name} ({card_number})", "SUCCESS")
                     else:
-                        log("❌ PayzTeam не вернул реквизиты", "ERROR")
+                        log("❌ H2H API не вернул реквизиты (нет свободных)", "ERROR")
                         return {
                             'success': False,
-                            'error': 'PayzTeam API не вернул реквизиты (нет свободных)',
+                            'error': 'Реквизиты недоступны (нет свободных). Попробуйте позже или измените сумму.',
                             'time': time.time() - start_time,
                             'requisite_source': 'none',
                             'logs': current_payment_logs.copy()
                         }
                 except Exception as e:
-                    log(f"❌ Ошибка получения реквизитов от PayzTeam: {e}", "ERROR")
+                    log(f"❌ Ошибка получения реквизитов от H2H API: {e}", "ERROR")
                     return {
                         'success': False,
-                        'error': f'Ошибка PayzTeam API: {str(e)}',
+                        'error': f'Ошибка H2H API: {str(e)}',
                         'time': time.time() - start_time,
                         'requisite_source': 'none',
                         'logs': current_payment_logs.copy()
@@ -1015,10 +1015,10 @@ class PaymentService:
             
             # Если реквизиты все еще не определены - ошибка
             if not card_number or not owner_name:
-                log("❌ Реквизиты не указаны и не получены от PayzTeam", "ERROR")
+                log("❌ Реквизиты не указаны и не получены от H2H API", "ERROR")
                 return {
                     'success': False,
-                    'error': 'Реквизиты не указаны. Используйте PayzTeam API или передайте реквизиты явно',
+                    'error': 'Реквизиты не указаны. Используйте H2H API или передайте реквизиты явно',
                     'time': time.time() - start_time,
                     'requisite_source': 'none',
                     'logs': current_payment_logs.copy()

@@ -10,6 +10,7 @@
 - ✅ **REST API** - простой HTTP интерфейс для интеграции
 - ✅ **База данных** - автоматический выбор получателей из БД
 - ✅ **Playwright** - современная автоматизация браузера
+- ✅ **Конвертация валют** - автоматическая конвертация RUB -> UZS через API multitransfer.ru
 
 ## 🏗️ Архитектура
 
@@ -84,6 +85,39 @@ curl -X POST http://localhost:5001/api/payment \
   "orderId": "unique_order_id"
 }
 ```
+
+### POST `/api/convert-currency`
+Конвертация RUB -> UZS через API multitransfer.ru
+
+**Headers:**
+- `Content-Type: application/json`
+
+**Body:**
+```json
+{
+  "amount_rub": 5000
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "amount_rub": 5000.0,
+  "amount_uzs": 758950.0,
+  "exchange_rate": 151.79,
+  "commission": {...}
+}
+```
+
+**Пример использования:**
+```bash
+curl -X POST http://localhost:5001/api/convert-currency \
+  -H "Content-Type: application/json" \
+  -d '{"amount_rub": 5000}'
+```
+
+Подробнее: [CURRENCY_CONVERSION.md](admin/CURRENCY_CONVERSION.md)
 
 ### GET `/health`
 Проверка статуса сервиса

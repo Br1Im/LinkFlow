@@ -321,7 +321,7 @@ if __name__ == "__main__":
 # Глобальная функция для быстрого получения реквизитов
 def get_payzteam_requisite(amount: float) -> Optional[Dict]:
     """
-    Быстрое получение реквизитов от PayzTeam
+    Быстрое получение реквизитов (поддерживает H2H и PayzTeam)
     
     Args:
         amount: Сумма платежа
@@ -331,44 +331,73 @@ def get_payzteam_requisite(amount: float) -> Optional[Dict]:
         {
             'card_number': '5614682414447872',
             'card_owner': 'Ziedullo Goziev',
-            'bank': 'Trast Bank'
+            'bank': 'Trast Bank' (опционально)
         }
     """
-    # Конфигурация PayzTeam
-    MERCHANT_ID = "747"
-    API_KEY = "f046a50c7e398bc48124437b612ac7ab"
-    SECRET_KEY = "aa7c2689-98f2-428f-9c03-93e3835c3b1d"
-    
-    api = PayzTeamAPI(
-        merchant_id=MERCHANT_ID,
-        api_key=API_KEY,
-        secret_key=SECRET_KEY
-    )
-    
     try:
-        uuid = f"REQ_{int(time.time() * 1000)}"
+        import sys
+        import os
+        sys.path.insert(0, os.path.dirname(__file__))
         
-        result = api.create_deal(
-            amount=amount,
-            uuid=uuid,
-            client_email="requisite@linkflow.com",
-            payment_method="abh_c2c"
-        )
+        # Импортируем конфигурацию
+        from requisite_config import get_requisite_service, get_h2h_config, get_payzteam_config
         
-        if result.get("success") and "paymentInfo" in result:
-            credentials = result["paymentInfo"].get("paymentCredentials", "")
-            parts = credentials.split("|")
+        service = get_requisite_service()
+        
+        if service == 'h2h':
+            # НОВЫЙ СЕРВИС - H2H API
+            from h2h_api import get_h2h_requisite
             
-            if len(parts) >= 2:
-                return {
-                    'card_number': parts[0],
-                    'card_owner': parts[1],
-                    'bank': parts[2] if len(parts) > 2 else 'Unknown',
-                    'deal_id': result.get('id')
-                }
+            config = get_h2h_config()
+            
+            return get_h2h_requisite(
+                amount=int(amount),
+                base_url=config['base_url'],
+                access_token=config['access_token'],
+                merchant_id=config['merchant_id'],
+                currency=config.get('currency', 'rub'),
+                payment_detail_type=config.get('payment_detail_type', 'card')
+            )
         
-        return None
+        elif service == 'payzteam':
+            # СТАРЫЙ СЕРВИС - PayzTeam API
+            config = get_payzteam_config()
+            
+            api = PayzTeamAPI(
+                merchant_id=config['merchant_id'],
+                api_key=config['api_key'],
+                secret_key=config['secret_key']
+            )
+            
+            uuid = f"REQ_{int(time.time() * 1000)}"
+            
+            result = api.create_deal(
+                amount=amount,
+                uuid=uuid,
+                client_email="requisite@linkflow.com",
+                payment_method=config.get('payment_method', 'abh_c2c')
+            )
+            
+            if result.get("success") and "paymentInfo" in result:
+                credentials = result["paymentInfo"].get("paymentCredentials", "")
+                parts = credentials.split("|")
+                
+                if len(parts) >= 2:
+                    return {
+                        'card_number': parts[0],
+                        'card_owner': parts[1],
+                        'bank': parts[2] if len(parts) > 2 else 'Unknown',
+                        'deal_id': result.get('id')
+                    }
+            
+            return None
         
+        else:
+            print(f"Unknown requisite service: {service}")
+            return None
+            
     except Exception as e:
-        print(f"PayzTeam API error: {e}")
+        print(f"Requisite API error: {e}")
+        import traceback
+        traceback.print_exc()
         return None
