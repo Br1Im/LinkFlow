@@ -95,6 +95,11 @@ async def fill_masked_date(page: Page, field_name: str, value: str, label: str, 
         real_val = await loc.input_value(timeout=2000)
         log(f"{label} после заполнения → DOM value = '{real_val}' (ожидали '{value}')", "DEBUG")
         
+        # Проверяем aria-invalid
+        is_invalid = await loc.evaluate("el => el.getAttribute('aria-invalid') === 'true'")
+        if is_invalid:
+            log(f"⚠️ {label} помечено как INVALID в DOM!", "WARNING")
+        
         return True
         
     except Exception as e:
@@ -105,6 +110,15 @@ async def fill_masked_date(page: Page, field_name: str, value: str, label: str, 
 def ensure_dd_mm_yyyy(s: str) -> str:
     """Нормализация формата даты в dd.mm.yyyy"""
     s = s.strip()
+    
+    # Если пришёл ISO формат (yyyy-mm-dd), конвертируем в dd.mm.yyyy
+    if '-' in s and len(s) == 10:
+        parts = s.split('-')
+        if len(parts) == 3:
+            y, m, d = parts
+            return f"{d.zfill(2)}.{m.zfill(2)}.{y}"
+    
+    # Если уже в формате dd.mm.yyyy
     if '.' not in s:
         return s
     parts = s.split('.')
@@ -240,7 +254,9 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         await fill_field_simple(page, "sender_documents_number", sender_data["passport_number"], "Номер паспорта", log)
         
         log("📝 Дата выдачи паспорта...", "DEBUG")
+        log(f"📅 RAW passport_issue_date из БД: '{sender_data['passport_issue_date']}'", "DEBUG")
         issue_date = ensure_dd_mm_yyyy(sender_data["passport_issue_date"])
+        log(f"📅 После ensure_dd_mm_yyyy: '{issue_date}'", "DEBUG")
         ok_issue = await fill_masked_date(page, "issueDate", issue_date, "Дата выдачи паспорта", log)
         if not ok_issue:
             log("⚠️ Дата выдачи паспорта не заполнена корректно", "WARNING")
@@ -255,7 +271,9 @@ async def process_step2(page: Page, card_number: str, owner_name: str, sender_da
         await fill_field_simple(page, "sender_lastName", sender_data["last_name"], "Фамилия отправителя", log)
         
         log("📝 Дата рождения...", "DEBUG")
+        log(f"📅 RAW birth_date из БД: '{sender_data['birth_date']}'", "DEBUG")
         birth_date = ensure_dd_mm_yyyy(sender_data["birth_date"])
+        log(f"📅 После ensure_dd_mm_yyyy: '{birth_date}'", "DEBUG")
         ok_birth = await fill_masked_date(page, "birthDate", birth_date, "Дата рождения", log)
         if not ok_birth:
             log("⚠️ Дата рождения не заполнена корректно", "WARNING")

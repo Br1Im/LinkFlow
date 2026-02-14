@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Один запрос к H2H API - полное тело ответа
+Один запрос к H2H API - полное тело ответа.
 """
 
 import requests
