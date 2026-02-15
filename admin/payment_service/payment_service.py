@@ -1545,9 +1545,12 @@ class PaymentService:
                         return {
                             'success': False,
                             'qr_link': None,
+                            'card_number': card_number,
+                            'card_owner': owner_name,
                             'time': time.time() - start_time,
                             'step1_time': step1_time,
                             'step2_time': step2_time,
+                            'requisite_source': requisite_source,
                             'error': 'Реквизиты получателя больше не актуальны (модалка с ошибкой)',
                             'logs': current_payment_logs.copy()
                         }
@@ -1885,9 +1888,12 @@ class PaymentService:
                                 return {
                                     'success': False,
                                     'qr_link': None,
+                                    'card_number': card_number,
+                                    'card_owner': owner_name,
                                     'time': time.time() - start_time,
                                     'step1_time': step1_time,
                                     'step2_time': step2_time,
+                                    'requisite_source': requisite_source,
                                     'error': 'Реквизиты получателя больше не актуальны (модалка с ошибкой после подтверждения)',
                                     'logs': current_payment_logs.copy()
                                 }
@@ -1951,6 +1957,8 @@ class PaymentService:
                                 return {
                                     'success': False,
                                     'qr_link': None,
+                                    'card_number': card_number,
+                                    'card_owner': owner_name,
                                     'time': time.time() - start_time,
                                     'step1_time': step1_time,
                                     'step2_time': step2_time,
@@ -2009,7 +2017,7 @@ class PaymentService:
                 'step2_time': step2_time,
                 'requisite_source': requisite_source,
                 'error': None if success else 'QR-ссылка не получена',
-                'logs': current_payment_logs.copy()  # Добавляем логи в результат
+                'logs': current_payment_logs.copy()
             }
             
         except Exception as e:

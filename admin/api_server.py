@@ -283,6 +283,8 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
             'success': False,
             'order_id': order_id,
             'error': result.get('error', 'Payment creation failed'),
+            'card_number': result.get('card_number'),
+            'card_owner': result.get('card_owner'),
             'payment_time': result.get('time'),
             'total_time': total_elapsed_time,
             'requisite_source': requisite_source,
