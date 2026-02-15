@@ -256,9 +256,9 @@ class H2HAPI:
 # Глобальная функция для быстрого получения реквизитов
 def get_h2h_requisite(
     amount: int,
-    base_url: str,
-    access_token: str,
-    merchant_id: str,
+    base_url: str = None,
+    access_token: str = None,
+    merchant_id: str = None,
     currency: str = "rub",
     payment_detail_type: str = "card"
 ) -> Optional[Dict]:
@@ -267,9 +267,9 @@ def get_h2h_requisite(
     
     Args:
         amount: Сумма платежа
-        base_url: Базовый URL API
-        access_token: Токен доступа
-        merchant_id: UUID мерчанта
+        base_url: Базовый URL API (если None - берётся из переменных окружения)
+        access_token: Токен доступа (если None - берётся из переменных окружения)
+        merchant_id: UUID мерчанта (если None - берётся из переменных окружения)
         currency: Валюта (по умолчанию rub)
         payment_detail_type: Тип реквизита (по умолчанию card)
         
@@ -282,6 +282,21 @@ def get_h2h_requisite(
             'amount': 1000
         }
     """
+    import os
+    
+    # Получаем параметры из переменных окружения если не переданы
+    if base_url is None:
+        base_url = os.getenv('H2H_BASE_URL', 'https://api.liberty.top')
+    if access_token is None:
+        access_token = os.getenv('H2H_ACCESS_TOKEN', '')
+    if merchant_id is None:
+        merchant_id = os.getenv('H2H_MERCHANT_ID', '')
+    
+    # Если параметры всё ещё пустые - возвращаем None
+    if not access_token or not merchant_id:
+        print("⚠️ H2H API: отсутствуют access_token или merchant_id")
+        return None
+    
     api = H2HAPI(base_url=base_url, access_token=access_token)
     
     try:
