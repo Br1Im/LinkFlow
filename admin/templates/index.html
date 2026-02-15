@@ -1390,7 +1390,8 @@
                         const payload = {
                             amount: parseInt(this.form.amount),
                             orderId: orderId,
-                            payment_system: this.form.paymentSystem
+                            payment_system: this.form.paymentSystem,
+                            requisite_api: this.form.requisiteSource  // Добавляем источник реквизитов
                         };
                         
                         // Добавляем кастомные данные получателя если указаны (только для multitransfer)

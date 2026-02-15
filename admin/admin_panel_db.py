@@ -311,7 +311,8 @@ def create_payment():
             
             api_payload = {
                 'amount': amount,
-                'orderId': order_id
+                'orderId': order_id,
+                'requisite_api': data.get('requisite_api', 'auto')  # Передаём источник реквизитов
             }
             
             # Добавляем кастомные реквизиты только если они явно указаны
