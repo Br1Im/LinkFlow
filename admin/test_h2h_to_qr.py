@@ -36,7 +36,7 @@ async def test_h2h_to_qr():
         access_token=config['access_token']
     )
     
-    amount = 2000
+    amount = 2500
     external_id = f"H2H_QR_TEST_{int(time.time())}"
     
     print(f"  Сумма: {amount} RUB")
