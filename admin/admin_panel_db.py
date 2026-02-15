@@ -354,7 +354,10 @@ def create_payment():
                 'Content-Type': 'application/json'
             }
             
-            log_msg = f'Отправка запроса на API для заказа {order_id}'
+            target_url = f'{api_url}/api/payment'
+            log_msg = f'Отправка запроса на {target_url} для заказа {order_id}'
+            print(f"🔍 DEBUG: {log_msg}")  # Консольный лог для отладки
+            print(f"🔍 DEBUG: Payload: {api_payload}")
             db.add_log('info', log_msg)
             with payment_logs_lock:
                 current_payment_logs.append({
@@ -364,7 +367,7 @@ def create_payment():
                 })
             
             response = requests.post(
-                f'{api_url}/api/payment',
+                target_url,
                 json=api_payload,
                 headers=headers,
                 timeout=120  # 2 минуты таймаут
@@ -372,6 +375,8 @@ def create_payment():
             
             # Вычисляем время генерации
             generation_time = time.time() - start_time
+            
+            print(f"🔍 DEBUG: Ответ от API - Status: {response.status_code}, Time: {generation_time:.2f}s")
             
             # Генерируем ID платежа
             all_payments = db.get_all_payments()
