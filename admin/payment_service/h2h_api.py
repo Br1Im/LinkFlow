@@ -267,9 +267,9 @@ def get_h2h_requisite(
     
     Args:
         amount: Сумма платежа
-        base_url: Базовый URL API (если None - берётся из переменных окружения)
-        access_token: Токен доступа (если None - берётся из переменных окружения)
-        merchant_id: UUID мерчанта (если None - берётся из переменных окружения)
+        base_url: Базовый URL API (если None - берётся из конфига)
+        access_token: Токен доступа (если None - берётся из конфига)
+        merchant_id: UUID мерчанта (если None - берётся из конфига)
         currency: Валюта (по умолчанию rub)
         payment_detail_type: Тип реквизита (по умолчанию card)
         
@@ -282,15 +282,24 @@ def get_h2h_requisite(
             'amount': 1000
         }
     """
-    import os
-    
-    # Получаем параметры из переменных окружения если не переданы
-    if base_url is None:
-        base_url = os.getenv('H2H_BASE_URL', 'https://api.liberty.top')
-    if access_token is None:
-        access_token = os.getenv('H2H_ACCESS_TOKEN', '')
-    if merchant_id is None:
-        merchant_id = os.getenv('H2H_MERCHANT_ID', '')
+    # Если параметры не переданы - берём из конфига
+    if base_url is None or access_token is None or merchant_id is None:
+        try:
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(__file__))
+            from requisite_config import get_h2h_config
+            
+            config = get_h2h_config()
+            if base_url is None:
+                base_url = config.get('base_url', 'https://api.liberty.top')
+            if access_token is None:
+                access_token = config.get('access_token', '')
+            if merchant_id is None:
+                merchant_id = config.get('merchant_id', '')
+        except Exception as e:
+            print(f"⚠️ Не удалось загрузить конфиг H2H API: {e}")
+            return None
     
     # Если параметры всё ещё пустые - возвращаем None
     if not access_token or not merchant_id:
