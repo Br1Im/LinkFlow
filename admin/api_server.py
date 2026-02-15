@@ -67,6 +67,7 @@ def run_async(coro):
 
 
 @app.route('/api/payment', methods=['POST'])
+@app.route('/api/create-payment', methods=['POST'])
 def create_payment():
     """API для создания платежа"""
     
