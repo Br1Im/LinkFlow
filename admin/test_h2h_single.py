@@ -17,14 +17,12 @@ headers = {
     'X-Max-Wait-Ms': '30000'
 }
 
+import time
 payload = {
     "amount": 2500,
     "currency": "rub",
-    "client_id": None,
-    "payer_bank": None,
-    "external_id": "TEST_CUSTOM_006",
+    "external_id": f"TEST_{int(time.time())}",
     "merchant_id": MERCHANT_ID,
-    "callback_url": "",
     "payment_detail_type": "card"
 }
 

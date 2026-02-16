@@ -101,18 +101,23 @@ class H2HAPI:
             Dict: Данные заказа с реквизитами
         """
         payload = {
-            "amount": amount,
-            "currency": currency or "rub",
-            "client_id": client_id,
-            "payer_bank": payer_bank,
             "external_id": external_id,
-            "merchant_id": merchant_id,
-            "callback_url": callback_url or "",
-            "payment_detail_type": payment_detail_type or "card"
+            "amount": amount,
+            "merchant_id": merchant_id
         }
-        
+
+        if currency:
+            payload["currency"] = currency
         if pay_gateway:
-            payload["pay_gateway"] = pay_gateway
+            payload["pay_gateway"] = pay_gateway  # Правильное имя параметра!
+        if payment_detail_type:
+            payload["payment_detail_type"] = payment_detail_type
+        if client_id:
+            payload["client_id"] = client_id
+        if callback_url:
+            payload["callback_url"] = callback_url
+        if payer_bank:
+            payload["payer_bank"] = payer_bank
         
         headers = self.headers.copy()
         headers['X-Max-Wait-Ms'] = str(max_wait_ms)
