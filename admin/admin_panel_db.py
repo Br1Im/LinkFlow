@@ -873,6 +873,49 @@ def retest_beneficiary():
         }), 500
 
 
+@app.route('/api/requisite-source', methods=['GET', 'POST'])
+def requisite_source():
+    """Управление источником реквизитов"""
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'payment_service'))
+    
+    try:
+        from requisite_config import get_requisite_service, set_requisite_service
+        
+        if request.method == 'GET':
+            # Получение текущего источника
+            current_source = get_requisite_service()
+            return jsonify({
+                'success': True,
+                'source': current_source
+            })
+        
+        elif request.method == 'POST':
+            # Изменение источника
+            data = request.json
+            new_source = data.get('source')
+            
+            if new_source not in ['auto', 'h2h', 'payzteam']:
+                return jsonify({
+                    'success': False,
+                    'error': 'Неверный источник. Используйте: auto, h2h или payzteam'
+                }), 400
+            
+            set_requisite_service(new_source)
+            db.add_log('info', f'Источник реквизитов изменен на: {new_source}')
+            
+            return jsonify({
+                'success': True,
+                'source': new_source
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("🎨 LinkFlow Admin Panel with Database")
