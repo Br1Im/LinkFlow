@@ -14,7 +14,7 @@ def main_menu() -> types.InlineKeyboardMarkup:
             ],
             [
                 types.InlineKeyboardButton(text="📩 Поддержка", callback_data="support"),
-                types.InlineKeyboardButton(text="📣 О канале", callback_data="about_channel"),
+                types.InlineKeyboardButton(text="📄 Пользовательское соглашение", callback_data="about_channel"),
             ],
         ]
     )
