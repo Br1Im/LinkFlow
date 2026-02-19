@@ -77,7 +77,7 @@ CHANNEL_TEXT = os.getenv(
     f"Присоединяйтесь: {CHANNEL_LINK}"
 )
 
-SUPPORT_CONTACT = os.getenv("SUPPORT_CONTACT", "@username")
+SUPPORT_CONTACT = os.getenv("SUPPORT_CONTACT", "@managerr_info")
 SUPPORT_TG_LINK = os.getenv("SUPPORT_TG_LINK", "")   # открыть Telegram по ссылке
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "")         # прямая ссылка в чат/бот поддержки
 FAQ_URL = os.getenv("FAQ_URL", "")

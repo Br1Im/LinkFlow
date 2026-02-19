@@ -1,5 +1,4 @@
 import os
-import asyncio
 from typing import Optional, List, Dict, Any, Union
 import uuid
 from datetime import datetime, timedelta, timezone  # + timezone
@@ -335,21 +334,35 @@ def setup_public_handlers(dp: Dispatcher, bot):
     async def process_about_channel(callback: types.CallbackQuery, state: FSMContext):
         await _exit_support_if_needed(state)
         await _clear_email_prompt(callback.message.chat.id, callback.from_user.id)
-        await async_log("INFO", f"{callback.from_user.id} нажал 'О канале'")
-        text, photo = await _get_about_content()
-
-        if photo:
-            try:
-                if text and len(text) > 1024:
-                    await _edit_to_photo_screen(callback.message, photo, "", main_menu())
-                    await callback.message.answer(text, reply_markup=main_menu(), disable_web_page_preview=True)
-                else:
-                    await _edit_to_photo_screen(callback.message, photo, text or "", main_menu())
-            except Exception as e:
-                await async_log("WARNING", f"about_photo send failed: {e}")
-                await _edit_to_text_screen(callback.message, text, main_menu())
-        else:
-            await _edit_to_text_screen(callback.message, text, main_menu())
+        await async_log("INFO", f"{callback.from_user.id} нажал 'Пользовательское соглашение'")
+        
+        agreement_text = (
+            "📄 Пользовательское соглашение\n\n"
+            "1. Термины и определения\n"
+            "1.1. Оферта – настоящее Пользовательское соглашение.\n"
+            "1.2. Сервис – Telegram-бот @food_vip_robot, принадлежащий Исполнителю и предназначенный для продажи Товара.\n"
+            "1.3. Пользователь – любое физическое лицо, акцептовавшее (принявшее) настоящую Оферту.\n"
+            "1.4. Товар – Курс.\n"
+            "1.5. Акцепт Оферты – совершение Пользователем оплаты Товара через Сервис.\n\n"
+            "2. Предмет Оферты\n"
+            "2.1. Исполнитель обязуется предоставить Пользователю Товар в количестве, выбранном и оплаченном Пользователем.\n"
+            "2.2. Сервис @food_vip_robot является независимой площадкой и не является аффилированным лицом Telegram FZ-LLC.\n\n"
+            "3. Порядок оплаты\n"
+            "3.1. Стоимость определяется в интерфейсе Сервиса перед оплатой.\n"
+            "3.2. Минимальная сумма: 3100 рублей.\n"
+            "3.3. Оплата: 100% предоплата через MulenPay (СБП).\n"
+            "3.4. Зачисление: автоматически в течение 1-5 минут.\n\n"
+            "4. Возврат\n"
+            "4.1. Возврат невозможен после предоставления ссылки на вступление.\n"
+            "4.2. Возврат 100% при техническом сбое.\n\n"
+            "5. Ответственность\n"
+            "5.1. Исполнитель не несет ответственности за действия платформы Telegram.\n\n"
+            "6. Поддержка\n"
+            "6.1. Контакт: @managerr_info\n\n"
+            "Полная версия: https://telegra.ph/User-Agreement-Food-VIP-Bot"
+        )
+        
+        await _edit_to_text_screen(callback.message, agreement_text, main_menu())
         await callback.answer()
 
     # ===================== Поддержка (переключение без новых сообщений) =====================
@@ -653,40 +666,13 @@ def setup_public_handlers(dp: Dispatcher, bot):
                     ],
                 )
                 payment_url = response["paymentUrl"]
-                
-                # Получаем прямую ссылку qr.nspk.ru через /sbp endpoint
-                import re
-                import httpx
-                qr_link = payment_url  # По умолчанию виджет
-                
-                uuid_match = re.search(r'/payment/widget/([a-f0-9-]+)', payment_url)
-                if uuid_match:
-                    payment_uuid = uuid_match.group(1)
-                    
-                    # Ждём немного, чтобы система подготовила платёж
-                    await asyncio.sleep(2)
-                    
-                    # Запрашиваем /sbp endpoint для получения прямой QR-ссылки
-                    sbp_url = f'https://mulenpay.ru/payment/widget/{payment_uuid}/sbp'
-                    
-                    try:
-                        async with httpx.AsyncClient() as client:
-                            sbp_response = await client.get(sbp_url, timeout=5)
-                            if sbp_response.status_code == 200:
-                                sbp_data = sbp_response.json()
-                                if sbp_data.get('success') and sbp_data.get('sbp'):
-                                    qr_payload = sbp_data.get('data', {}).get('qrpayload', '')
-                                    if qr_payload:
-                                        qr_link = qr_payload
-                    except Exception as e:
-                        print(f"Ошибка получения QR-ссылки: {e}")
 
                 keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
                         [
                             InlineKeyboardButton(
                                 text="💳 Перейти к оплате",
-                                url=qr_link
+                                url=payment_url
                             )
                         ],
                         [
@@ -761,40 +747,13 @@ def setup_public_handlers(dp: Dispatcher, bot):
                 ],
             )
             payment_url = response["paymentUrl"]
-            
-            # Получаем прямую ссылку qr.nspk.ru через /sbp endpoint
-            import re
-            import httpx
-            qr_link = payment_url  # По умолчанию виджет
-            
-            uuid_match = re.search(r'/payment/widget/([a-f0-9-]+)', payment_url)
-            if uuid_match:
-                payment_uuid = uuid_match.group(1)
-                
-                # Ждём немного, чтобы система подготовила платёж
-                await asyncio.sleep(2)
-                
-                # Запрашиваем /sbp endpoint для получения прямой QR-ссылки
-                sbp_url = f'https://mulenpay.ru/payment/widget/{payment_uuid}/sbp'
-                
-                try:
-                    async with httpx.AsyncClient() as client:
-                        sbp_response = await client.get(sbp_url, timeout=5)
-                        if sbp_response.status_code == 200:
-                            sbp_data = sbp_response.json()
-                            if sbp_data.get('success') and sbp_data.get('sbp'):
-                                qr_payload = sbp_data.get('data', {}).get('qrpayload', '')
-                                if qr_payload:
-                                    qr_link = qr_payload
-                except Exception as e:
-                    print(f"Ошибка получения QR-ссылки: {e}")
 
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
                             text="💳 Перейти к оплате",
-                            url=qr_link
+                            url=payment_url
                         )
                     ],
                     [
