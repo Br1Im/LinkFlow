@@ -49,6 +49,10 @@ class SupportUserFSM(StatesGroup):
     waiting_message = State()
 
 
+class PaymentFSM(StatesGroup):
+    waiting_amount = State()
+
+
 class SupportAdminFSM(StatesGroup):
     waiting_reply = State()
 
@@ -294,12 +298,27 @@ def setup_public_handlers(dp: Dispatcher, bot):
         await _exit_support_if_needed(state)
         await _clear_email_prompt(callback.message.chat.id, callback.from_user.id)
         await async_log("INFO", f"{callback.from_user.id} нажал 'Подписка'")
+        
+        # Показываем информацию о стоимости
+        pricing_text = (
+            "💰 Стоимость курса\n\n"
+            "🔹 Базовая стоимость курса: 3000 рублей\n"
+            "🔹 Дополнительно: 100 рублей/сутки персональное ведение\n"
+            "🔹 Количество максимальных дней: 20\n\n"
+            "💡 Итого: от 3000 до 5000 рублей\n"
+            "(3000 + 100×количество дней персонального ведения)"
+        )
+        
+        kb = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(text="💳 Ввести сумму", callback_data="enter_amount")],
+            [types.InlineKeyboardButton(text="↩️ Назад", callback_data="back_to_main")]
+        ])
+        
         photo = await _welcome_photo()
-        kb = tariff_menu(TARIFFS)
         if photo:
-            await _edit_to_photo_screen(callback.message, photo, "💰 Выберите тариф:", kb)
+            await _edit_to_photo_screen(callback.message, photo, pricing_text, kb)
         else:
-            await _edit_to_text_screen(callback.message, "💰 Выберите тариф:", kb)
+            await _edit_to_text_screen(callback.message, pricing_text, kb)
         await callback.answer()
 
     @dp.callback_query(lambda c: c.data == "about_channel")
@@ -322,6 +341,87 @@ def setup_public_handlers(dp: Dispatcher, bot):
         else:
             await _edit_to_text_screen(callback.message, text, main_menu())
         await callback.answer()
+
+    # ===================== Кастомный payment flow =====================
+
+    @dp.callback_query(lambda c: c.data == "enter_amount")
+    async def enter_amount(callback: types.CallbackQuery, state: FSMContext):
+        await _clear_email_prompt(callback.message.chat.id, callback.from_user.id)
+        await state.set_state(PaymentFSM.waiting_amount)
+        
+        amount_text = (
+            "💰 Введите сумму для оплаты курса\n\n"
+            "🔹 Базовая стоимость: 3000 рублей\n"
+            "🔹 + 100 рублей за каждый день персонального ведения (макс. 20 дней)\n\n"
+            "💡 Примеры:\n"
+            "• 3000 руб. — только курс\n"
+            "• 3500 руб. — курс + 5 дней ведения\n"
+            "• 5000 руб. — курс + 20 дней ведения\n\n"
+            "Введите итоговую сумму числом:"
+        )
+        
+        kb = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_payment")]
+        ])
+        
+        photo = await _welcome_photo()
+        if photo:
+            await _edit_to_photo_screen(callback.message, photo, amount_text, kb)
+        else:
+            await _edit_to_text_screen(callback.message, amount_text, kb)
+        await callback.answer()
+
+    @dp.callback_query(lambda c: c.data == "cancel_payment")
+    async def cancel_payment(callback: types.CallbackQuery, state: FSMContext):
+        await state.clear()
+        await _clear_email_prompt(callback.message.chat.id, callback.from_user.id)
+        photo = await _welcome_photo()
+        if photo:
+            await _edit_to_photo_screen(callback.message, photo, config.WELCOME_TEXT, main_menu())
+        else:
+            await _edit_to_text_screen(callback.message, config.WELCOME_TEXT, main_menu())
+        await callback.answer()
+
+    @dp.message(PaymentFSM.waiting_amount)
+    async def process_amount_input(message: types.Message, state: FSMContext):
+        from tariffs import calculate_tariff
+        
+        try:
+            amount = int(message.text.strip())
+        except ValueError:
+            await message.answer("⚠️ Пожалуйста, введите число (например: 3000)")
+            return
+        
+        tariff_info, error = calculate_tariff(amount)
+        
+        if error:
+            await message.answer(f"⚠️ {error}\n\nПопробуйте ещё раз:")
+            return
+        
+        # Сохраняем сумму и тариф
+        user_id = message.from_user.id
+        storage[user_id] = {
+            "tariff": "custom",
+            "amount": amount,
+            "tariff_info": tariff_info
+        }
+        
+        await state.clear()
+        
+        # Показываем способы оплаты
+        methods = await get_payment_methods(enabled_only=True)
+        if not methods:
+            await message.answer(
+                "⚠️ Сейчас ни один способ оплаты не включён. Напишите в поддержку: " + config.SUPPORT_CONTACT,
+                reply_markup=main_menu(),
+            )
+            return
+        
+        description = tariff_info['description']
+        payment_text = f"✅ Выбрано: {description}\n💰 Сумма: {amount} руб.\n\nВыберите способ оплаты:"
+        
+        kb = payment_methods("custom", methods)
+        await message.answer(payment_text, reply_markup=kb)
 
     # ===================== Поддержка (переключение без новых сообщений) =====================
 
