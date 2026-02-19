@@ -25,7 +25,7 @@ print("=" * 100)
 print("10 ЗАПРОСОВ К PAYZTEAM API (2500-3000 RUB)")
 print("=" * 100)
 
-for i, amount in enumerate(amounts, 1):
+for i, amount in enumerate(amounts, 1):вфы
     print(f"\n{'=' * 100}")
     print(f"ЗАПРОС #{i}: {amount} RUB")
     print(f"{'=' * 100}")

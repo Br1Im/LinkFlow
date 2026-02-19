@@ -1,0 +1,5 @@
+{
+"name": "Cryptoliqbez",
+"script": "run.py",
+"interpreter": "python3.11"
+}

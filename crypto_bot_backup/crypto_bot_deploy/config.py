@@ -24,13 +24,11 @@ def _get_int(name: str, default: int = 0) -> int:
         return default
 
 
-from typing import Optional, List, Dict
-
-def _get_list_int(name: str, default: Optional[List[int]] = None) -> List[int]:
+def _get_list_int(name: str, default: list[int] | None = None) -> list[int]:
     raw = os.getenv(name, "")
     if not raw:
         return default or []
-    out: List[int] = []
+    out: list[int] = []
     for item in raw.replace(";", ",").split(","):
         item = item.strip()
         if not item:
@@ -59,22 +57,22 @@ REMINDER_DAYS = _get_int("REMINDER_DAYS", 1)
 CHANNEL_LINK = os.getenv("CHANNEL_LINK", "https://t.me/your_channel")
 
 WELCOME_TEXT = os.getenv("WELCOME_TEXT") or (
-    "🌐Здравствуйте! Рады видеть Вас в боте платных подписок.\n\n"
-    "Мы предоставляем доступ к эксклюзивному контенту🔹\n\n"
-    "Для оплаты нажмите кнопку «Подписка».\n\n"
+    "От создателей КриптоЛикбез и Первого Биткоина рады приветствовать Вас в нашем курсе✅\n\n"
+    "Здесь мы разберем что такое криптовалюты и как на ней зарабатывают\n\n"
+    "Для оплаты нажмите кнопку «Подписка».\n"
     "После оплаты Вам будет предоставлена ссылка для вступления🤝\n\n"
     "ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ ПО РАБОТЕ С ПЕРСОНАЛЬНЫМИ ДАННЫМИ ПОЛЬЗОВАТЕЛЕЙ\n"
     "https://telegra.ph/POLITIKA-KONFIDENCIALNOSTI-PO-RABOTE-S-PERSONALNYMI-DANNYMI-POLZOVATELEJ-03-30"
 )
 
 CHANNEL_TEXT = os.getenv(
-    "CHANNEL_TEXT") or ("📺 О нашем канале:\n"
+    "CHANNEL_TEXT") or ("📺 О нашем курсе:\n"
     "Мы предоставляем эксклюзивный контент для подписчиков:\n"
-    "🔹 Свежие новости из мира криптовалют\n"
-    "🔹 Аналитика и прогнозы от экспертов\n"
-    "🔹 Сигналы на сделки (BTC, ETH, альткоины)\n"
-    "🔹 Обзоры перспективных проектов (ICO, NFT, DeFi)\n"
-    "🔹 Обучение и гайды для новичков и профи\n\n"
+    "🔹 Основы криптовалют и блокчейна\n"
+    "🔹 Как зарабатывать на криптовалютах\n"
+    "🔹 Анализ рынка и стратегии\n"
+    "🔹 Безопасность и хранение активов\n"
+    "🔹 Персональное ведение и поддержка\n\n"
     f"Присоединяйтесь: {CHANNEL_LINK}"
 )
 
@@ -137,7 +135,7 @@ IM_RESULT_URL = os.getenv("IM_RESULT_URL", "")
 
 
 # -------------- Tribute --------------
-def _parse_tribute_links(raw: str) -> Dict[int, str]:
+def _parse_tribute_links(raw: str) -> dict[int, str]:
     """
     Ждём формат в .env:
 
@@ -147,7 +145,7 @@ def _parse_tribute_links(raw: str) -> Dict[int, str]:
     Разделитель между парами — запятая,
     внутри пары: СУММА=ССЫЛКА.
     """
-    result: Dict[int, str] = {}
+    result: dict[int, str] = {}
     if not raw:
         return result
     for part in raw.split(","):
@@ -166,6 +164,6 @@ def _parse_tribute_links(raw: str) -> Dict[int, str]:
 
 
 TRIBUTE_API_KEY = os.getenv("TRIBUTE_API_KEY", "")
-TRIBUTE_SUB_LINKS: Dict[int, str] = _parse_tribute_links(
+TRIBUTE_SUB_LINKS: dict[int, str] = _parse_tribute_links(
     os.getenv("TRIBUTE_SUB_LINKS", "")
 )
