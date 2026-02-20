@@ -54,6 +54,7 @@ async def _ensure_default_payment_methods():
         ("ton", "💎 Toncoin (TON)", 30),
         ("im", "IntellectMoney (карта / СБП)", 40),
         ("tribute", "TriBute (карта / СБП)", 50),
+        ("mp", "💳 MulenPay (СБП)", 15),
     ]
     for code, title, sort_order in defaults:
         if code in existing:
