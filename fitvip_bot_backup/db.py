@@ -48,6 +48,7 @@ async def _ensure_default_payment_methods():
 
     defaults = [
         ("yookassa", "\U0001f1f7\U0001f1fa YooKassa (RUB)", 10),
+        ("mp", "💳 MulenPay (СБП)", 15),
         ("stars", "⭐ Telegram Stars", 20),
         ("ton", "💎 Toncoin (TON)", 30),
         ("im", "IntellectMoney (карта / СБП)", 40),

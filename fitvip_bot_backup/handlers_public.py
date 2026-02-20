@@ -750,6 +750,21 @@ def setup_public_handlers(dp: Dispatcher, bot):
         # делегируем обработку email в модуль payments.yookassa
         await pay_yookassa.process_email(message, storage, bot)
 
+    # ---------- MulenPay check payment ----------
+    @dp.callback_query(lambda c: c.data.startswith("check_mp:"))
+    async def check_mulenpay_payment(callback: types.CallbackQuery):
+        """Проверка статуса платежа MulenPay"""
+        from .payments import mulenpay
+        
+        parts = callback.data.split(":")
+        if len(parts) < 3:
+            return await callback.answer("Некорректные данные", show_alert=True)
+        
+        payment_id = parts[1]
+        amount = parts[2]
+        
+        await mulenpay.check_payment_status(callback, payment_id, amount, bot)
+
     # ---------- Профиль ----------
 
     @dp.callback_query(lambda c: c.data == "profile")

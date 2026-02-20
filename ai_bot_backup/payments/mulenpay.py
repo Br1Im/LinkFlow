@@ -14,10 +14,10 @@ from .base import register_payment
 # Импортируем MulenPayClient из локального файла
 from .mulenpay_client import MulenPayClient
 
-# TODO: Заменить на реальные ключи для crypto-bot
-MULENPAY_SECRET_KEY = '09a9972a4245b55339f9233cbd4b2edfe2a81a3f2cde4fcf9d67298298ad00ee'
-MULENPAY_PRIVATE_KEY2 = 'aFZRjeQm4YQcZpN1kfqVJJsWGGkQrMPdH5U3elaQ3455b840'
-MULENPAY_SHOP_ID = '322'
+# TODO: Заменить на реальные ключи для ai-bot
+MULENPAY_SECRET_KEY = 'ff689d0f8856f0dde5f6ead000f05c6dacae22ec6600cdbb2290b3f13cb069c9'
+MULENPAY_PRIVATE_KEY2 = 'NcvxkxQ1pdiV5BooSHbf804ersg4iGLXJdgYNjugecc5acb2'
+MULENPAY_SHOP_ID = '321'
 
 mp = MulenPayClient(secret_key=MULENPAY_SECRET_KEY)
 
@@ -32,10 +32,10 @@ async def start_payment(callback, state, storage, bot, tariff, user_id, helpers)
         user_data = storage.get(user_id, {})
         amount = user_data.get("amount", 3000)
         tariff_info = user_data.get("tariff_info", {})
-        description = tariff_info.get("description", "Курс по криптовалютам")
+        description = tariff_info.get("description", "Курс по AI")
     else:
         amount = TARIFFS[tariff]["price"]
-        description = f"Курс по криптовалютам - {tariff}"
+        description = f"Курс по AI - {tariff}"
     
     order_id = f"{user_id}_{tariff}_{uuid.uuid4().hex[:8]}"
     
