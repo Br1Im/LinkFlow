@@ -49,8 +49,8 @@ async def start_payment(callback, state, storage, bot, tariff, user_id, helpers)
             description=description,
         )
         
-        payment_id = response["payment"]["id"]
-        payment_url = response["payment"]["url"]
+        payment_id = response["id"]
+        payment_url = response["paymentUrl"]
         
         # Сохраняем платёж в БД
         await register_payment(
