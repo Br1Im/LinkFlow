@@ -466,8 +466,9 @@ def create_qr_payment():
     mp_client = MulenPayClient(secret_key=secret_key)
     
     try:
-        # Создаем платеж
-        response = run_async(mp_client.create_payment(
+        # Создаем платеж используя asyncio.run вместо run_async
+        import asyncio
+        response = asyncio.run(mp_client.create_payment(
             private_key2="nVT5DyeFCJGMe04THqN8hE7usCTiiSpuHiOHdWkac9f96f48",
             currency="rub",
             amount=str(amount),
@@ -909,6 +910,178 @@ def set_requisite_source():
         return jsonify({
             'success': False,
             'error': str(e)
+        }), 500
+
+
+@app.route('/api/create-bot-payment/<bot_name>', methods=['POST'])
+def create_bot_payment(bot_name):
+    """Создать платеж через MulenPay для конкретного бота и получить прямую QR-ссылку
+    
+    Поддерживаемые боты: nutrition, crypto, ai, fitvip
+    
+    Request:
+        {
+            "amount": 3000
+        }
+    
+    Response:
+        {
+            "success": true,
+            "qr_link": "https://qr.nspk.ru/...",
+            "widget_url": "https://mulenpay.ru/payment/widget/UUID",
+            "payment_id": "123456",
+            "amount": 3000,
+            "bot_name": "crypto"
+        }
+    """
+    import re
+    import requests
+    import time
+    import uuid as uuid_lib
+    
+    # Словарь с credentials для каждого бота
+    BOT_CREDENTIALS = {
+        'nutrition': {
+            'shopId': '280',
+            'secret_key': 'b48d74485fcf7b4a2cade546bdebcaf3692945ffeeb7ff98729a758f6322684c',
+            'private_key2': 'nVT5DyeFCJGMe04THqN8hE7usCTiiSpuHiOHdWkac9f96f48'
+        },
+        'crypto': {
+            'shopId': '322',
+            'secret_key': '09a9972a4245b55339f9233cbd4b2edfe2a81a3f2cde4fcf9d67298298ad00ee',
+            'private_key2': 'aFZRjeQm4YQcZpN1kfqVJJsWGGkQrMPdH5U3elaQ3455b840'
+        },
+        'ai': {
+            'shopId': '321',
+            'secret_key': 'ff689d0f8856f0dde5f6ead000f05c6dacae22ec6600cdbb2290b3f13cb069c9',
+            'private_key2': 'NcvxkxQ1pdiV5BooSHbf804ersg4iGLXJdgYNjugecc5acb2'
+        },
+        'fitvip': {
+            'shopId': '320',
+            'secret_key': '3f1d3205d7b3254348b62975ce3c8c856f4772aeb83a9a3e6317ded80be556a2',
+            'private_key2': 'Z1xK2O43vfGaFVLlVXg5sLtkPutjJnjphufzjySv162b051e'
+        }
+    }
+    
+    # Валидация bot_name
+    if bot_name not in BOT_CREDENTIALS:
+        return jsonify({
+            'success': False,
+            'error': f'Invalid bot name. Must be one of: {", ".join(BOT_CREDENTIALS.keys())}'
+        }), 400
+    
+    data = request.get_json()
+    amount = data.get('amount')
+    
+    if not amount:
+        return jsonify({
+            'success': False,
+            'error': 'amount is required'
+        }), 400
+    
+    try:
+        amount = int(amount)
+        if amount < 100 or amount > 120000:
+            return jsonify({
+                'success': False,
+                'error': 'Amount must be between 100 and 120000 RUB'
+            }), 400
+    except ValueError:
+        return jsonify({
+            'success': False,
+            'error': 'Invalid amount format'
+        }), 400
+    
+    # Получаем credentials для выбранного бота
+    credentials = BOT_CREDENTIALS[bot_name]
+    
+    # Импортируем MulenPay клиент
+    sys.path.insert(0, os.path.dirname(__file__))
+    from mulenpay import MulenPayClient
+    
+    # Создаем MulenPay клиент с credentials бота
+    mp_client = MulenPayClient(secret_key=credentials['secret_key'])
+    
+    try:
+        # Создаем платеж
+        response = run_async(mp_client.create_payment(
+            private_key2=credentials['private_key2'],
+            currency="rub",
+            amount=str(amount),
+            uuid=str(uuid_lib.uuid4()),
+            shopId=credentials['shopId'],
+            description=f"Платеж {amount} руб. ({bot_name})",
+            items=[
+                {
+                    "description": f"Платеж {amount} руб.",
+                    "quantity": 1,
+                    "price": str(amount),
+                    "vat_code": 0,
+                    "payment_subject": 1,
+                    "payment_mode": 1,
+                }
+            ],
+        ))
+        
+        payment_id = response.get('id')
+        widget_url = response.get('paymentUrl')
+        
+        if not widget_url:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to create payment',
+                'bot_name': bot_name
+            }), 500
+        
+        # Извлекаем UUID из URL виджета
+        uuid_match = re.search(r'/payment/widget/([a-f0-9-]+)', widget_url)
+        if not uuid_match:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid widget URL format',
+                'widget_url': widget_url,
+                'bot_name': bot_name
+            }), 500
+        
+        payment_uuid = uuid_match.group(1)
+        
+        # Ждём немного, чтобы система подготовила платёж
+        time.sleep(2)
+        
+        # Запрашиваем /sbp endpoint для получения прямой QR-ссылки
+        sbp_url = f'https://mulenpay.ru/payment/widget/{payment_uuid}/sbp'
+        
+        sbp_response = requests.get(sbp_url, timeout=5)
+        if sbp_response.status_code == 200:
+            sbp_data = sbp_response.json()
+            if sbp_data.get('success') and sbp_data.get('sbp'):
+                qr_payload = sbp_data.get('data', {}).get('qrpayload', '')
+                if qr_payload:
+                    return jsonify({
+                        'success': True,
+                        'qr_link': qr_payload,
+                        'widget_url': widget_url,
+                        'payment_id': payment_id,
+                        'amount': amount,
+                        'bot_name': bot_name
+                    })
+        
+        # Если не удалось получить QR-ссылку, возвращаем виджет
+        return jsonify({
+            'success': True,
+            'qr_link': widget_url,  # Fallback на виджет
+            'widget_url': widget_url,
+            'payment_id': payment_id,
+            'amount': amount,
+            'bot_name': bot_name,
+            'warning': 'Failed to get direct QR link, returning widget URL'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'bot_name': bot_name
         }), 500
 
 

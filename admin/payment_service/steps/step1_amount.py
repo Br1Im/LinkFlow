@@ -290,11 +290,97 @@ async def process_step1(page: Page, amount: int, log_func) -> dict:
             }
         
         # Клик по кнопке
-        await page.locator('#pay').evaluate('el => el.click()')
-        log("Кнопка Продолжить нажата", "SUCCESS")
+        log("Нажимаю кнопку Продолжить...", "DEBUG")
         
-        await page.wait_for_url('**/sender-details**', timeout=10000)
-        log("Переход на страницу заполнения данных", "SUCCESS")
+        # Проверяем и закрываем модалки перед кликом
+        try:
+            modal_closed = await page.evaluate("""
+                () => {
+                    const buttons = document.querySelectorAll('button[buttontext="Понятно"]');
+                    let closed = false;
+                    buttons.forEach(btn => {
+                        if (btn.textContent.includes('Понятно')) {
+                            btn.click();
+                            closed = true;
+                        }
+                    });
+                    return closed;
+                }
+            """)
+            if modal_closed:
+                log("Модалка закрыта перед кликом", "WARNING")
+                await page.wait_for_timeout(300)
+        except:
+            pass
+        
+        # Пробуем разные способы клика
+        click_success = False
+        for method in ['evaluate', 'click', 'force']:
+            try:
+                if method == 'evaluate':
+                    await page.locator('#pay').evaluate('el => el.click()')
+                elif method == 'click':
+                    await page.locator('#pay').click(timeout=2000)
+                elif method == 'force':
+                    await page.locator('#pay').click(force=True, timeout=2000)
+                
+                log(f"Кнопка Продолжить нажата ({method})", "SUCCESS")
+                click_success = True
+                break
+            except Exception as e:
+                log(f"Метод {method} не сработал: {e}", "WARNING")
+                await page.wait_for_timeout(200)
+        
+        if not click_success:
+            log("Не удалось нажать кнопку Продолжить", "ERROR")
+            return {
+                'success': False,
+                'time': time.time() - start_time,
+                'error': 'Не удалось нажать кнопку Продолжить'
+            }
+        
+        # Ждём навигацию с увеличенным таймаутом и обработкой ошибок
+        try:
+            await page.wait_for_url('**/sender-details**', timeout=15000)
+            log("Переход на страницу заполнения данных", "SUCCESS")
+        except Exception as e:
+            # Проверяем текущий URL
+            current_url = page.url
+            log(f"Таймаут навигации. Текущий URL: {current_url}", "WARNING")
+            
+            # Если уже на нужной странице - это успех
+            if 'sender-details' in current_url:
+                log("Уже на странице sender-details", "SUCCESS")
+            else:
+                # Проверяем наличие модалок
+                modal_info = await page.evaluate("""
+                    () => {
+                        const modals = document.querySelectorAll('[role="dialog"], .modal, [class*="modal"]');
+                        if (modals.length > 0) {
+                            return {
+                                found: true,
+                                count: modals.length,
+                                text: Array.from(modals).map(m => m.textContent.substring(0, 100)).join(' | ')
+                            };
+                        }
+                        return { found: false };
+                    }
+                """)
+                
+                if modal_info.get('found'):
+                    log(f"Обнаружена модалка: {modal_info.get('text', '')[:200]}", "ERROR")
+                    return {
+                        'success': False,
+                        'time': time.time() - start_time,
+                        'error': f'Модалка блокирует навигацию: {modal_info.get("text", "")[:100]}'
+                    }
+                else:
+                    log(f"Навигация не произошла. URL: {current_url}", "ERROR")
+                    return {
+                        'success': False,
+                        'time': time.time() - start_time,
+                        'error': f'Timeout навигации. URL: {current_url}'
+                    }
         
         elapsed_time = time.time() - start_time
         log(f"⏱️ Этап 1 занял: {elapsed_time:.2f}s", "INFO")

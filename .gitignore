@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
+venv/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -20,10 +23,19 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
-venv/
-ENV/
-env/
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+admin/current_payment_logs.json
+
+# Screenshots
+screenshots/
+admin/screenshots/
 
 # IDE
 .vscode/
@@ -32,28 +44,36 @@ env/
 *.swo
 *~
 
-# Screenshots
-screenshots/
-admin/screenshots/
-!screenshots/.gitkeep
-
-# Logs
-*.log
-admin/current_payment_logs.json
-
 # OS
 .DS_Store
 Thumbs.db
 
-# Docker
-.dockerignore
+# Playwright
+.playwright/
 
 # Temporary files
 *.tmp
-/tmp/
+*.bak
+*.old
 
-# Database (keep linkflow.db for local testing)
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
+# Test files (keep only essential ones)
+test_*.py
+!test_create_qr_remote.py
+!test_all_bots_payment.py
+
+# Bots (moved to separate folder)
+bots/
+
+# Deployment
+deploy_*.ps1
+upload_*.bat
+nginx_*.conf
+
+# Excel
+*.xlsx
+*.xls
+
+# Text reports
+*.txt
+!requirements.txt
+!requirements_playwright.txt
