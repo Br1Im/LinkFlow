@@ -297,7 +297,7 @@ if __name__ == "__main__":
     print("Результат создания платежа:")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     
-    # Если платеж создан успешно
+    # Если платеж создан успешно 
     if result.get("success"):
         deal_id = result.get("id")
         print(f"\nID платежа: {deal_id}")

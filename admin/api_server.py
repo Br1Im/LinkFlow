@@ -204,21 +204,21 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
     # Запускаем запросы к API параллельно в зависимости от requisite_api
     h2h_future = None
     payzteam_future = None
-    requisite_source = "database"  # По умолчанию из БД
+    requisite_source = "api"  # Реквизиты только от API
     
-    # Если реквизиты не указаны явно, получаем от API
+    # ВАЖНО: Реквизиты берутся ТОЛЬКО от API, БД НЕ используется!
     if not card_number or not owner_name:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             if requisite_api == 'auto':
-                # В AUTO режиме используем get_payzteam_requisite, которая сама делает fallback H2H -> PayzTeam
-                log("Запускаю запрос в AUTO режиме (H2H -> PayzTeam fallback)...", "INFO")
-                h2h_future = executor.submit(get_payzteam_requisite, amount)
+                # В AUTO режиме запускаем оба API параллельно
+                log("Запускаю запросы к H2H и PayzTeam API параллельно...", "INFO")
+                h2h_future = executor.submit(get_h2h_requisite, amount)
+                payzteam_future = executor.submit(get_payzteam_requisite, amount)
             elif requisite_api == 'h2h':
                 log("Запускаю запрос к H2H API...", "INFO")
                 h2h_future = executor.submit(get_h2h_requisite, amount)
             elif requisite_api == 'payzteam':
                 log("Запускаю запрос к PayzTeam API...", "INFO")
-                payzteam_future = executor.submit(get_payzteam_requisite, amount)
                 payzteam_future = executor.submit(get_payzteam_requisite, amount)
     
     # Создаем платеж (первый этап начнется сразу)
@@ -386,7 +386,7 @@ def get_qr_link():
     sbp_url = f'https://mulenpay.ru/payment/widget/{payment_uuid}/sbp'
     
     try:
-        sbp_response = requests.get(sbp_url, timeout=5)
+        sbp_response = requests.get(sbp_url, timeout=15)
         if sbp_response.status_code == 200:
             sbp_data = sbp_response.json()
             if sbp_data.get('success') and sbp_data.get('sbp'):
@@ -995,92 +995,44 @@ def create_bot_payment(bot_name):
     # Получаем credentials для выбранного бота
     credentials = BOT_CREDENTIALS[bot_name]
     
-    # Импортируем MulenPay клиент
-    sys.path.insert(0, os.path.dirname(__file__))
-    from mulenpay import MulenPayClient
-    
-    # Создаем MulenPay клиент с credentials бота
-    mp_client = MulenPayClient(secret_key=credentials['secret_key'])
-    
     try:
-        # Создаем платеж
-        response = run_async(mp_client.create_payment(
-            private_key2=credentials['private_key2'],
-            currency="rub",
-            amount=str(amount),
-            uuid=str(uuid_lib.uuid4()),
-            shopId=credentials['shopId'],
-            description=f"Платеж {amount} руб. ({bot_name})",
-            items=[
-                {
-                    "description": f"Платеж {amount} руб.",
-                    "quantity": 1,
-                    "price": str(amount),
-                    "vat_code": 0,
-                    "payment_subject": 1,
-                    "payment_mode": 1,
-                }
-            ],
-        ))
+        # Импортируем функцию с retry-логикой
+        from api_server_bot_payment_retry import create_bot_payment_with_retry
         
-        payment_id = response.get('id')
-        widget_url = response.get('paymentUrl')
+        print(f"[INFO] Starting payment creation for {bot_name}, amount: {amount}")
         
-        if not widget_url:
+        # Вызываем функцию с retry
+        success, data, status_code = create_bot_payment_with_retry(bot_name, amount, credentials)
+        
+        print(f"[INFO] Payment function returned: success={success}, status={status_code}")
+        print(f"[INFO] Response data keys: {list(data.keys()) if isinstance(data, dict) else 'NOT A DICT'}")
+        
+        # Проверяем, что data - это словарь
+        if not isinstance(data, dict):
+            print(f"[ERROR] Response data is not a dict: {type(data)}")
             return jsonify({
                 'success': False,
-                'error': 'Failed to create payment',
-                'bot_name': bot_name
+                'error': 'Internal error: invalid response format'
             }), 500
         
-        # Извлекаем UUID из URL виджета
-        uuid_match = re.search(r'/payment/widget/([a-f0-9-]+)', widget_url)
-        if not uuid_match:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid widget URL format',
-                'widget_url': widget_url,
-                'bot_name': bot_name
-            }), 500
+        # Логируем перед отправкой
+        print(f"[INFO] Sending JSON response with status {status_code}")
         
-        payment_uuid = uuid_match.group(1)
+        response = jsonify(data)
+        print(f"[INFO] JSON response created successfully")
         
-        # Ждём немного, чтобы система подготовила платёж
-        time.sleep(2)
-        
-        # Запрашиваем /sbp endpoint для получения прямой QR-ссылки
-        sbp_url = f'https://mulenpay.ru/payment/widget/{payment_uuid}/sbp'
-        
-        sbp_response = requests.get(sbp_url, timeout=5)
-        if sbp_response.status_code == 200:
-            sbp_data = sbp_response.json()
-            if sbp_data.get('success') and sbp_data.get('sbp'):
-                qr_payload = sbp_data.get('data', {}).get('qrpayload', '')
-                if qr_payload:
-                    return jsonify({
-                        'success': True,
-                        'qr_link': qr_payload,
-                        'widget_url': widget_url,
-                        'payment_id': payment_id,
-                        'amount': amount,
-                        'bot_name': bot_name
-                    })
-        
-        # Если не удалось получить QR-ссылку, возвращаем виджет
-        return jsonify({
-            'success': True,
-            'qr_link': widget_url,  # Fallback на виджет
-            'widget_url': widget_url,
-            'payment_id': payment_id,
-            'amount': amount,
-            'bot_name': bot_name,
-            'warning': 'Failed to get direct QR link, returning widget URL'
-        })
+        return response, status_code
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"[ERROR] Exception in bot payment endpoint:")
+        print(error_details)
+        
         return jsonify({
             'success': False,
             'error': str(e),
+            'error_type': type(e).__name__,
             'bot_name': bot_name
         }), 500
 

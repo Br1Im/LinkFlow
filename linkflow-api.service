@@ -1,0 +1,17 @@
+[Unit]
+Description=LinkFlow API Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/LinkFlow
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/usr/local/bin/python3.11 /root/LinkFlow/admin/api_server.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/root/LinkFlow/admin/api_server.log
+StandardError=append:/root/LinkFlow/admin/api_server.log
+
+[Install]
+WantedBy=multi-user.target

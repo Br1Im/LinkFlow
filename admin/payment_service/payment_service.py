@@ -608,14 +608,21 @@ class PaymentService:
         # Очищаем логи перед началом нового платежа
         current_payment_logs.clear()
         
-        requisite_source = "database"  # По умолчанию из БД
+        requisite_source = "none"  # Реквизиты только от API, БД не используется
         
-        # Если реквизиты не указаны и есть future - будем ждать H2H API после этапа 1
+        # Если реквизиты не указаны и есть future - будем ждать API после этапа 1
         if not card_number or not owner_name:
-            if h2h_future:
-                log(f"Начало создания платежа: {amount}₽, реквизиты будут получены от H2H API", "INFO")
+            if h2h_future or payzteam_future:
+                log(f"Начало создания платежа: {amount}₽, реквизиты будут получены от API", "INFO")
             else:
-                log(f"Начало создания платежа: {amount}₽, реквизиты будут взяты из БД", "INFO")
+                log(f"❌ ОШИБКА: Реквизиты не указаны и API не запрошены", "ERROR")
+                return {
+                    'success': False,
+                    'error': 'Реквизиты должны быть получены от H2H или PayzTeam API',
+                    'time': 0,
+                    'requisite_source': 'none',
+                    'logs': current_payment_logs.copy()
+                }
         else:
             log(f"Начало создания платежа: {amount}₽, карта {card_number}, владелец {owner_name}", "INFO")
             requisite_source = "manual"  # Указаны вручную
