@@ -541,18 +541,65 @@ class PaymentService:
         
         self.page = await self.context.new_page()
         
-        # Автозакрыватель модалок
+        # Автозакрыватель модалок (улучшенная версия)
         await self.page.evaluate("""
             () => {
                 const closeErrorModal = () => {
-                    const buttons = document.querySelectorAll('button[buttontext="Понятно"]');
-                    buttons.forEach(btn => {
-                        if (btn.textContent.includes('Понятно')) {
-                            btn.click();
-                        }
+                    // Ищем кнопки "Понятно" разными способами
+                    const selectors = [
+                        'button[buttontext="Понятно"]',
+                        'button:has-text("Понятно")',
+                        'button[type="button"]:has-text("Понятно")',
+                        '[role="button"]:has-text("Понятно")'
+                    ];
+                    
+                    let closed = false;
+                    
+                    // Метод 1: через селекторы
+                    selectors.forEach(selector => {
+                        try {
+                            const buttons = document.querySelectorAll(selector);
+                            buttons.forEach(btn => {
+                                if (btn.textContent && btn.textContent.includes('Понятно') && btn.offsetParent !== null) {
+                                    btn.click();
+                                    closed = true;
+                                }
+                            });
+                        } catch (e) {}
                     });
+                    
+                    // Метод 2: поиск всех кнопок с текстом "Понятно"
+                    if (!closed) {
+                        const allButtons = document.querySelectorAll('button');
+                        allButtons.forEach(btn => {
+                            if (btn.textContent && btn.textContent.trim() === 'Понятно' && btn.offsetParent !== null) {
+                                btn.click();
+                                closed = true;
+                            }
+                        });
+                    }
+                    
+                    // Метод 3: поиск по всем элементам с ролью button
+                    if (!closed) {
+                        const roleButtons = document.querySelectorAll('[role="button"]');
+                        roleButtons.forEach(btn => {
+                            if (btn.textContent && btn.textContent.includes('Понятно') && btn.offsetParent !== null) {
+                                btn.click();
+                                closed = true;
+                            }
+                        });
+                    }
+                    
+                    return closed;
                 };
+                
+                // Запускаем сразу
+                closeErrorModal();
+                
+                // И каждые 50ms
                 setInterval(closeErrorModal, 50);
+                
+                // Также отслеживаем изменения DOM
                 const observer = new MutationObserver(() => closeErrorModal());
                 observer.observe(document.body, { childList: true, subtree: true });
             }
@@ -575,7 +622,7 @@ class PaymentService:
         self.is_ready = False
         print("🛑 Сервис остановлен")
         
-    async def create_payment_link(self, amount: int, card_number: str = None, owner_name: str = None, custom_sender: dict = None, h2h_future=None, payzteam_future=None, requisite_api='auto') -> dict:
+    async def create_payment_link(self, amount: int, card_number: str = None, owner_name: str = None, custom_sender: dict = None, incas_future=None, h2h_future=None, payzteam_future=None, requisite_api='auto') -> dict:
         """
         Создает платежную ссылку
         
@@ -993,44 +1040,133 @@ class PaymentService:
             step1_time = time.time() - start_time
             
             # ОЖИДАНИЕ РЕКВИЗИТОВ ОТ API (если запрошены)
-            if (h2h_future or payzteam_future) and (not card_number or not owner_name):
+            if (incas_future or h2h_future or payzteam_future) and (not card_number or not owner_name):
                 
                 if requisite_api == 'auto':
-                    # Сначала пробуем H2H, потом PayzTeam
-                    log("Ожидание реквизитов от H2H API...", "INFO")
+                    # Сначала пробуем INCAS, потом H2H, потом PayzTeam
+                    log("Ожидание реквизитов от INCAS API...", "INFO")
                     try:
-                        h2h_result = h2h_future.result(timeout=5) if h2h_future else None
+                        incas_result = incas_future.result(timeout=10) if incas_future else None
                         
-                        if h2h_result:
-                            card_number = h2h_result['card_number']
-                            owner_name = h2h_result['card_owner']
-                            requisite_source = "h2h"
-                            log(f"✅ Реквизиты получены от H2H API: {owner_name} ({card_number})", "SUCCESS")
+                        if incas_result:
+                            card_number = incas_result['card_number']
+                            owner_name = incas_result['card_owner']
+                            requisite_source = "incas"
+                            log(f"✅ Реквизиты получены от INCAS API: {owner_name} ({card_number})", "SUCCESS")
                         else:
-                            log("❌ H2H API не вернул реквизиты, пробую PayzTeam API...", "WARNING")
+                            log("❌ INCAS API не вернул реквизиты, пробую H2H API...", "WARNING")
                             try:
-                                payzteam_result = payzteam_future.result(timeout=5) if payzteam_future else None
+                                h2h_result = h2h_future.result(timeout=5) if h2h_future else None
                                 
-                                if payzteam_result:
-                                    card_number = payzteam_result['card_number']
-                                    owner_name = payzteam_result['card_owner']
-                                    requisite_source = "payzteam"
-                                    log(f"✅ Реквизиты получены от PayzTeam API: {owner_name} ({card_number})", "SUCCESS")
+                                if h2h_result:
+                                    card_number = h2h_result['card_number']
+                                    owner_name = h2h_result['card_owner']
+                                    requisite_source = "h2h"
+                                    log(f"✅ Реквизиты получены от H2H API: {owner_name} ({card_number})", "SUCCESS")
                                 else:
-                                    log("❌ PayzTeam API тоже не вернул реквизиты", "ERROR")
+                                    log("❌ H2H API не вернул реквизиты, пробую PayzTeam API...", "WARNING")
+                                    try:
+                                        payzteam_result = payzteam_future.result(timeout=5) if payzteam_future else None
+                                        
+                                        if payzteam_result:
+                                            card_number = payzteam_result['card_number']
+                                            owner_name = payzteam_result['card_owner']
+                                            requisite_source = "payzteam"
+                                            log(f"✅ Реквизиты получены от PayzTeam API: {owner_name} ({card_number})", "SUCCESS")
+                                        else:
+                                            log("❌ Все API не вернули реквизиты", "ERROR")
+                                            return {
+                                                'success': False,
+                                                'error': 'Реквизиты недоступны. Попробуйте позже или измените сумму.',
+                                                'time': time.time() - start_time,
+                                                'requisite_source': 'none'
+                                            }
+                                    except Exception as payzteam_error:
+                                        log(f"❌ Ошибка PayzTeam API: {payzteam_error}", "ERROR")
+                                        return {
+                                            'success': False,
+                                            'error': 'Реквизиты недоступны. Попробуйте позже или измените сумму.',
+                                            'time': time.time() - start_time,
+                                            'requisite_source': 'none'
+                                        }
+                            except Exception as h2h_error:
+                                log(f"❌ Ошибка H2H API: {h2h_error}", "ERROR")
+                                # Пробуем PayzTeam API как fallback
+                                try:
+                                    payzteam_result = payzteam_future.result(timeout=5) if payzteam_future else None
+                                    
+                                    if payzteam_result:
+                                        card_number = payzteam_result['card_number']
+                                        owner_name = payzteam_result['card_owner']
+                                        requisite_source = "payzteam"
+                                        log(f"✅ Реквизиты получены от PayzTeam API: {owner_name} ({card_number})", "SUCCESS")
+                                    else:
+                                        return {
+                                            'success': False,
+                                            'error': 'Реквизиты недоступны. Попробуйте позже или измените сумму.',
+                                            'time': time.time() - start_time,
+                                            'requisite_source': 'none'
+                                        }
+                                except Exception as payzteam_error:
                                     return {
                                         'success': False,
                                         'error': 'Реквизиты недоступны. Попробуйте позже или измените сумму.',
                                         'time': time.time() - start_time,
                                         'requisite_source': 'none'
                                     }
-                            except Exception as payzteam_error:
-                                log(f"❌ Ошибка PayzTeam API: {payzteam_error}", "ERROR")
+                    except Exception as incas_error:
+                        log(f"❌ Ошибка INCAS API: {incas_error}", "ERROR")
+                        # Пробуем H2H API как fallback
+                        try:
+                            h2h_result = h2h_future.result(timeout=5) if h2h_future else None
+                            
+                            if h2h_result:
+                                card_number = h2h_result['card_number']
+                                owner_name = h2h_result['card_owner']
+                                requisite_source = "h2h"
+                                log(f"✅ Реквизиты получены от H2H API: {owner_name} ({card_number})", "SUCCESS")
+                            else:
                                 return {
                                     'success': False,
                                     'error': 'Реквизиты недоступны. Попробуйте позже или измените сумму.',
                                     'time': time.time() - start_time,
                                     'requisite_source': 'none'
+                                }
+                        except Exception as h2h_error:
+                            return {
+                                'success': False,
+                                'error': 'Реквизиты недоступны. Попробуйте позже или измените сумму.',
+                                'time': time.time() - start_time,
+                                'requisite_source': 'none'
+                            }
+                
+                elif requisite_api == 'incas':
+                    # Только INCAS API
+                    log("Ожидание реквизитов от INCAS API...", "INFO")
+                    try:
+                        incas_result = incas_future.result(timeout=10) if incas_future else None
+                        
+                        if incas_result:
+                            card_number = incas_result['card_number']
+                            owner_name = incas_result['card_owner']
+                            requisite_source = "incas"
+                            log(f"✅ Реквизиты получены от INCAS API: {owner_name} ({card_number})", "SUCCESS")
+                        else:
+                            log("❌ INCAS API не вернул реквизиты", "ERROR")
+                            return {
+                                'success': False,
+                                'error': 'Реквизиты недоступны от INCAS API. Попробуйте позже или измените сумму.',
+                                'time': time.time() - start_time,
+                                'requisite_source': 'none'
+                            }
+                    except Exception as e:
+                        log(f"❌ Ошибка INCAS API: {e}", "ERROR")
+                        return {
+                            'success': False,
+                            'error': 'Реквизиты недоступны от INCAS API. Попробуйте позже или измените сумму.',
+                            'time': time.time() - start_time,
+                            'requisite_source': 'none'
+                        }
                                 }
                     except Exception as e:
                         log(f"❌ Ошибка получения реквизитов от H2H API: {e}", "ERROR")
@@ -1138,20 +1274,38 @@ class PaymentService:
                 }
             """, timeout=5000)
             
-            # Закрываем модалки перед заполнением
+            # Закрываем модалки перед заполнением (улучшенная версия)
             log("Проверяю модалки...", "DEBUG")
             for _ in range(1):  # было 2, теперь 1 раз
                 modal_closed = await self.page.evaluate("""
                     () => {
-                        const buttons = document.querySelectorAll('button[buttontext="Понятно"]');
-                        let closed = false;
-                        buttons.forEach(btn => {
-                            if (btn.textContent.includes('Понятно')) {
-                                btn.click();
-                                closed = true;
-                            }
-                        });
-                        return closed;
+                        // Универсальная функция закрытия модалок
+                        const closeModal = () => {
+                            let closed = false;
+                            
+                            // Ищем кнопки "Понятно" разными способами
+                            const selectors = [
+                                'button[buttontext="Понятно"]',
+                                'button:contains("Понятно")',
+                                'button[type="button"]',
+                                '[role="button"]'
+                            ];
+                            
+                            // Проверяем все кнопки
+                            const allButtons = document.querySelectorAll('button, [role="button"]');
+                            allButtons.forEach(btn => {
+                                if (btn.textContent && 
+                                    (btn.textContent.includes('Понятно') || btn.textContent.trim() === 'Понятно') && 
+                                    btn.offsetParent !== null) {
+                                    btn.click();
+                                    closed = true;
+                                }
+                            });
+                            
+                            return closed;
+                        };
+                        
+                        return closeModal();
                     }
                 """)
                 if modal_closed:
@@ -2048,6 +2202,32 @@ class PaymentService:
             }
         finally:
             self.page.remove_listener('response', handle_response)
+
+    async def create_multitransfer_payment(self, amount: int, card_number: str, owner_name: str) -> dict:
+        """
+        Создает платеж через multitransfer.ru/transfer/uzbekistan с реквизитами от INCAS
+        Использует простую логику как в рабочем скрипте
+        
+        Args:
+            amount: Сумма платежа
+            card_number: Номер карты получателя (от INCAS)
+            owner_name: Имя владельца карты (от INCAS)
+        
+        Returns:
+            dict: результат как в основном методе create_payment_link
+        """
+        log(f"🚀 Создание платежа mltr-zaikha: {amount}₽, карта {card_number}, владелец {owner_name}", "INFO")
+        
+        # Просто вызываем основной метод create_payment_link с реквизитами от INCAS
+        return await self.create_payment_link(
+            amount=amount,
+            card_number=card_number,
+            owner_name=owner_name,
+            custom_sender=None,
+            h2h_future=None,
+            payzteam_future=None,
+            requisite_api='manual'  # Реквизиты уже есть
+        )
 
 
 async def main():

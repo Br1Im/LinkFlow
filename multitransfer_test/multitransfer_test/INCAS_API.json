@@ -1,0 +1,198 @@
+[
+  {
+    "title": "Description of the flow process",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/Description-of-the-flow-process\" aria-label=\"tag/Description-of-the-flow-process\"></a>Description of the flow process</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"> <h2>Authentification</h2> Please note that accessToken-based authentication is used to interact with the system.<br> <h2>Payments via payment form<"
+  },
+  {
+    "title": "Statuses and structure of operations",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/Statuses-and-structure-of-operations\" aria-label=\"tag/Statuses-and-structure-of-operations\"></a>Statuses and structure of operations</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"> <h2>Statuses of operations (payments, payouts, refunds)</h2> <img src=\"statuses.png\"> </div></div>"
+  },
+  {
+    "title": "Callbacks",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/Callbacks\" aria-label=\"tag/Callbacks\"></a>Callbacks</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"><p> Notification goes to an URL which merchant provides upon integration process, or to <b>callbackUrl</b> parameter from the original request. Notification is a POST request with JSON body with the data equivalent"
+  },
+  {
+    "title": "Card encryption",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/Card-encryption\" aria-label=\"tag/Card-encryption\"></a>Card encryption</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"> <h3>JSON card data object</h3> Example:<br> <code> { \t\"pan\": \"4111111111111111\", \t\"cvv\": \"123\", \t\"exp_month\": 12, \t\"exp_year\": 2030 } </code> <br><br> This object must be encrypted by RSA_OAEP wi"
+  },
+  {
+    "title": "Errors",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/Errors\" aria-label=\"tag/Errors\"></a>Errors</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"> <table> <tbody> <tr> <th>Error code</th> <th>HTTP code</th> <th>Error code description</th> </tr> <tr> <td>0</td> <td>200</td> <td>Successful operation.</td> </tr> <tr> <td colspan=\"3\"><strong>Validation errors</strong></t"
+  },
+  {
+    "title": "orders",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/orders\" aria-label=\"tag/orders\"></a>orders</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"><p>Orders operations</p>\n</div></div>"
+  },
+  {
+    "title": "Create order by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/orders/paths/~1orders~1{orderId}/put\" aria-label=\"tag/orders/paths/~1orders~1{orderId}/put\"></a>Create order by ID </h2><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHptR kNXOKB\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://www.w3.org/2000/svg\" y=\"0\" aria-hidden=\"tru"
+  },
+  {
+    "title": "Find order by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/orders/paths/~1orders~1{orderId}/get\" aria-label=\"tag/orders/paths/~1orders~1{orderId}/get\"></a>Find order by ID </h2><div class=\"sc-bVVIoq bxAVpD\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya\"><p>Find by order</p>\n</div></div><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHpt"
+  },
+  {
+    "title": "Confirm order by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/orders/paths/~1orders~1{orderId}~1confirm/post\" aria-label=\"tag/orders/paths/~1orders~1{orderId}~1confirm/post\"></a>Confirm order by ID </h2><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHptR kNXOKB\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://www.w3.org/2000/svg\" y"
+  },
+  {
+    "title": "Cancel order by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/orders/paths/~1orders~1{orderId}~1cancel/post\" aria-label=\"tag/orders/paths/~1orders~1{orderId}~1cancel/post\"></a>Cancel order by ID </h2><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHptR kNXOKB\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://www.w3.org/2000/svg\" y=\"0"
+  },
+  {
+    "title": "payments",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/payments\" aria-label=\"tag/payments\"></a>payments</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"><p>Payments operations</p>\n</div></div>"
+  },
+  {
+    "title": "Create payment by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/payments/paths/~1payments~1{paymentId}/put\" aria-label=\"tag/payments/paths/~1payments~1{paymentId}/put\"></a>Create payment by ID </h2><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHptR kNXOKB\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://www.w3.org/2000/svg\" y=\"0\" ar"
+  },
+  {
+    "title": "Find payment by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/payments/paths/~1payments~1{paymentId}/get\" aria-label=\"tag/payments/paths/~1payments~1{paymentId}/get\"></a>Find payment by ID </h2><div class=\"sc-bVVIoq bxAVpD\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya\"><p>Returns a single payment</p>\n</div></div><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:"
+  },
+  {
+    "title": "Confirm payment by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/payments/paths/~1payments~1{paymentId}~1confirm/post\" aria-label=\"tag/payments/paths/~1payments~1{paymentId}~1confirm/post\"></a>Confirm payment by ID </h2><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHptR kNXOKB\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://www.w3.o"
+  },
+  {
+    "title": "Find refunds of payment by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/payments/paths/~1payments~1{paymentId}~1refunds/get\" aria-label=\"tag/payments/paths/~1payments~1{paymentId}~1refunds/get\"></a>Find refunds of payment by ID </h2><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHptR kNXOKB\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://ww"
+  },
+  {
+    "title": "refunds",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/refunds\" aria-label=\"tag/refunds\"></a>refunds</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"><p>Refunds operations</p>\n</div></div>"
+  },
+  {
+    "title": "Create or update refund by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/refunds/paths/~1refunds~1{refundId}/put\" aria-label=\"tag/refunds/paths/~1refunds~1{refundId}/put\"></a>Create or update refund by ID </h2><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHptR kNXOKB\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://www.w3.org/2000/svg\" y=\"0\""
+  },
+  {
+    "title": "Find refund by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/refunds/paths/~1refunds~1{refundId}/get\" aria-label=\"tag/refunds/paths/~1refunds~1{refundId}/get\"></a>Find refund  by ID </h2><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHptR kNXOKB\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://www.w3.org/2000/svg\" y=\"0\" aria-hidde"
+  },
+  {
+    "title": "payouts",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/payouts\" aria-label=\"tag/payouts\"></a>payouts</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"><p>Payout operations</p>\n</div></div>"
+  },
+  {
+    "title": "Create payout by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/payouts/paths/~1payouts~1{payoutId}/put\" aria-label=\"tag/payouts/paths/~1payouts~1{payoutId}/put\"></a>Create payout by ID </h2><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHptR kNXOKB\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://www.w3.org/2000/svg\" y=\"0\" aria-hidd"
+  },
+  {
+    "title": "Find payout by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/payouts/paths/~1payouts~1{payoutId}/get\" aria-label=\"tag/payouts/paths/~1payouts~1{payoutId}/get\"></a>Find payout by ID </h2><div class=\"sc-bVVIoq bxAVpD\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya\"><p>Find by payout</p>\n</div></div><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\""
+  },
+  {
+    "title": "accounts",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/accounts\" aria-label=\"tag/accounts\"></a>accounts</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"><p>Your acoounts</p>\n</div></div>"
+  },
+  {
+    "title": "Get your accounts",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/accounts/paths/~1accounts/get\" aria-label=\"tag/accounts/paths/~1accounts/get\"></a>Get your accounts </h2><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizations:</h5><svg class=\"sc-cwHptR kNXOKB\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://www.w3.org/2000/svg\" y=\"0\" aria-hidden=\"true\"><polygon poi"
+  },
+  {
+    "title": "keys",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/keys\" aria-label=\"tag/keys\"></a>keys</h2></div></div><div class=\"sc-fqkvVR wnFnm\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya redoc-markdown \"><p>Public keys</p>\n</div></div>"
+  },
+  {
+    "title": "Get current keys",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/keys/paths/~1keys/get\" aria-label=\"tag/keys/paths/~1keys/get\"></a>Get current keys </h2><div class=\"sc-bVVIoq bxAVpD\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya\"><p>w/o authorization</p>\n</div></div><div><h3 class=\"sc-fMMURN ciDERN\">Responses</h3><div><button class=\"sc-kzqdkY fZRtWb\"><svg class=\"sc-cwHptR ehtaAK\" version=\"1.1\" viewBox=\"0 0 24 24\" x=\"0\" xmlns=\"http://ww"
+  },
+  {
+    "title": "dictionary/banks",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/dictionarybanks\" aria-label=\"tag/dictionarybanks\"></a>dictionary/banks</h2></div></div>"
+  },
+  {
+    "title": "Get available bank IDs",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/dictionarybanks/paths/~1dictionary~1banks/get\" aria-label=\"tag/dictionarybanks/paths/~1dictionary~1banks/get\"></a>Get available bank IDs </h2><div class=\"sc-bVVIoq bxAVpD\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya\"><p>Get available banks</p>\n</div></div><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA hjazRA\">Authorizat"
+  },
+  {
+    "title": "Get bank info by ID",
+    "method": "",
+    "path": "",
+    "description": "",
+    "html": "<div class=\"sc-kAyceB XMnSL\"><div class=\"sc-fqkvVR cEAxIC\"><h2 class=\"sc-jXbUNg copjkU\"><a class=\"sc-jlZhew jrsfjb\" href=\"#tag/dictionarybanks/paths/~1dictionary~1banks~1{bankId}/get\" aria-label=\"tag/dictionarybanks/paths/~1dictionary~1banks~1{bankId}/get\"></a>Get bank info by ID </h2><div class=\"sc-bVVIoq bxAVpD\"><div class=\"sc-eeDRCY sc-eBMEME gvJSKt hzUya\"><p>Get bank info by ID</p>\n</div></div><div class=\"sc-jaXxmE cDocAe\"><div class=\"sc-iMTnTL fJRIzN\"><h5 class=\"sc-dAlyuH sc-hwdzOV hNlDMA h"
+  }
+]

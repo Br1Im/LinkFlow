@@ -168,7 +168,7 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
     """Создание платежа через Playwright
     
     Args:
-        requisite_api: 'auto' (INCAS -> H2H -> PayzTeam), 'incas' (только INCAS), 'h2h' (только H2H), 'payzteam' (только PayzTeam)
+        requisite_api: 'auto' (H2H -> PayzTeam), 'h2h' (только H2H), 'payzteam' (только PayzTeam)
     """
     import time
     import concurrent.futures
@@ -179,7 +179,6 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'payment_service'))
     from h2h_api import get_h2h_requisite
     from payzteam_api import get_payzteam_requisite
-    from incas_api import get_incas_requisite
     
     log(f"Создаю платеж через Playwright: amount={amount}, orderId={order_id}, requisite_api={requisite_api}", "INFO")
     if custom_sender:
@@ -203,7 +202,6 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
         run_async(payment_service.start(headless=True))
     
     # Запускаем запросы к API параллельно в зависимости от requisite_api
-    incas_future = None
     h2h_future = None
     payzteam_future = None
     requisite_source = "api"  # Реквизиты только от API
@@ -212,12 +210,10 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
     if not card_number or not owner_name:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             if requisite_api == 'auto':
-                # В AUTO режиме сначала пробуем INCAS, потом H2H, потом PayzTeam
-                log("Запускаю запрос к INCAS API...", "INFO")
-                incas_future = executor.submit(get_incas_requisite, amount)
-            elif requisite_api == 'incas':
-                log("Запускаю запрос к INCAS API...", "INFO")
-                incas_future = executor.submit(get_incas_requisite, amount)
+                # В AUTO режиме запускаем оба API параллельно
+                log("Запускаю запросы к H2H и PayzTeam API параллельно...", "INFO")
+                h2h_future = executor.submit(get_h2h_requisite, amount)
+                payzteam_future = executor.submit(get_payzteam_requisite, amount)
             elif requisite_api == 'h2h':
                 log("Запускаю запрос к H2H API...", "INFO")
                 h2h_future = executor.submit(get_h2h_requisite, amount)
@@ -233,7 +229,6 @@ def create_payment_playwright(amount, order_id, card_number, owner_name, custom_
             card_number=card_number,
             owner_name=owner_name,
             custom_sender=custom_sender,
-            incas_future=incas_future,
             h2h_future=h2h_future,
             payzteam_future=payzteam_future,
             requisite_api=requisite_api
@@ -1138,10 +1133,23 @@ def test_payzteam_requisite():
         }), 500
 
 
+
+
 @app.route('/api/create-payment/mltr-zaikha', methods=['POST'])
 def create_payment_mltr_zaikha():
-    """Создать платеж через INCAS API + Playwright для multitransfer abkhazia
-    
+    """Тестовый эндпоинт для multitransfer abkhazia"""
+    return jsonify({
+        'success': True,
+        'message': 'Тест платёжной ссылки',
+        'endpoint': 'mltr-zaikha'
+    }), 200
+
+
+
+@app.route('/api/create-incas-payment', methods=['POST'])
+def create_incas_payment():
+    """Создать платеж через INCAS API и получить реквизиты для P2P перевода
+
     Request:
         {
             "amount": 1000
@@ -1150,22 +1158,24 @@ def create_payment_mltr_zaikha():
     Response:
         {
             "success": true,
-            "qr_link": "https://qr.nspk.ru/...",
-            "payment_id": "ORDER_20260305_123456",
+            "payment_id": "payment_20260307_194028",
+            "txn_id": "8260664563300001018",
+            "order_id": "order_0fe4b0914166457b",
             "amount": 1000,
-            "card_number": "8600123456789012",
-            "card_owner": "IVANOV IVAN IVANOVICH",
-            "payment_time": 18.5,
-            "status": "completed",
-            "endpoint": "mltr-zaikha"
+            "currency": "RUB",
+            "status": "PENDING",
+            "card_number": "9860146822978020",
+            "card_holder": "FARRUHJON BAHRAMOV",
+            "bank": "uz_garant",
+            "qr_data": "https://pay.payloop.tv/transfer?...",
+            "payment_instructions": "Переводите только через Т-БАНК..."
         }
     """
     import requests
     import json
-    import time
-    import uuid
     from datetime import datetime
-    
+    import uuid
+
     data = request.get_json()
     amount = data.get('amount')
 
@@ -1177,10 +1187,10 @@ def create_payment_mltr_zaikha():
 
     try:
         amount = float(amount)
-        if amount < 100 or amount > 120000:
+        if amount < 100 or amount > 50000:
             return jsonify({
                 'success': False,
-                'error': 'Amount must be between 100 and 120000 RUB'
+                'error': 'Amount must be between 100 and 50000 RUB'
             }), 400
     except ValueError:
         return jsonify({
@@ -1188,33 +1198,23 @@ def create_payment_mltr_zaikha():
             'error': 'Invalid amount format'
         }), 400
 
-    start_time = time.time()
-    
-    # Генерируем ID платежа
-    order_id = f"ORDER_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
-    log(f"🚀 Создание платежа mltr-zaikha: amount={amount}, order_id={order_id}", "INFO")
-
-    # ЭТАП 1: Получаем реквизиты от INCAS API
-    log("📋 Получение реквизитов от INCAS API...", "INFO")
-    
     # INCAS API конфигурация
     API_URL = "https://gate.incas.world/v1"
     BEARER_TOKEN = "axLhH837yWpg3lzfs3tShn3KV"
 
-    # Генерируем уникальные ID для INCAS
+    # Генерируем уникальные ID
     payment_id = f"payment_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    incas_order_id = f"order_{uuid.uuid4().hex[:16]}"
+    order_id = f"order_{uuid.uuid4().hex[:16]}"
 
     headers = {
         "Authorization": f"Bearer {BEARER_TOKEN}",
         "Content-Type": "application/json"
     }
 
-    # Данные запроса к INCAS
+    # Данные запроса
     payload = {
-        "orderId": incas_order_id,
-        "description": f"Multitransfer payment {amount} RUB",
+        "orderId": order_id,
+        "description": f"Payment {amount} RUB",
         "autoConfirm": False,
         "returnUrl": "https://your-site.com/return",
         "callbackUrl": "https://webhook.site/unique-url",
@@ -1235,151 +1235,64 @@ def create_payment_mltr_zaikha():
     }
 
     url = f"{API_URL}/payments/{payment_id}"
-    
+
     try:
-        # Запрос к INCAS API
-        incas_response = requests.put(
+        response = requests.put(
             url,
             headers=headers,
             json=payload,
             timeout=30
         )
 
-        if incas_response.status_code != 200:
-            log(f"❌ INCAS API ошибка: {incas_response.status_code}", "ERROR")
+        if response.status_code == 200:
+            data = response.json()
+            
+            if 'object' in data:
+                obj = data['object']
+                payment_data = obj.get('paymentData', {}).get('object', {})
+                
+                return jsonify({
+                    'success': True,
+                    'payment_id': obj.get('paymentId'),
+                    'txn_id': obj.get('txnId'),
+                    'order_id': obj.get('orderId'),
+                    'amount': amount,
+                    'currency': 'RUB',
+                    'status': obj.get('status', {}).get('value'),
+                    'card_number': payment_data.get('credentials'),
+                    'card_holder': payment_data.get('description'),
+                    'bank': payment_data.get('bank'),
+                    'qr_data': payment_data.get('qrData'),
+                    'payment_instructions': payment_data.get('paymentInstructions', {}).get('value', ''),
+                    'created_at': obj.get('createdAt')
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid response format from INCAS API'
+                }), 500
+        else:
+            error_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
             return jsonify({
                 'success': False,
-                'error': f'INCAS API error: {incas_response.status_code}',
-                'endpoint': 'mltr-zaikha'
+                'error': f'INCAS API error: {response.status_code}',
+                'details': error_data
             }), 500
-
-        incas_data = incas_response.json()
-        
-        if 'object' not in incas_data:
-            log("❌ INCAS API: неверный формат ответа", "ERROR")
-            return jsonify({
-                'success': False,
-                'error': 'Invalid response format from INCAS API',
-                'endpoint': 'mltr-zaikha'
-            }), 500
-
-        obj = incas_data['object']
-        payment_data = obj.get('paymentData', {}).get('object', {})
-        
-        card_number = payment_data.get('credentials')
-        card_owner = payment_data.get('description')
-        
-        if not card_number or not card_owner:
-            log("❌ INCAS API: реквизиты не получены", "ERROR")
-            return jsonify({
-                'success': False,
-                'error': 'No requisites received from INCAS API',
-                'endpoint': 'mltr-zaikha'
-            }), 500
-        
-        log(f"✅ Реквизиты получены: {card_owner} ({card_number})", "SUCCESS")
 
     except requests.exceptions.Timeout:
-        log("❌ INCAS API: таймаут", "ERROR")
         return jsonify({
             'success': False,
-            'error': 'INCAS API timeout',
-            'endpoint': 'mltr-zaikha'
+            'error': 'Request timeout'
+        }), 500
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'error': 'Connection error'
         }), 500
     except Exception as e:
-        log(f"❌ INCAS API: {e}", "ERROR")
         return jsonify({
             'success': False,
-            'error': str(e),
-            'endpoint': 'mltr-zaikha'
-        }), 500
-
-    # ЭТАП 2: Создаем QR-ссылку через Playwright + multitransfer.ru
-    log("🎭 Создание QR-ссылки через Playwright...", "INFO")
-    
-    if not PLAYWRIGHT_AVAILABLE:
-        log("❌ Playwright недоступен", "ERROR")
-        return jsonify({
-            'success': False,
-            'error': 'Playwright not available',
-            'endpoint': 'mltr-zaikha'
-        }), 500
-
-    global payment_service
-    
-    # Ждем пока браузер будет готов
-    for wait_attempt in range(10):
-        if payment_service and payment_service.is_ready:
-            break
-        if wait_attempt == 0:
-            log("Ожидание готовности браузера...", "DEBUG")
-        time.sleep(0.5)
-    
-    if not payment_service or not payment_service.is_ready:
-        log("Запускаю браузер...", "INFO")
-        payment_service = PaymentService()
-        run_async(payment_service.start(headless=True))
-
-    # Создаем платеж через multitransfer.ru с полученными реквизитами
-    try:
-        result = run_async(
-            payment_service.create_multitransfer_payment(
-                amount=amount,
-                card_number=card_number,
-                owner_name=card_owner
-            )
-        )
-        
-        # Перезапускаем браузер для следующего платежа
-        try:
-            log("Перезапускаю браузер для следующего платежа...", "DEBUG")
-            run_async(payment_service.stop())
-            time.sleep(0.5)
-            run_async(payment_service.start(headless=True))
-            log("Браузер перезапущен", "SUCCESS")
-        except Exception as e:
-            log(f"Ошибка перезапуска браузера: {e}", "ERROR")
-
-        total_time = time.time() - start_time
-        
-        if result.get('success'):
-            log(f"✅ Платеж создан успешно за {total_time:.1f}с", "SUCCESS")
-            return jsonify({
-                'success': True,
-                'qr_link': result.get('qr_link'),
-                'payment_id': order_id,
-                'amount': amount,
-                'card_number': card_number,
-                'card_owner': card_owner,
-                'payment_time': total_time,
-                'status': 'completed',
-                'endpoint': 'mltr-zaikha'
-            }), 201
-        else:
-            log(f"❌ Ошибка создания платежа: {result.get('error')}", "ERROR")
-            return jsonify({
-                'success': False,
-                'error': result.get('error', 'Payment creation failed'),
-                'payment_id': order_id,
-                'amount': amount,
-                'card_number': card_number,
-                'card_owner': card_owner,
-                'payment_time': total_time,
-                'endpoint': 'mltr-zaikha'
-            }), 500
-            
-    except Exception as e:
-        total_time = time.time() - start_time
-        log(f"❌ Ошибка Playwright: {e}", "ERROR")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'payment_id': order_id,
-            'amount': amount,
-            'card_number': card_number,
-            'card_owner': card_owner,
-            'payment_time': total_time,
-            'endpoint': 'mltr-zaikha'
+            'error': str(e)
         }), 500
 
 
