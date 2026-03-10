@@ -1002,7 +1002,8 @@ def create_bot_payment(bot_name):
     
     try:
         # Импортируем функцию с retry-логикой
-        from api_server_bot_payment_retry import create_bot_payment_with_retry
+        sys.path.insert(0, os.path.dirname(__file__))
+        from api_server_bot_payment_retry_new import create_bot_payment_with_retry
         
         print(f"[INFO] Starting payment creation for {bot_name}, amount: {amount}")
         
