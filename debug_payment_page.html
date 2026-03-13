@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="/nova/img/icons/logo.svg">
+    <link rel="stylesheet" type="text/css" href="/nova/css/style.css">
+    <link rel="stylesheet" type="text/css" href="/nova/css/field-constructor.css">
+    <link rel="stylesheet" type="text/css" href="/nova/css/sbp.css">
+    <link rel="stylesheet" type="text/css" href="/nova/css/toastify.css">
+    <meta name="description" content="A payment form for secure transactions.">
+    <meta name="keywords" content="payments, checkout, security, PCI DSS">
+    <title>Payment Form</title>
+    <script src="/nova/js/toastify.js?v=20260120"></script>
+    <script src="/nova/js/theme.js?v=20260120"></script>
+    <script src="/nova/js/sbp.js?v=20260120"></script>
+    <script src="/nova/js/timer.js?v=20260120"></script>
+    <script src="/nova/js/qr-code.js?v=20260120"></script>
+    <script src="/nova/js/api.js?v=20260120" defer></script>
+    <script src="/nova/js/bank-list.js?v=20260120"></script>
+</head>
+<body class="theme-light">
+
+<script>const formJsonConfig = `{"success":true,"mobileBehavior":{"type":"bankList"},"fields":{"expiryDate":{"required":true,"allowExpiredCards":true},"cardCode":{"required":true,"format":3,"name":"CVV"},"additionalFields":[{"name":"card_holder","required":true,"regexp":"^(?! )(?!.* $)(?!.* {2,})[A-Za-z ]{2,48}$","id":"card-holder-field","labelText":"Cardholder name","placeholder":"In Latin letters"}]},"tooltip_title":"Oops…","tooltip_text":"This field is filled in incorrectly","created_at":1773044559,"valid_for_seconds":1800}`</script>
+<div id="app">
+    <main id="checklivestatus">
+        <div id="mainWrapper" class="main-wrapper">
+            <header class="header">
+                <nav>
+                    <a id="backLinkHeader" class="back-link_header" href="https://t.me/BridgeAPI_bot/failure">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                        Go back
+                    </a>
+                </nav>
+            </header>
+            <div id="formWrapper" class="form-wrapper">
+                <img class="ellipse-up" src="/nova/img/icons/ellipse-up-edited.png" alt="1Payment">
+                <form id="paymentFormSbp" class="payment-form" sendOnLoad>
+                    <header class="form-header">
+                        <div class="form-header_content">
+                            <div class="form-header_left">
+                                <label>
+    <span id="amount" class="form-header_amount">100.00</span>
+    <span id="currency" class="form-header_currency">₽</span>
+</label>
+                                <label><span id="payer"
+                                             class="form-header_payer"></span></label>
+                            </div>
+                            <div id="formIconSbp" class="form-header_right">
+                                <img id="logo" class="logo" src="/nova/img/icons/logo.svg" alt="Logo">
+                            </div>
+                        </div>
+                        <label><span id="description"
+                                     class="form-header_description"></span></label>
+                    </header>
+                    <section id="formQRCodeWrapper" class="form-qrcode_wrapper">
+                        <h3 class="form-qrcode_title">To pay, scan the QR code</h3>
+                        <p class="form-qrcode_text">Open your banking app and scan the QR code to pay.</p>
+                        <p class="form-button_notification"></p>
+                        <input type="hidden" name="doPayment">
+                    </section>
+                    <section class="bank-list-wrapper">
+                        <div class="bank-search-wrapper">
+                            <input name="bank_search"  id="bankSearch" placeholder="Search banks" type="text" class="bank-search">
+                            <img class="bank-search_icon" src="/nova/img/icons/webp/search.webp" alt="Bank search">
+                        </div>
+                        <ul id="bankList" class="bank-list"></ul>
+                        <p class="form-footer_notification"></p>
+                    </section>
+                    <footer class="form-footer form-footer-desktop">
+                        <div class="form-footer_content">
+                            <div class="form-footer_content-left-side">
+                                <img src="/nova/img/icons/webp/lock.webp" class="pci-icon" alt="PCI DSS">
+                                <p class="pci-text">Your data is protected by PCI DSS</p>
+                            </div>
+                            <div class="form-footer_content-right-side"><span class="form-footer_content-timer-text">Time left </span><span id="timer" class="form-footer_content-timer"></span></div>
+                        </div>
+                    </footer>
+                </form>
+                <img class="ellipse-down" src="/nova/img/icons/ellipse-down-edited.png" alt="Payment">
+                <div id="globalLoader" class="global-loader-wrapper">
+                    <div class="global-loader-content">
+                        <span class="global-loader"></span>
+                    </div>
+                </div>
+            </div>
+            <footer class="form-footer form-footer-mobile" id="formFooterMobile">
+                <div class="form-footer_content">
+                    <a id="backLink" class="back-link" href="https://t.me/BridgeAPI_bot/failure">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                        Go back
+                    </a>
+                </div>
+            </footer>
+        </div>
+    </main>
+</div>
+</body>
+</html>
